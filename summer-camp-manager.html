@@ -1,0 +1,1787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Summer Camp Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+  :root {
+    --green: #2D6A0F;
+    --green-mid: #4A8A22;
+    --green-light: #EBF5E1;
+    --green-border: #B8D99A;
+    --amber: #B06A10;
+    --amber-light: #FBF0E1;
+    --amber-border: #E0BC84;
+    --blue: #1A5EA8;
+    --blue-light: #E3EEFB;
+    --blue-border: #92BFEE;
+    --purple: #5046B8;
+    --purple-light: #EEECFD;
+    --purple-border: #B0AAEC;
+    --coral: #9A3320;
+    --coral-light: #FBEAE6;
+    --coral-border: #E8A898;
+    --teal: #0F6E56;
+    --teal-light: #E0F5EE;
+    --bg: #F5F7F2;
+    --surface: #FFFFFF;
+    --surface2: #F0F3EC;
+    --border: #DDE5D6;
+    --border-light: #EBF0E5;
+    --text: #1C2718;
+    --text-2: #5A6B52;
+    --text-3: #8A9E80;
+    --shadow: 0 1px 3px rgba(30,50,20,0.08), 0 1px 2px rgba(30,50,20,0.06);
+    --shadow-md: 0 4px 12px rgba(30,50,20,0.10), 0 2px 4px rgba(30,50,20,0.06);
+    --shadow-lg: 0 16px 40px rgba(30,50,20,0.14), 0 4px 8px rgba(30,50,20,0.08);
+    --radius: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 20px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  .app-shell { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 10;
+  }
+  .sidebar-logo {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .logo-mark {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: var(--green);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-size: 18px;
+  }
+  .logo-text { font-weight: 600; font-size: 15px; color: var(--text); line-height: 1.2; }
+  .logo-sub { font-size: 11px; color: var(--text-3); font-weight: 400; }
+
+  .sidebar-nav { padding: 12px 10px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    color: var(--text-2);
+    font-size: 14px;
+    font-weight: 400;
+    transition: all .15s;
+    margin-bottom: 2px;
+    border: none; background: none; width: 100%; text-align: left;
+  }
+  .nav-item i { font-size: 17px; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--green-light); color: var(--green); font-weight: 500; }
+  .nav-item.active i { color: var(--green); }
+
+  .sidebar-footer {
+    padding: 12px 10px 20px;
+    border-top: 1px solid var(--border-light);
+  }
+  .sync-status {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .sync-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #ccc;
+    flex-shrink: 0;
+  }
+  .sync-dot.connected { background: #4CAF50; }
+  .sync-dot.loading { background: var(--amber); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .main-content {
+    margin-left: 220px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  .top-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky; top: 0; z-index: 5;
+  }
+  .top-bar-title { font-size: 17px; font-weight: 600; flex: 1; }
+  .page { display: none; padding: 28px; }
+  .page.active { display: block; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn-primary {
+    background: var(--green); border-color: var(--green); color: #fff;
+  }
+  .btn-primary:hover { background: var(--green-mid); border-color: var(--green-mid); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-ghost { border-color: transparent; background: transparent; }
+  .btn-ghost:hover { background: var(--surface2); border-color: var(--border); }
+  .btn-danger { color: var(--coral); }
+  .btn-danger:hover { background: var(--coral-light); border-color: var(--coral-border); }
+
+  /* ── Stats ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .stat-label { font-size: 12px; color: var(--text-3); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; font-weight: 500; }
+  .stat-val { font-size: 28px; font-weight: 600; color: var(--text); line-height: 1; }
+  .stat-sub { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+
+  /* ── Toolbar ── */
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; }
+  .search-wrap i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 16px; pointer-events: none; }
+  .search-wrap input { padding-left: 34px; }
+  input, select, textarea {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    width: 100%;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--green-mid); box-shadow: 0 0 0 3px rgba(74,138,34,0.1); }
+  select { cursor: pointer; }
+
+  /* ── Camper cards ── */
+  .camper-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .camper-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    cursor: pointer;
+    transition: all .15s;
+    box-shadow: var(--shadow);
+    position: relative;
+  }
+  .camper-card:hover { border-color: var(--green-border); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 14px;
+    flex-shrink: 0;
+    border: 2px solid #fff;
+  }
+  .card-name { font-weight: 600; font-size: 15px; }
+  .card-sub { font-size: 12px; color: var(--text-3); }
+  .badges { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+  .badge {
+    font-size: 11px; padding: 2px 8px;
+    border-radius: 20px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 3px;
+  }
+  .badge-weekly { background: var(--green-light); color: var(--green); border: 1px solid var(--green-border); }
+  .badge-daily { background: var(--amber-light); color: var(--amber); border: 1px solid var(--amber-border); }
+  .badge-pre { background: var(--blue-light); color: var(--blue); border: 1px solid var(--blue-border); }
+  .badge-post { background: var(--purple-light); color: var(--purple); border: 1px solid var(--purple-border); }
+  .badge-allergy { background: var(--coral-light); color: var(--coral); border: 1px solid var(--coral-border); }
+  .week-info { font-size: 11px; color: var(--text-3); margin-bottom: 7px; display: flex; align-items: center; gap: 4px; }
+  .day-pills { display: flex; gap: 4px; }
+  .dp {
+    font-size: 11px; padding: 3px 7px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--text-3);
+    font-weight: 500;
+  }
+  .dp.on { background: var(--green-light); border-color: var(--green-border); color: var(--green); }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-3); grid-column: 1/-1; }
+  .empty-state i { font-size: 40px; display: block; margin-bottom: 10px; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(10,20,8,0.45);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100; padding: 20px;
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border);
+    width: 100%; max-width: 560px;
+    max-height: 90vh; overflow-y: auto;
+    padding: 24px;
+    box-shadow: var(--shadow-lg);
+    transform: translateY(16px) scale(.98);
+    transition: transform .2s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0) scale(1); }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .modal-title { font-size: 18px; font-weight: 600; }
+  .modal-close { background: none; border: none; cursor: pointer; color: var(--text-3); font-size: 20px; padding: 2px; border-radius: 6px; }
+  .modal-close:hover { background: var(--surface2); }
+  .form-section-label {
+    font-size: 11px; font-weight: 600; color: var(--text-3);
+    text-transform: uppercase; letter-spacing: .06em;
+    margin: 20px 0 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-light);
+  }
+  .form-section-label:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-group { margin-bottom: 12px; }
+  .form-label { font-size: 12px; color: var(--text-2); margin-bottom: 5px; display: block; font-weight: 500; }
+  .type-toggle { display: flex; gap: 8px; }
+  .type-opt {
+    flex: 1; padding: 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-align: center; cursor: pointer;
+    font-size: 13px; color: var(--text-2);
+    transition: all .15s; font-weight: 400;
+  }
+  .type-opt:hover { background: var(--surface2); }
+  .type-opt.sel-weekly { background: var(--green-light); border-color: var(--green-border); color: var(--green); font-weight: 500; }
+  .type-opt.sel-daily { background: var(--amber-light); border-color: var(--amber-border); color: var(--amber); font-weight: 500; }
+  .days-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; }
+  .day-sel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 4px; text-align: center;
+    cursor: pointer; font-size: 12px; font-weight: 500;
+    transition: all .15s; color: var(--text-2);
+    user-select: none;
+  }
+  .day-sel:hover:not(.dis) { background: var(--surface2); }
+  .day-sel.sel { background: var(--green-light); border-color: var(--green-border); color: var(--green); }
+  .day-sel.dis { opacity: .35; cursor: not-allowed; }
+  .care-day {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 4px; text-align: center;
+    cursor: pointer; font-size: 11px; font-weight: 500;
+    transition: all .15s; color: var(--text-2);
+    user-select: none;
+  }
+  .care-day:hover:not(.dis) { background: var(--surface2); }
+  .care-day.pre.sel { background: var(--blue-light); border-color: var(--blue-border); color: var(--blue); }
+  .care-day.post.sel { background: var(--purple-light); border-color: var(--purple-border); color: var(--purple); }
+  .care-day.dis { opacity: .35; cursor: not-allowed; }
+  .care-label { font-size: 12px; color: var(--text-2); font-weight: 500; margin-bottom: 6px; margin-top: 10px; display: flex; align-items: center; gap: 5px; }
+  .modal-footer { display: flex; gap: 8px; justify-content: space-between; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-light); }
+  .modal-footer-right { display: flex; gap: 8px; }
+
+  /* ── Calendar ── */
+  .cal-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .cal-title { font-size: 18px; font-weight: 600; flex: 1; }
+  .cal-sub { font-size: 12px; color: var(--text-3); font-weight: 400; }
+  .view-toggle { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .view-toggle-btn {
+    padding: 6px 14px; font-size: 13px; font-weight: 500;
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-2); font-family: 'DM Sans', sans-serif;
+    transition: all .15s;
+  }
+  .view-toggle-btn.active { background: var(--green); color: #fff; }
+  .view-toggle-btn:not(.active):hover { background: var(--surface2); }
+
+  /* Weekly view */
+  .cal-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; }
+  .cal-col { display: flex; flex-direction: column; gap: 8px; }
+  .cal-day-header {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 8px; text-align: center;
+    box-shadow: var(--shadow);
+  }
+  .cal-day-name { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+  .cal-day-num { font-size: 22px; font-weight: 700; line-height: 1.2; }
+  .cal-day-month { font-size: 11px; color: var(--text-3); }
+  .cal-today .cal-day-header { background: var(--green); border-color: var(--green); }
+  .cal-today .cal-day-name, .cal-today .cal-day-num, .cal-today .cal-day-month { color: #fff; }
+  .cal-entry {
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    border: 1px solid transparent;
+  }
+  .cal-entry-w { background: var(--green-light); border-color: var(--green-border); }
+  .cal-entry-d { background: var(--amber-light); border-color: var(--amber-border); }
+  .cal-entry-name { font-size: 12px; font-weight: 600; }
+  .cal-entry-tags { display: flex; gap: 3px; margin-top: 4px; flex-wrap: wrap; }
+  .cal-tag { font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 500; }
+  .ct-c { background: var(--green-light); color: var(--green); }
+  .ct-p { background: var(--blue-light); color: var(--blue); }
+  .ct-q { background: var(--purple-light); color: var(--purple); }
+  .cal-empty { font-size: 12px; color: var(--text-3); text-align: center; padding: 8px 0; }
+
+  /* Monthly view */
+  .month-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--border);
+  }
+  .month-dow {
+    background: var(--surface2);
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 11px; font-weight: 600;
+    color: var(--text-3);
+    text-transform: uppercase; letter-spacing: .05em;
+  }
+  .month-cell {
+    background: var(--surface);
+    min-height: 110px;
+    padding: 6px;
+    border-right: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-light);
+    position: relative;
+    vertical-align: top;
+  }
+  .month-cell.other-month { background: var(--bg); }
+  .month-cell.today { background: #F2FAF0; }
+  .month-cell-num {
+    font-size: 13px; font-weight: 600;
+    color: var(--text-2);
+    margin-bottom: 4px;
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+  }
+  .month-cell.today .month-cell-num {
+    background: var(--green); color: #fff;
+  }
+  .month-cell.other-month .month-cell-num { color: var(--text-3); }
+  .month-entry {
+    font-size: 10px; font-weight: 500;
+    padding: 2px 5px;
+    border-radius: 4px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: default;
+  }
+  .month-entry-w { background: var(--green-light); color: var(--green); border-left: 2px solid var(--green); }
+  .month-entry-d { background: var(--amber-light); color: var(--amber); border-left: 2px solid var(--amber); }
+  .month-more { font-size: 10px; color: var(--text-3); padding: 1px 4px; cursor: pointer; }
+  .month-more:hover { color: var(--green); }
+
+
+  /* ── Import ── */
+  .import-drop {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-lg);
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    background: var(--surface);
+  }
+  .import-drop:hover, .import-drop.over { border-color: var(--green-mid); background: var(--green-light); }
+  .import-drop i { font-size: 36px; color: var(--text-3); display: block; margin-bottom: 10px; }
+  .import-drop p { color: var(--text-2); font-size: 14px; }
+  .import-drop small { color: var(--text-3); font-size: 12px; }
+  .import-preview {
+    margin-top: 16px;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .import-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 13px;
+  }
+  .import-row:last-child { border-bottom: none; }
+  .import-row-name { font-weight: 600; flex: 1; }
+  .import-row-weeks { color: var(--text-3); font-size: 12px; }
+  .import-status { font-size: 11px; padding: 2px 7px; border-radius: 20px; font-weight: 500; }
+  .import-status-new { background: var(--green-light); color: var(--green); border: 1px solid var(--green-border); }
+  .import-status-exists { background: var(--amber-light); color: var(--amber); border: 1px solid var(--amber-border); }
+  .import-progress { margin-top: 12px; font-size: 13px; color: var(--text-2); text-align: center; }
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width .3s; }
+
+  /* ── Detail Panel ── */
+  .detail-overlay {
+    position: fixed; inset: 0;
+    background: rgba(10,20,8,0.35);
+    z-index: 50;
+    opacity: 0; pointer-events: none; transition: opacity .2s;
+  }
+  .detail-overlay.open { opacity: 1; pointer-events: all; }
+  .detail-panel {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 400px;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    padding: 24px;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    transform: translateX(100%);
+    transition: transform .25s;
+    z-index: 51;
+  }
+  .detail-overlay.open .detail-panel { transform: translateX(0); }
+  .detail-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
+  .detail-avatar { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; flex-shrink: 0; }
+  .detail-name { font-size: 20px; font-weight: 700; }
+  .detail-sub { font-size: 13px; color: var(--text-3); }
+  .detail-close { margin-left: auto; background: none; border: none; cursor: pointer; color: var(--text-3); font-size: 20px; border-radius: 6px; padding: 2px; }
+  .detail-close:hover { background: var(--surface2); }
+  .detail-section { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border-light); }
+  .detail-section:last-child { border-bottom: none; }
+  .detail-section-title { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+  .detail-row { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+  .detail-row i { color: var(--text-3); font-size: 15px; margin-top: 1px; flex-shrink: 0; }
+  .detail-row span { color: var(--text-2); }
+  .detail-days { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .detail-actions { display: flex; gap: 8px; margin-top: 20px; }
+
+  /* ── Loading ── */
+  .loading-screen {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+    z-index: 200;
+    transition: opacity .3s;
+  }
+  .loading-logo { font-size: 36px; }
+  .loading-text { font-size: 15px; font-weight: 500; color: var(--text-2); }
+  .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Toast ── */
+  .toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--text); color: #fff;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    font-size: 13px; font-weight: 500;
+    box-shadow: var(--shadow-md);
+    display: flex; align-items: center; gap: 8px;
+    opacity: 0; transform: translateY(8px);
+    transition: all .2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); pointer-events: all; }
+  .toast.success { background: var(--green); }
+  .toast.error { background: var(--coral); }
+
+  /* ── Misc ── */
+  .allergy-alert {
+    background: var(--coral-light);
+    border: 1px solid var(--coral-border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-size: 13px; color: var(--coral);
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 12px;
+  }
+
+  /* ── Mobile Bottom Nav ── */
+  .mobile-nav {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 20;
+    padding: 6px 0 max(env(safe-area-inset-bottom), 8px);
+    box-shadow: 0 -2px 12px rgba(30,50,20,0.08);
+  }
+  .mobile-nav-inner { display: flex; justify-content: space-around; }
+  .mobile-nav-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 6px 28px; background: none; border: none; cursor: pointer;
+    color: var(--text-3); font-family: 'DM Sans', sans-serif;
+    font-size: 11px; font-weight: 500; border-radius: var(--radius);
+    transition: color .15s;
+  }
+  .mobile-nav-btn i { font-size: 22px; }
+  .mobile-nav-btn.active { color: var(--green); }
+  .mobile-nav-btn.active i { color: var(--green); }
+
+  /* ── Mobile Sync Bar ── */
+  .mobile-sync-bar {
+    display: none;
+    align-items: center; justify-content: flex-end;
+    gap: 6px; padding: 4px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border-light);
+    font-size: 11px; color: var(--text-3);
+  }
+
+  @media (max-width: 768px) {
+    /* ── Layout ── */
+    .sidebar { display: none; }
+    .mobile-nav { display: block; }
+    .mobile-sync-bar { display: flex; }
+    .main-content { margin-left: 0; padding-bottom: 72px; }
+
+    /* ── Top bar ── */
+    .top-bar { padding: 11px 14px; gap: 7px; flex-wrap: nowrap; }
+    .top-bar-title { font-size: 15px; }
+    .btn-label { display: none; }
+
+    /* ── Pages ── */
+    .page { padding: 14px; }
+    .page > div[style*="padding:28px"] { padding: 0 !important; }
+    .cal-page-inner { padding: 0 !important; }
+
+    /* ── Stats grid ── */
+    .stats-grid { grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 14px; }
+    .stat-card { padding: 12px 14px; }
+    .stat-val { font-size: 22px; }
+    .stat-label { font-size: 11px; }
+
+    /* ── Toolbar ── */
+    .toolbar { gap: 6px; margin-bottom: 12px; }
+    .search-wrap { min-width: 0; }
+    .toolbar select { min-width: 0; width: auto; font-size: 12px; padding: 7px 8px; }
+
+    /* ── Camper grid ── */
+    .camper-grid { grid-template-columns: 1fr; gap: 8px; }
+    .camper-card { padding: 12px; }
+
+    /* ── Calendar controls ── */
+    .cal-controls { gap: 6px; margin-bottom: 12px; }
+    .cal-title { font-size: 14px; }
+    .view-toggle-btn { padding: 6px 10px; font-size: 12px; }
+    #page-calendar .top-bar { flex-wrap: wrap; row-gap: 8px; }
+
+    /* ── Weekly calendar — horizontal scroll ── */
+    .cal-grid {
+      display: flex !important;
+      overflow-x: auto;
+      gap: 8px;
+      padding-bottom: 8px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .cal-col {
+      min-width: 160px;
+      flex-shrink: 0;
+      scroll-snap-align: start;
+    }
+
+    /* ── Monthly calendar ── */
+    .month-grid { font-size: 10px; }
+    .month-cell { min-height: 72px; padding: 3px; }
+    .month-cell-num { font-size: 10px; width: 18px; height: 18px; margin-bottom: 2px; }
+    .month-dow { padding: 6px 2px; font-size: 9px; }
+    .month-entry { font-size: 9px; padding: 1px 3px; }
+    .month-more { font-size: 9px; }
+
+    /* ── Modal — slide up from bottom ── */
+    .modal-overlay { padding: 0; align-items: flex-end; }
+    .modal {
+      max-width: 100%;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      max-height: 93vh;
+      padding: 20px 16px;
+    }
+    .modal-overlay.open .modal { transform: translateY(0) scale(1); }
+    .form-row { grid-template-columns: 1fr; }
+    .days-row { gap: 4px; }
+    .modal-footer { gap: 6px; }
+
+    /* ── Detail panel — full width ── */
+    .detail-panel { width: 100%; padding: 16px; }
+
+    /* ── Import modal ── */
+    .import-drop { padding: 28px 16px; }
+
+    /* ── Toast — above bottom nav ── */
+    .toast-wrap { bottom: 84px; right: 12px; left: 12px; }
+    .toast { font-size: 12px; }
+
+    /* ── Buttons in top bar ── */
+    .top-bar .btn { padding: 7px 10px; font-size: 12px; gap: 4px; }
+    .top-bar .btn-sm { padding: 6px 9px; }
+  }
+
+  @media (max-width: 400px) {
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .month-cell { min-height: 56px; }
+    .top-bar .btn-label { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-logo">⛺</div>
+  <div class="loading-text">Loading camp data…</div>
+  <div class="spinner"></div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<div class="app-shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <div class="logo-icon"><i class="ti ti-tent"></i></div>
+        <div>
+          <div class="logo-text">Camp Manager</div>
+          <div class="logo-sub">Summer 2025</div>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" onclick="showPage('roster',this)">
+        <i class="ti ti-users"></i> Roster
+      </button>
+      <button class="nav-item" onclick="showPage('calendar',this)">
+        <i class="ti ti-calendar-week"></i> Calendar
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sync-status">
+        <div class="sync-dot loading" id="syncDot"></div>
+        <span id="syncLabel">Connecting…</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content">
+    <!-- Mobile sync bar -->
+    <div class="mobile-sync-bar">
+      <div class="sync-dot loading" id="syncDotMobile"></div>
+      <span id="syncLabelMobile">Connecting…</span>
+    </div>
+    <!-- Roster page -->
+    <div id="page-roster" class="page active">
+      <div class="top-bar">
+        <div class="top-bar-title">Camper Roster</div>
+        <button class="btn" onclick="openImport()">
+          <i class="ti ti-upload"></i> <span class="btn-label">Import CSV</span>
+        </button>
+        <button class="btn btn-primary" onclick="openModal()">
+          <i class="ti ti-plus"></i> <span class="btn-label">Add camper</span>
+        </button>
+      </div>
+      <div style="padding:28px">
+        <div class="stats-grid" id="statsGrid"></div>
+        <div class="toolbar">
+          <div class="search-wrap">
+            <i class="ti ti-search"></i>
+            <input type="text" placeholder="Search campers…" oninput="sQ=this.value.toLowerCase();renderRoster()">
+          </div>
+          <select onchange="tF=this.value;renderRoster()">
+            <option value="all">All types</option>
+            <option value="weekly">Weekly</option>
+            <option value="daily">Daily</option>
+          </select>
+          <select onchange="wF=this.value;renderRoster()">
+            <option value="all">All weeks</option>
+          </select>
+        </div>
+        <div class="camper-grid" id="camperGrid"></div>
+      </div>
+    </div>
+
+    <!-- Calendar page -->
+    <div id="page-calendar" class="page">
+      <div class="top-bar">
+        <div class="top-bar-title">
+          <span id="calMonthLabel">Calendar</span>
+          <span class="cal-sub" id="calWeekLabel"></span>
+        </div>
+        <div class="view-toggle">
+          <button class="view-toggle-btn active" id="vBtnWeek" onclick="setCalView('week')"><i class="ti ti-calendar-week"></i> Week</button>
+          <button class="view-toggle-btn" id="vBtnMonth" onclick="setCalView('month')"><i class="ti ti-calendar-month"></i> Month</button>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="calBack()"><i class="ti ti-arrow-left"></i></button>
+        <button class="btn btn-sm" onclick="calToday()">Today</button>
+        <button class="btn btn-ghost btn-sm" onclick="calFwd()"><i class="ti ti-arrow-right"></i></button>
+        <select class="btn btn-sm" onchange="cF=this.value;rCal()" style="border:1px solid var(--border);cursor:pointer">
+          <option value="all">All campers</option>
+          <option value="weekly">Weekly only</option>
+          <option value="daily">Daily only</option>
+        </select>
+      </div>
+      <div class="cal-page-inner" style="padding:28px">
+        <div id="calGrid"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Mobile bottom nav -->
+  <nav class="mobile-nav">
+    <div class="mobile-nav-inner">
+      <button class="mobile-nav-btn nav-item active" onclick="showPage('roster',this)">
+        <i class="ti ti-users"></i>
+        Roster
+      </button>
+      <button class="mobile-nav-btn nav-item" onclick="showPage('calendar',this)">
+        <i class="ti ti-calendar-week"></i>
+        Calendar
+      </button>
+    </div>
+  </nav>
+</div>
+
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="importOverlay" onclick="if(event.target===this)closeImport()">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <span class="modal-title">Import from JotForm CSV</span>
+      <button class="modal-close" onclick="closeImport()"><i class="ti ti-x"></i></button>
+    </div>
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:16px">
+      Upload a CSV exported from JotForm. Each row will be imported as a camper registration.
+      Existing campers with the same name + week will be skipped.
+    </p>
+    <div class="import-drop" id="importDrop"
+      ondragover="event.preventDefault();this.classList.add('over')"
+      ondragleave="this.classList.remove('over')"
+      ondrop="handleImportDrop(event)"
+      onclick="document.getElementById('importFileInput').click()">
+      <i class="ti ti-file-type-csv"></i>
+      <p>Drag &amp; drop your JotForm CSV here</p>
+      <small>or click to browse</small>
+    </div>
+    <input type="file" id="importFileInput" accept=".csv" style="display:none" onchange="handleImportFile(this)">
+    <div id="importPreview" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 8px">
+        <span style="font-size:13px;font-weight:600;color:var(--text)" id="importPreviewTitle"></span>
+        <span style="font-size:12px;color:var(--text-3)" id="importPreviewSub"></span>
+      </div>
+      <div class="import-preview" id="importPreviewList"></div>
+      <div class="import-progress" id="importProgress" style="display:none">
+        <span id="importProgressLabel">Importing…</span>
+        <div class="progress-bar"><div class="progress-fill" id="importProgressFill" style="width:0%"></div></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeImport()">Cancel</button>
+      <div class="modal-footer-right">
+        <button class="btn btn-primary" id="importBtn" onclick="doImport()" style="display:none">
+          <i class="ti ti-upload"></i> Import all
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Panel -->
+<div class="detail-overlay" id="detailOverlay" onclick="if(event.target===this)closeDetail()">
+  <div class="detail-panel" id="detailPanel"></div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">Add camper</span>
+      <button class="modal-close" onclick="closeModal()"><i class="ti ti-x"></i></button>
+    </div>
+
+    <div class="form-section-label">Personal info</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">First name *</label><input type="text" id="fFirst" placeholder="Emma"></div>
+      <div class="form-group"><label class="form-label">Last name *</label><input type="text" id="fLast" placeholder="Johnson"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Age</label><input type="number" id="fAge" placeholder="8" min="3" max="18"></div>
+      <div class="form-group"><label class="form-label">Parent / guardian</label><input type="text" id="fParent" placeholder="Sarah Johnson"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Phone</label><input type="text" id="fPhone" placeholder="(905) 555-0100"></div>
+      <div class="form-group"><label class="form-label">Email</label><input type="text" id="fEmail" placeholder="sarah@email.com"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Address</label><input type="text" id="fAddress" placeholder="123 Maple St, Hamilton, ON"></div>
+
+    <div class="form-section-label">Medical &amp; allergies</div>
+    <div class="form-group"><label class="form-label">Allergies (leave blank if none)</label><input type="text" id="fAllergies" placeholder="e.g. peanuts, bee stings"></div>
+    <div class="form-group"><label class="form-label">Medical notes</label><input type="text" id="fMedical" placeholder="e.g. EpiPen, asthma inhaler"></div>
+
+    <div class="form-section-label">Camp registration</div>
+    <div class="form-group">
+      <label class="form-label">Camp type *</label>
+      <div class="type-toggle">
+        <div class="type-opt sel-weekly" id="typeWeekly" onclick="selType('weekly')">📅 Weekly (Mon–Fri)</div>
+        <div class="type-opt" id="typeDaily" onclick="selType('daily')">📆 Daily (select days)</div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Camp week</label>
+      <input type="date" id="fWeekStart">
+    </div>
+    <div class="form-group" id="dayPickerGroup" style="display:none">
+      <label class="form-label">Camp days</label>
+      <div class="days-row" id="dayGrid">
+        <div class="day-sel sel" data-d="0" onclick="togDay(this)">Mon</div>
+        <div class="day-sel" data-d="1" onclick="togDay(this)">Tue</div>
+        <div class="day-sel" data-d="2" onclick="togDay(this)">Wed</div>
+        <div class="day-sel" data-d="3" onclick="togDay(this)">Thu</div>
+        <div class="day-sel" data-d="4" onclick="togDay(this)">Fri</div>
+      </div>
+    </div>
+    <div class="form-group">
+      <div class="care-label"><span style="width:8px;height:8px;border-radius:50%;background:var(--blue);display:inline-block"></span> Pre-care (7–9am)</div>
+      <div class="days-row" id="preGrid">
+        <div class="care-day pre" data-d="0" onclick="togCare(this,'pre')">Mon</div>
+        <div class="care-day pre" data-d="1" onclick="togCare(this,'pre')">Tue</div>
+        <div class="care-day pre" data-d="2" onclick="togCare(this,'pre')">Wed</div>
+        <div class="care-day pre" data-d="3" onclick="togCare(this,'pre')">Thu</div>
+        <div class="care-day pre" data-d="4" onclick="togCare(this,'pre')">Fri</div>
+      </div>
+      <div class="care-label" style="margin-top:10px"><span style="width:8px;height:8px;border-radius:50%;background:var(--purple);display:inline-block"></span> Post-care (4–6pm)</div>
+      <div class="days-row" id="postGrid">
+        <div class="care-day post" data-d="0" onclick="togCare(this,'post')">Mon</div>
+        <div class="care-day post" data-d="1" onclick="togCare(this,'post')">Tue</div>
+        <div class="care-day post" data-d="2" onclick="togCare(this,'post')">Wed</div>
+        <div class="care-day post" data-d="3" onclick="togCare(this,'post')">Thu</div>
+        <div class="care-day post" data-d="4" onclick="togCare(this,'post')">Fri</div>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Additional notes</label><textarea id="fNotes" rows="3" placeholder="Any additional notes, interests, special considerations…" style="resize:vertical"></textarea></div>
+
+    <div class="form-section-label">Second parent / guardian</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Name</label><input type="text" id="fParent2" placeholder="Guardian name"></div>
+      <div class="form-group"><label class="form-label">Phone</label><input type="text" id="fPhone2" placeholder="(905) 555-0100"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Email</label><input type="text" id="fEmail2" placeholder="guardian@email.com"></div>
+      <div class="form-group"><label class="form-label">Address</label><input type="text" id="fAddress2" placeholder="123 Maple St"></div>
+    </div>
+
+    <div class="form-section-label">Emergency contacts</div>
+    <div style="font-size:12px;color:var(--text-3);margin-bottom:10px">Parent(s)/guardian(s) above are emergency contacts by default. Add others below if needed.</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">EC #1 Name</label><input type="text" id="fEc1Name" placeholder="Full name"></div>
+      <div class="form-group"><label class="form-label">EC #1 Phone</label><input type="text" id="fEc1Phone" placeholder="(905) 555-0100"></div>
+    </div>
+    <div class="form-group"><label class="form-label">EC #1 Relationship</label><input type="text" id="fEc1Rel" placeholder="e.g. Aunt, Grandparent"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">EC #2 Name</label><input type="text" id="fEc2Name" placeholder="Full name"></div>
+      <div class="form-group"><label class="form-label">EC #2 Phone</label><input type="text" id="fEc2Phone" placeholder="(905) 555-0100"></div>
+    </div>
+    <div class="form-group"><label class="form-label">EC #2 Relationship</label><input type="text" id="fEc2Rel" placeholder="e.g. Uncle, Neighbour"></div>
+
+    <div class="form-section-label">Authorized pickup persons</div>
+    <div class="form-group"><label class="form-label">Additional pickup people</label><textarea id="fPickup" rows="2" placeholder="Full names and relationships, e.g. Grandma Rosa (Grandmother), Uncle Dave (Uncle)" style="resize:vertical"></textarea></div>
+
+    <div class="form-section-label">Payment</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Payment method</label>
+        <select id="fPayMethod">
+          <option value="">— Select —</option>
+          <option value="Credit">Credit card</option>
+          <option value="E-transfer">E-transfer</option>
+          <option value="Cash">Cash</option>
+          <option value="Cheque">Cheque</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Grand total</label><input type="text" id="fGrandTotal" placeholder="e.g. $864.45"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-danger" id="deleteBtn" onclick="deleteCamper()" style="display:none"><i class="ti ti-trash"></i> Delete</button>
+      <div class="modal-footer-right">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveCamper()"><i class="ti ti-check"></i> Save camper</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore, collection, onSnapshot,
+  addDoc, updateDoc, deleteDoc, doc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBiOFJO1cvC388rLNEErnapOVXviGRyJGQ",
+  authDomain: "summer-camp-2026-f63ff.firebaseapp.com",
+  projectId: "summer-camp-2026-f63ff",
+  storageBucket: "summer-camp-2026-f63ff.firebasestorage.app",
+  messagingSenderId: "651535885138",
+  appId: "1:651535885138:web:856199a57e99257367108b",
+  measurementId: "G-JBXXDQWLDJ"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Expose db operations to global scope
+window._db = db;
+window._addDoc = addDoc;
+window._updateDoc = updateDoc;
+window._deleteDoc = deleteDoc;
+window._doc = doc;
+window._serverTimestamp = serverTimestamp;
+window._collection = collection;
+
+const campersRef = collection(db, "campers");
+
+// Listen for real-time updates
+onSnapshot(campersRef, (snapshot) => {
+  window.campers = [];
+  snapshot.forEach(d => {
+    window.campers.push({ id: d.id, ...d.data() });
+  });
+  // Sort by last name
+  window.campers.sort((a,b) => (a.last||'').localeCompare(b.last||''));
+
+  // Update week filter options
+  if (typeof window.updateWeekFilter === 'function') window.updateWeekFilter();
+  if (typeof window.renderRoster === 'function') window.renderRoster();
+  if (typeof window.rCal === 'function' && document.getElementById('page-calendar').classList.contains('active')) window.rCal();
+
+  // Hide loading
+  const ls = document.getElementById('loadingScreen');
+  ls.style.opacity = '0';
+  setTimeout(() => ls.style.display='none', 300);
+
+  // Update sync status
+  window._setSynced();
+}, (err) => {
+  console.error(err);
+  if (typeof window.showToast === 'function') window.showToast('Connection error: ' + err.message, 'error');
+  document.getElementById('syncLabel').textContent = 'Offline';
+  document.getElementById('syncDot').className = 'sync-dot';
+  document.getElementById('syncLabelMobile').textContent = 'Offline';
+  document.getElementById('syncDotMobile').className = 'sync-dot';
+  const ls = document.getElementById('loadingScreen');
+  ls.style.opacity = '0';
+  setTimeout(() => ls.style.display='none', 300);
+});
+
+window._setSynced = function() {
+  document.getElementById('syncDot').className = 'sync-dot connected';
+  document.getElementById('syncLabel').textContent = 'Synced';
+  document.getElementById('syncDotMobile').className = 'sync-dot connected';
+  document.getElementById('syncLabelMobile').textContent = 'Synced';
+};
+
+</script>
+
+<script>
+const DN = ['Mon','Tue','Wed','Thu','Fri'];
+const AV = [
+  ['#EAF3DE','#2D6A0F'],['#EEEDFE','#5046B8'],['#E1F5EE','#0F6E56'],
+  ['#FAEEDA','#B06A10'],['#E6F1FB','#1A5EA8'],['#FAECE7','#9A3320'],
+  ['#FDF0FB','#8B2E7C'],['#F0F8FF','#1A6B8A']
+];
+window.campers = [];
+let editingId = null;
+let cType = 'weekly';
+let sQ = '';
+let tF = 'all';
+let wF = 'all';
+let wO = 0;
+let cF = 'all';
+
+// ── Navigation ──
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'calendar') rCal();
+}
+
+// ── Toast ──
+function showToast(msg, type='success') {
+  const wrap = document.getElementById('toastWrap');
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.innerHTML = `<i class="ti ti-${type==='success'?'check':'alert-circle'}"></i> ${msg}`;
+  wrap.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 300);
+  }, 3000);
+}
+
+// ── Week filter ──
+function updateWeekFilter() {
+  const sel = document.querySelectorAll('select')[1]; // second select = week filter
+  const current = sel.value;
+  const weeks = [...new Set(window.campers.map(c => c.weekStart).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="all">All weeks</option>';
+  weeks.forEach(w => {
+    const d = new Date(w + 'T00:00:00');
+    const label = 'Week of ' + d.toLocaleDateString('en-CA', {month:'short', day:'numeric'});
+    sel.innerHTML += `<option value="${w}" ${w===current?'selected':''}>${label}</option>`;
+  });
+  wF = sel.value;
+}
+
+// ── Date helpers ──
+function getMon(off=0) {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day===0?-6:1);
+  const m = new Date(d.setDate(diff + off*7));
+  m.setHours(0,0,0,0);
+  return m;
+}
+function dStr(d) { return d.toISOString().slice(0,10); }
+function getMonOfDate(s) {
+  const d = new Date(s + 'T00:00:00');
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day===0?-6:1);
+  const m = new Date(d.setDate(diff));
+  m.setHours(0,0,0,0);
+  return m;
+}
+function fmtWk(s) {
+  if(!s) return '—';
+  const d = new Date(s + 'T00:00:00');
+  return d.toLocaleDateString('en-CA', {month:'short', day:'numeric'});
+}
+
+// ── Stats ──
+function renderStats() {
+  const total = window.campers.length;
+  const wk = window.campers.filter(c=>c.type==='weekly').length;
+  const dy = window.campers.filter(c=>c.type==='daily').length;
+  const care = window.campers.filter(c=>c.preDays?.length||c.postDays?.length).length;
+  const allergy = window.campers.filter(c=>c.allergies).length;
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Total campers</div><div class="stat-val">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">Weekly</div><div class="stat-val">${wk}</div><div class="stat-sub">Mon–Fri</div></div>
+    <div class="stat-card"><div class="stat-label">Daily</div><div class="stat-val">${dy}</div><div class="stat-sub">Selected days</div></div>
+    <div class="stat-card"><div class="stat-label">With care</div><div class="stat-val">${care}</div><div class="stat-sub">${allergy} allergies</div></div>
+  `;
+}
+
+// ── Roster ──
+function renderRoster() {
+  renderStats();
+  const filtered = window.campers.filter(c => {
+    if (sQ && !(c.first+' '+c.last).toLowerCase().includes(sQ)) return false;
+    if (tF !== 'all' && c.type !== tF) return false;
+    if (wF !== 'all' && c.weekStart !== wF) return false;
+    return true;
+  });
+  if (!filtered.length) {
+    document.getElementById('camperGrid').innerHTML = `<div class="empty-state"><i class="ti ti-mood-empty"></i><div>No campers found</div></div>`;
+    return;
+  }
+  document.getElementById('camperGrid').innerHTML = filtered.map(c => {
+    const idx = window.campers.indexOf(c) % AV.length;
+    const [bg,fg] = AV[idx];
+    const ini = ((c.first||'')[0]+(c.last||'')[0]||'').toUpperCase();
+    return `<div class="camper-card" onclick="openDetail('${c.id}')">
+      <div class="card-header">
+        <div class="avatar" style="background:${bg};color:${fg}">${ini}</div>
+        <div>
+          <div class="card-name">${c.first} ${c.last}</div>
+          <div class="card-sub">${c.age?'Age '+c.age:''}${c.parent?' · '+c.parent:''}</div>
+        </div>
+      </div>
+      <div class="badges">
+        <span class="badge ${c.type==='weekly'?'badge-weekly':'badge-daily'}">${c.type==='weekly'?'Weekly':'Daily'}</span>
+        ${c.preDays?.length?'<span class="badge badge-pre"><i class="ti ti-sunrise" style="font-size:10px"></i> Pre-care</span>':''}
+        ${c.postDays?.length?'<span class="badge badge-post"><i class="ti ti-sunset" style="font-size:10px"></i> Post-care</span>':''}
+        ${c.allergies?'<span class="badge badge-allergy"><i class="ti ti-alert-triangle" style="font-size:10px"></i> Allergy</span>':''}
+        ${c.grandTotal?'<span class="badge" style="background:var(--teal-light);color:var(--teal);border:1px solid #7ACDB8"><i class="ti ti-receipt" style="font-size:10px"></i> '+c.grandTotal+'</span>':''}
+      </div>
+      <div class="week-info"><i class="ti ti-calendar" style="font-size:13px"></i> Week of ${fmtWk(c.weekStart)}</div>
+      <div class="day-pills">${[0,1,2,3,4].map(d=>`<span class="dp${c.campDays?.includes(d)?' on':''}">${DN[d]}</span>`).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Detail panel ──
+function openDetail(id) {
+  const c = window.campers.find(x=>x.id===id);
+  if(!c) return;
+  const idx = window.campers.indexOf(c) % AV.length;
+  const [bg,fg] = AV[idx];
+  const ini = ((c.first||'')[0]+(c.last||'')[0]||'').toUpperCase();
+  const campDayNames = (c.campDays||[]).map(d=>DN[d]).join(', ') || 'None';
+  const preDayNames = (c.preDays||[]).map(d=>DN[d]).join(', ') || 'None';
+  const postDayNames = (c.postDays||[]).map(d=>DN[d]).join(', ') || 'None';
+  document.getElementById('detailPanel').innerHTML = `
+    <div class="detail-header">
+      <div class="detail-avatar" style="background:${bg};color:${fg}">${ini}</div>
+      <div>
+        <div class="detail-name">${c.first} ${c.last}</div>
+        <div class="detail-sub">${c.age?'Age '+c.age+' · ':''}${c.type==='weekly'?'Weekly camper':'Daily camper'}</div>
+      </div>
+      <button class="detail-close" onclick="closeDetail()"><i class="ti ti-x"></i></button>
+    </div>
+    ${c.allergies?`<div class="allergy-alert"><i class="ti ti-alert-triangle"></i><strong>Allergy:</strong> ${c.allergies}</div>`:''}
+    <div class="detail-section" style="margin-top:16px">
+      <div class="detail-section-title">Contact</div>
+      ${c.parent?`<div class="detail-row"><i class="ti ti-user"></i><span>${c.parent}</span></div>`:''}
+      ${c.phone?`<div class="detail-row"><i class="ti ti-phone"></i><span>${c.phone}</span></div>`:''}
+      ${c.email?`<div class="detail-row"><i class="ti ti-mail"></i><span>${c.email}</span></div>`:''}
+      ${c.address?`<div class="detail-row"><i class="ti ti-map-pin"></i><span>${c.address}</span></div>`:''}
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Medical</div>
+      ${c.allergies?`<div class="detail-row"><i class="ti ti-alert-triangle" style="color:var(--coral)"></i><span><strong>Allergies:</strong> ${c.allergies}</span></div>`:`<div class="detail-row"><i class="ti ti-circle-check" style="color:var(--green)"></i><span>No known allergies</span></div>`}
+      ${c.medical?`<div class="detail-row"><i class="ti ti-pill"></i><span>${c.medical}</span></div>`:''}
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Schedule — Week of ${fmtWk(c.weekStart)}</div>
+      <div class="detail-row"><i class="ti ti-tent" style="color:var(--green)"></i><span><strong>Camp:</strong> ${campDayNames}</span></div>
+      <div class="detail-row"><i class="ti ti-sunrise" style="color:var(--blue)"></i><span><strong>Pre-care:</strong> ${preDayNames}</span></div>
+      <div class="detail-row"><i class="ti ti-sunset" style="color:var(--purple)"></i><span><strong>Post-care:</strong> ${postDayNames}</span></div>
+      <div class="detail-days">${[0,1,2,3,4].map(d=>`<span class="dp${c.campDays?.includes(d)?' on':''}">${DN[d]}</span>`).join('')}</div>
+    </div>
+    ${c.notes?`<div class="detail-section"><div class="detail-section-title">Notes &amp; interests</div><div style="font-size:13px;color:var(--text-2);white-space:pre-wrap">${c.notes}</div></div>`:''}
+    ${c.parent2?`<div class="detail-section">
+      <div class="detail-section-title">Second parent / guardian</div>
+      <div class="detail-row"><i class="ti ti-user"></i><span>${c.parent2}</span></div>
+      ${c.phone2?`<div class="detail-row"><i class="ti ti-phone"></i><span>${c.phone2}</span></div>`:''}
+      ${c.email2?`<div class="detail-row"><i class="ti ti-mail"></i><span>${c.email2}</span></div>`:''}
+      ${c.address2?`<div class="detail-row"><i class="ti ti-map-pin"></i><span>${c.address2}</span></div>`:''}
+    </div>`:''}
+    ${(c.ec1Name||c.ec2Name)?`<div class="detail-section">
+      <div class="detail-section-title">Additional emergency contacts</div>
+      ${c.ec1Name?`<div class="detail-row"><i class="ti ti-shield-heart" style="color:var(--coral)"></i><span><strong>${c.ec1Name}</strong>${c.ec1Rel?' ('+c.ec1Rel+')':''} ${c.ec1Phone?'· '+c.ec1Phone:''}</span></div>`:''}
+      ${c.ec2Name?`<div class="detail-row"><i class="ti ti-shield-heart" style="color:var(--coral)"></i><span><strong>${c.ec2Name}</strong>${c.ec2Rel?' ('+c.ec2Rel+')':''} ${c.ec2Phone?'· '+c.ec2Phone:''}</span></div>`:''}
+    </div>`:''}
+    ${c.pickup?`<div class="detail-section">
+      <div class="detail-section-title">Authorized pickup persons</div>
+      <div class="detail-row"><i class="ti ti-walk"></i><span>${c.pickup}</span></div>
+    </div>`:''}
+    ${(c.payMethod||c.grandTotal)?`<div class="detail-section">
+      <div class="detail-section-title">Payment</div>
+      ${c.payMethod?`<div class="detail-row"><i class="ti ti-credit-card"></i><span>${c.payMethod}</span></div>`:''}
+      ${c.grandTotal?`<div class="detail-row"><i class="ti ti-receipt"></i><span><strong>Grand total: ${c.grandTotal}</strong></span></div>`:''}
+    </div>`:''}
+    <div class="detail-actions">
+      <button class="btn btn-primary" style="flex:1" onclick="closeDetail();openModal('${c.id}')"><i class="ti ti-edit"></i> Edit</button>
+    </div>
+  `;
+  document.getElementById('detailOverlay').classList.add('open');
+}
+function closeDetail() {
+  document.getElementById('detailOverlay').classList.remove('open');
+}
+
+// ── Modal helpers ──
+function selType(t) {
+  cType = t;
+  document.getElementById('typeWeekly').className = 'type-opt' + (t==='weekly'?' sel-weekly':'');
+  document.getElementById('typeDaily').className = 'type-opt' + (t==='daily'?' sel-daily':'');
+  document.getElementById('dayPickerGroup').style.display = t==='daily'?'block':'none';
+  syncCare();
+}
+function getSelDays() {
+  return [...document.querySelectorAll('#dayGrid .day-sel.sel')].map(x=>+x.dataset.d);
+}
+function syncCare() {
+  const cd = getSelDays();
+  ['pre','post'].forEach(k => {
+    document.querySelectorAll('.care-day.'+k).forEach(el => {
+      const d = +el.dataset.d;
+      const ok = cType==='weekly' || cd.includes(d);
+      el.classList.toggle('dis', !ok);
+      if(!ok) el.classList.remove('sel');
+    });
+  });
+}
+function togDay(el) {
+  if(cType==='weekly') return;
+  el.classList.toggle('sel');
+  syncCare();
+}
+function togCare(el, k) {
+  if(el.classList.contains('dis')) return;
+  el.classList.toggle('sel');
+}
+
+function openModal(id=null) {
+  editingId = id;
+  const c = id ? window.campers.find(x=>x.id===id) : null;
+  document.getElementById('modalTitle').textContent = c ? 'Edit camper' : 'Add camper';
+  document.getElementById('deleteBtn').style.display = c ? 'flex' : 'none';
+  document.getElementById('fFirst').value = c?.first||'';
+  document.getElementById('fLast').value = c?.last||'';
+  document.getElementById('fAge').value = c?.age||'';
+  document.getElementById('fParent').value = c?.parent||'';
+  document.getElementById('fPhone').value = c?.phone||'';
+  document.getElementById('fEmail').value = c?.email||'';
+  document.getElementById('fAddress').value = c?.address||'';
+  document.getElementById('fAllergies').value = c?.allergies||'';
+  document.getElementById('fMedical').value = c?.medical||'';
+  document.getElementById('fNotes').value = c?.notes||'';
+  document.getElementById('fWeekStart').value = c?.weekStart || dStr(getMon(0));
+  cType = c?.type||'weekly';
+  selType(cType);
+  document.querySelectorAll('#dayGrid .day-sel').forEach(el => {
+    el.classList.toggle('sel', c ? c.campDays?.includes(+el.dataset.d) : +el.dataset.d===0);
+  });
+  document.querySelectorAll('.care-day.pre').forEach(el => el.classList.toggle('sel', c?.preDays?.includes(+el.dataset.d)||false));
+  document.querySelectorAll('.care-day.post').forEach(el => el.classList.toggle('sel', c?.postDays?.includes(+el.dataset.d)||false));
+  syncCare();
+  // New fields
+  document.getElementById('fParent2').value = c?.parent2||'';
+  document.getElementById('fPhone2').value = c?.phone2||'';
+  document.getElementById('fEmail2').value = c?.email2||'';
+  document.getElementById('fAddress2').value = c?.address2||'';
+  document.getElementById('fEc1Name').value = c?.ec1Name||'';
+  document.getElementById('fEc1Phone').value = c?.ec1Phone||'';
+  document.getElementById('fEc1Rel').value = c?.ec1Rel||'';
+  document.getElementById('fEc2Name').value = c?.ec2Name||'';
+  document.getElementById('fEc2Phone').value = c?.ec2Phone||'';
+  document.getElementById('fEc2Rel').value = c?.ec2Rel||'';
+  document.getElementById('fPickup').value = c?.pickup||'';
+  document.getElementById('fPayMethod').value = c?.payMethod||'';
+  document.getElementById('fGrandTotal').value = c?.grandTotal||'';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+async function saveCamper() {
+  const first = document.getElementById('fFirst').value.trim();
+  const last = document.getElementById('fLast').value.trim();
+  if(!first||!last) { showToast("Please enter the camper's name.", 'error'); return; }
+  const campDays = cType==='weekly' ? [0,1,2,3,4] : getSelDays();
+  if(!campDays.length) { showToast('Please select at least one camp day.', 'error'); return; }
+  const preDays = [...document.querySelectorAll('.care-day.pre.sel')].map(x=>+x.dataset.d);
+  const postDays = [...document.querySelectorAll('.care-day.post.sel')].map(x=>+x.dataset.d);
+  const ws = document.getElementById('fWeekStart').value;
+  const mon = ws ? dStr(getMonOfDate(ws)) : dStr(getMon(0));
+  const data = {
+    first, last,
+    age: +document.getElementById('fAge').value||null,
+    parent: document.getElementById('fParent').value.trim(),
+    phone: document.getElementById('fPhone').value.trim(),
+    email: document.getElementById('fEmail').value.trim(),
+    address: document.getElementById('fAddress').value.trim(),
+    allergies: document.getElementById('fAllergies').value.trim(),
+    medical: document.getElementById('fMedical').value.trim(),
+    notes: document.getElementById('fNotes').value.trim(),
+    type: cType, weekStart: mon,
+    campDays, preDays, postDays,
+    parent2: document.getElementById('fParent2').value.trim(),
+    phone2: document.getElementById('fPhone2').value.trim(),
+    email2: document.getElementById('fEmail2').value.trim(),
+    address2: document.getElementById('fAddress2').value.trim(),
+    ec1Name: document.getElementById('fEc1Name').value.trim(),
+    ec1Phone: document.getElementById('fEc1Phone').value.trim(),
+    ec1Rel: document.getElementById('fEc1Rel').value.trim(),
+    ec2Name: document.getElementById('fEc2Name').value.trim(),
+    ec2Phone: document.getElementById('fEc2Phone').value.trim(),
+    ec2Rel: document.getElementById('fEc2Rel').value.trim(),
+    pickup: document.getElementById('fPickup').value.trim(),
+    payMethod: document.getElementById('fPayMethod').value,
+    grandTotal: document.getElementById('fGrandTotal').value.trim(),
+    updatedAt: window._serverTimestamp()
+  };
+  try {
+    if(editingId) {
+      await window._updateDoc(window._doc(window._db, 'campers', editingId), data);
+      showToast('Camper updated!');
+    } else {
+      data.createdAt = window._serverTimestamp();
+      await window._addDoc(window._collection(window._db, 'campers'), data);
+      showToast('Camper added!');
+    }
+    closeModal();
+  } catch(e) {
+    showToast('Error saving: ' + e.message, 'error');
+  }
+}
+
+async function deleteCamper() {
+  if(!editingId) return;
+  const c = window.campers.find(x=>x.id===editingId);
+  if(!confirm('Remove ' + (c?.first||'') + ' ' + (c?.last||'') + '? This cannot be undone.')) return;
+  try {
+    await window._deleteDoc(window._doc(window._db, 'campers', editingId));
+    showToast('Camper deleted.');
+    closeModal();
+  } catch(e) {
+    showToast('Error deleting: ' + e.message, 'error');
+  }
+}
+
+// ── Calendar ──
+let calView = 'week'; // 'week' or 'month'
+let mO = 0; // month offset
+
+function setCalView(v) {
+  calView = v;
+  document.getElementById('vBtnWeek').classList.toggle('active', v==='week');
+  document.getElementById('vBtnMonth').classList.toggle('active', v==='month');
+  rCal();
+}
+function calBack()  { if(calView==='week') { wO--; } else { mO--; } rCal(); }
+function calFwd()   { if(calView==='week') { wO++; } else { mO++; } rCal(); }
+function calToday() { wO=0; mO=0; rCal(); }
+
+function rCal() {
+  if(calView==='week') rCalWeek(); else rCalMonth();
+}
+
+function rCalWeek() {
+  const wMon = getMon(wO);
+  const days = [0,1,2,3,4].map(i => { const d=new Date(wMon); d.setDate(d.getDate()+i); return d; });
+  const today = dStr(new Date());
+  const months = [...new Set(days.map(d=>d.toLocaleDateString('en-CA',{month:'long',year:'numeric'})))];
+  document.getElementById('calMonthLabel').textContent = months.join(' / ');
+  document.getElementById('calWeekLabel').textContent = ' · ' + days[0].toLocaleDateString('en-CA',{month:'short',day:'numeric'}) + ' – ' + days[4].toLocaleDateString('en-CA',{month:'short',day:'numeric'});
+  const wMs = dStr(wMon);
+  const filt = window.campers.filter(c => {
+    if(cF!=='all'&&c.type!==cF) return false;
+    if(!c.weekStart) return false;
+    return dStr(getMonOfDate(c.weekStart))===wMs;
+  });
+  document.getElementById('calGrid').className = 'cal-grid';
+  document.getElementById('calGrid').innerHTML = days.map((d,i) => {
+    const ds = dStr(d);
+    const isToday = ds===today;
+    const ents = filt.filter(c => c.campDays?.includes(i));
+    return '<div class="cal-col ' + (isToday?'cal-today':'') + '">'
+      + '<div class="cal-day-header">'
+      + '<div class="cal-day-name">' + DN[i] + '</div>'
+      + '<div class="cal-day-num">' + d.getDate() + '</div>'
+      + '<div class="cal-day-month">' + d.toLocaleDateString('en-CA',{month:'short'}) + '</div>'
+      + '</div>'
+      + (!ents.length ? '<div class="cal-empty">—</div>' : '')
+      + ents.map(c =>
+          '<div class="cal-entry ' + (c.type==='weekly'?'cal-entry-w':'cal-entry-d') + '">'
+          + '<div class="cal-entry-name">' + c.first + ' ' + (c.last||'')[0] + '.</div>'
+          + '<div class="cal-entry-tags">'
+          + '<span class="cal-tag ct-c">Camp</span>'
+          + (c.preDays?.includes(i) ? '<span class="cal-tag ct-p">Pre</span>' : '')
+          + (c.postDays?.includes(i) ? '<span class="cal-tag ct-q">Post</span>' : '')
+          + '</div></div>'
+        ).join('')
+      + '</div>';
+  }).join('');
+}
+
+function rCalMonth() {
+  const now = new Date();
+  const baseMonth = new Date(now.getFullYear(), now.getMonth() + mO, 1);
+  const year = baseMonth.getFullYear();
+  const month = baseMonth.getMonth();
+  document.getElementById('calMonthLabel').textContent = baseMonth.toLocaleDateString('en-CA',{month:'long',year:'numeric'});
+  document.getElementById('calWeekLabel').textContent = '';
+
+  // Build grid: Mon–Fri only (5 cols) + Weekly Total col (1 col) = 6 columns
+  const firstDay = new Date(year, month, 1);
+  const lastDay  = new Date(year, month+1, 0);
+  const startDow = (firstDay.getDay() + 6) % 7; // Mon=0 … Sun=6
+  const gridStart = new Date(firstDay);
+  gridStart.setDate(gridStart.getDate() - startDow);
+
+  const today = dStr(new Date());
+  const DOW_LABELS = ['Mon','Tue','Wed','Thu','Fri'];
+
+  // Build entries grouped by dateStr (Mon–Fri only)
+  function campDates(c) {
+    if(!c.weekStart) return [];
+    const mon = getMonOfDate(c.weekStart);
+    return (c.campDays||[]).map(d => {
+      const date = new Date(mon);
+      date.setDate(date.getDate() + d);
+      return { dateStr: dStr(date), dayIdx: d, camper: c };
+    });
+  }
+  const allEntries = window.campers
+    .filter(c => cF==='all' || c.type===cF)
+    .flatMap(campDates);
+
+  const byDate = {};
+  allEntries.forEach(e => {
+    if(!byDate[e.dateStr]) byDate[e.dateStr] = [];
+    byDate[e.dateStr].push(e);
+  });
+
+  // Weekly unique camper counts keyed by Monday date string
+  const weekTotals = {};
+  allEntries.forEach(e => {
+    const d = new Date(e.dateStr + 'T00:00:00');
+    const dow = (d.getDay() + 6) % 7;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - dow);
+    const monStr = dStr(mon);
+    if(!weekTotals[monStr]) weekTotals[monStr] = { campers: new Set(), weekly: new Set(), daily: new Set(), pre: new Set(), post: new Set() };
+    weekTotals[monStr].campers.add(e.camper.id);
+    if(e.camper.type==='weekly') weekTotals[monStr].weekly.add(e.camper.id);
+    else weekTotals[monStr].daily.add(e.camper.id);
+    if(e.camper.preDays?.includes(e.dayIdx)) weekTotals[monStr].pre.add(e.camper.id);
+    if(e.camper.postDays?.includes(e.dayIdx)) weekTotals[monStr].post.add(e.camper.id);
+  });
+
+  const totalDays = startDow + lastDay.getDate();
+  const rows = Math.ceil(totalDays / 7);
+
+  // Grid is 6 columns: Mon Tue Wed Thu Fri | Weekly Total
+  let html = '<div class="month-grid" style="grid-template-columns:repeat(5,1fr) 110px">';
+
+  // Headers
+  DOW_LABELS.forEach(l => { html += '<div class="month-dow">' + l + '</div>'; });
+  html += '<div class="month-dow" style="background:var(--green-light);color:var(--green)">Week Total</div>';
+
+  for(let r=0; r<rows; r++) {
+    // Mon of this grid row
+    const rowMon = new Date(gridStart);
+    rowMon.setDate(gridStart.getDate() + r*7);
+    const rowMonStr = dStr(rowMon);
+    const wt = weekTotals[rowMonStr] || { campers: new Set(), weekly: new Set(), daily: new Set(), pre: new Set(), post: new Set() };
+
+    // Mon–Fri cells
+    for(let col=0; col<5; col++) {
+      const cellDate = new Date(gridStart);
+      cellDate.setDate(gridStart.getDate() + r*7 + col);
+      const ds = dStr(cellDate);
+      const inMonth = cellDate.getMonth()===month;
+      const isToday = ds===today;
+      const ents = byDate[ds] || [];
+      const shown = ents.slice(0,3);
+      const extra = ents.length - shown.length;
+
+      html += '<div class="month-cell' + (!inMonth?' other-month':'') + (isToday?' today':'') + '">';
+      html += '<div class="month-cell-num">' + cellDate.getDate() + '</div>';
+      shown.forEach(e => {
+        const name = e.camper.first + ' ' + (e.camper.last||'')[0] + '.';
+        const cls = e.camper.type==='weekly' ? 'month-entry-w' : 'month-entry-d';
+        const pre = e.camper.preDays?.includes(e.dayIdx) ? ' ·pre' : '';
+        const post = e.camper.postDays?.includes(e.dayIdx) ? ' ·post' : '';
+        html += '<div class="month-entry ' + cls + '" title="' + e.camper.first + ' ' + e.camper.last + (pre||post ? ' (' + (pre?'pre-care ':'') + (post?'post-care':'') + ')' : '') + '">' + name + (pre||post ? ' <span style="opacity:.7;font-size:9px">' + (pre?'↑':'') + (post?'↓':'') + '</span>' : '') + '</div>';
+      });
+      if(extra>0) html += '<div class="month-more">+' + extra + ' more</div>';
+      html += '</div>';
+    }
+
+    // Weekly Total cell
+    const total = wt.campers.size;
+    html += '<div class="month-cell" style="background:var(--green-light);border-left:2px solid var(--green-border);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;padding:8px 6px;">';
+    if(total === 0) {
+      html += '<span style="font-size:12px;color:var(--text-3)">—</span>';
+    } else {
+      html += '<div style="font-size:22px;font-weight:700;color:var(--green);line-height:1">' + total + '</div>';
+      html += '<div style="font-size:10px;color:var(--text-3);text-align:center;line-height:1.4">';
+      if(wt.weekly.size) html += '<span style="color:var(--green)">' + wt.weekly.size + ' wkly</span>';
+      if(wt.weekly.size && wt.daily.size) html += '<br>';
+      if(wt.daily.size) html += '<span style="color:var(--amber)">' + wt.daily.size + ' daily</span>';
+      html += '</div>';
+      if(wt.pre.size || wt.post.size) {
+        html += '<div style="font-size:10px;color:var(--text-3);text-align:center;margin-top:2px">';
+        if(wt.pre.size) html += '<span style="color:var(--blue)">↑' + wt.pre.size + '</span> ';
+        if(wt.post.size) html += '<span style="color:var(--purple)">↓' + wt.post.size + '</span>';
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+  }
+
+  html += '</div>';
+  document.getElementById('calGrid').className = '';
+  document.getElementById('calGrid').innerHTML = html;
+}
+
+// ── Import CSV ──
+let importRows = [];
+
+function openImport() {
+  document.getElementById('importOverlay').classList.add('open');
+  document.getElementById('importPreview').style.display = 'none';
+  document.getElementById('importBtn').style.display = 'none';
+  document.getElementById('importDrop').style.display = 'block';
+  importRows = [];
+}
+function closeImport() {
+  document.getElementById('importOverlay').classList.remove('open');
+}
+
+function handleImportDrop(e) {
+  e.preventDefault();
+  document.getElementById('importDrop').classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  if(file) parseImportFile(file);
+}
+function handleImportFile(input) {
+  if(input.files[0]) parseImportFile(input.files[0]);
+}
+
+function parseImportFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = e.target.result;
+    const parsed = parseCSV(text);
+    if(!parsed.length) { showToast('No data rows found in CSV.', 'error'); return; }
+    buildImportRows(parsed);
+  };
+  reader.readAsText(file);
+}
+
+function parseCSV(text) {
+  const lines = [];
+  let cur = '', inQ = false;
+  const cells = (line) => {
+    const res = []; let c = '', q = false;
+    for(let i=0;i<line.length;i++){
+      const ch = line[i];
+      if(ch==='"'){ if(q && line[i+1]==='"'){c+='"';i++;}else q=!q; }
+      else if(ch===','&&!q){res.push(c.trim());c='';}
+      else c+=ch;
+    }
+    res.push(c.trim()); return res;
+  };
+  // Split into raw rows respecting quoted newlines
+  let field='', quoted=false, rows=[];
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(ch==='"') quoted=!quoted;
+    if((ch==='\n'||ch==='\r')&&!quoted){if(field.trim())rows.push(field);field='';if(ch==='\r'&&text[i+1]==='\n')i++;}
+    else field+=ch;
+  }
+  if(field.trim())rows.push(field);
+  if(!rows.length)return[];
+  const headers=cells(rows[0]);
+  return rows.slice(1).map(r=>{
+    const vals=cells(r);
+    const obj={};
+    headers.forEach((h,i)=>{ obj[h]=(vals[i]||'').replace(/^"|"$/g,'').trim(); });
+    return obj;
+  }).filter(r=>r["Child's full name"]);
+}
+
+// Week definitions matching the JotForm columns
+const WEEKS = [
+  { label: 'Week 1 (July 13-17)', start: '2026-07-13', campCol: 'Choose the weeks your child will attend camp >> Week 1 (July 13-17) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 1 (July 13-17) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 1 (July 13-17) >> Post-care' },
+  { label: 'Week 2 (July 20-24)', start: '2026-07-20', campCol: 'Choose the weeks your child will attend camp >> Week 2 (July 20-24) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 2 (July 20-24) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 2 (July 20-24) >> Post-care' },
+  { label: 'Week 3 (July 27-31)', start: '2026-07-27', campCol: 'Choose the weeks your child will attend camp >> Week 3 (July 27-31) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 3 (July 27-31) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 3 (July 27-31) >> Post-care' },
+  { label: 'Week 4 (Aug 4-7)',    start: '2026-08-04', campCol: 'Choose the weeks your child will attend camp >> Week 4 (Aug 4-7): >> Camp',    preCol: 'Choose the weeks your child will attend camp >> Week 4 (Aug 4-7): >> Pre-care',    postCol: 'Choose the weeks your child will attend camp >> Week 4 (Aug 4-7): >> Post-care' },
+  { label: 'Week 5 (Aug 10-14)', start: '2026-08-10', campCol: 'Choose the weeks your child will attend camp >> Week 5 (Aug 10-14) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 5 (Aug 10-14) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 5 (Aug 10-14) >> Post-care' },
+  { label: 'Week 6 (Aug 17-21)', start: '2026-08-17', campCol: 'Choose the weeks your child will attend camp >> Week 6 (Aug 17-21) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 6 (Aug 17-21) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 6 (Aug 17-21) >> Post-care' },
+  { label: 'Week 7 (Aug 24-28)', start: '2026-08-24', campCol: 'Choose the weeks your child will attend camp >> Week 7 (Aug 24-28) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 7 (Aug 24-28) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 7 (Aug 24-28) >> Post-care' },
+];
+
+function buildImportRows(csvRows) {
+  importRows = [];
+  // Each CSV row may register for multiple weeks → create one camper entry per week
+  csvRows.forEach(row => {
+    const fullName = row["Child's full name"] || '';
+    const nameParts = fullName.trim().split(/\s+/);
+    const first = nameParts[0] || '';
+    const last = nameParts.slice(1).join(' ') || '';
+
+    // Combine describe + special considerations into notes
+    const describe = row["Please describe your child in a few words. Feel free to include interests, likes, hobbies, etc."] || '';
+    const special  = row["We focus on providing a safe and fun environment for all our attendees. Kindly provide any specific considerations or guidelines to guarantee a positive camp experience for your child."] || '';
+    const notesParts = [];
+    if(describe && describe.toLowerCase()!=='n/a' && describe.toLowerCase()!=='none') notesParts.push('Interests: ' + describe);
+    if(special  && special.toLowerCase()!=='n/a'  && special.toLowerCase()!=='nil.' && special.toLowerCase()!=='none') notesParts.push('Considerations: ' + special);
+    const notes = notesParts.join('\n');
+
+    const parent  = row['Parent/guardian name'] || '';
+    const email   = row['Email address'] || '';
+    const phone   = row['Phone number'] || '';
+    const address = row['Mailing address'] || '';
+
+    const has2nd = (row["Do you want to add a second parent/guardian's contact info?"] || '').toLowerCase() === 'yes';
+    const parent2  = has2nd ? (row['Secondary parent/guardian name'] || '') : '';
+    const email2   = has2nd ? (row['Secondary parent email address'] || '') : '';
+    const phone2   = has2nd ? (row['Secondary phone number'] || '') : '';
+    const address2 = has2nd ? (row['Secondary parent mailing address'] || '') : '';
+
+    const hasEC = (row["By default the parent(s)/guardian(s) provided above will added as emergency contacts. Do you wish to add other people as emergency contacts?"] || '').toLowerCase() === 'yes';
+    const ec1Name  = hasEC ? (row['Name of additional emergency contact #1'] || '') : '';
+    const ec1Phone = hasEC ? (row['Phone number of additional emergency contact #1'] || '') : '';
+    const ec1Rel   = hasEC ? (row['Relationship of additional emergency contact #1'] || '') : '';
+    const ec2Name  = hasEC ? (row['Name of additional emergency contact #2'] || '') : '';
+    const ec2Phone = hasEC ? (row['Phone number of additional emergency contact #2'] || '') : '';
+    const ec2Rel   = hasEC ? (row['Relationship of additional emergency contact #2'] || '') : '';
+
+    const pickupCol = "By default, your child can only be picked up by the parent/guardian(s) you provided above. Do you want to add additional authorized people to pickup your child? Identification will be required at pickup";
+    const hasPickup = (row[pickupCol] || '').toLowerCase() === 'yes';
+    const pickup = hasPickup ? (row['Additional pickup person(s). Please include full names and relationships to the child in the field below.'] || '') : '';
+
+    const allergiesYN = (row["Does your child have any allergies/sensitivities?"] || '').toLowerCase();
+    const allergies = allergiesYN === 'yes' ? (row['List all allergies/sensitivities'] || '') : '';
+    const medical = row["Please list any other important medical information for your child (medications, puffers, learning disabilities, etc.)"] || '';
+    const healthCard = row["Child's Health Card number"] || '';
+    const medFull = [medical !== 'none' && medical !== 'N/a' ? medical : '', healthCard ? 'Health card: ' + healthCard : ''].filter(Boolean).join(' | ');
+
+    const payMethod  = row['How would you like to pay?'] || '';
+    const grandTotal = row['Grand total'] || '';
+
+    // Create one entry per registered week
+    WEEKS.forEach(wk => {
+      const hasCamp = (row[wk.campCol] || '').toLowerCase() === 'camp';
+      if(!hasCamp) return;
+      const hasPre  = (row[wk.preCol] || '').toLowerCase() === 'pre-care';
+      const hasPost = (row[wk.postCol] || '').toLowerCase() === 'post-care';
+      const campDays = [0,1,2,3,4];
+      const preDays  = hasPre  ? [0,1,2,3,4] : [];
+      const postDays = hasPost ? [0,1,2,3,4] : [];
+
+      const existingMatch = window.campers.some(c =>
+        c.first === first && c.last === last && c.weekStart === wk.start
+      );
+
+      importRows.push({
+        csvName: fullName, weekLabel: wk.label, weekStart: wk.start,
+        exists: existingMatch,
+        data: {
+          first, last, age: null,
+          parent, email, phone, address,
+          parent2, email2, phone2, address2,
+          ec1Name, ec1Phone, ec1Rel, ec2Name, ec2Phone, ec2Rel,
+          pickup, allergies,
+          medical: medFull,
+          notes, type: 'weekly', weekStart: wk.start,
+          campDays, preDays, postDays,
+          payMethod, grandTotal
+        }
+      });
+    });
+  });
+
+  // Show preview
+  document.getElementById('importPreviewTitle').textContent = importRows.length + ' registrations found';
+  const newCount = importRows.filter(r=>!r.exists).length;
+  const skipCount = importRows.filter(r=>r.exists).length;
+  document.getElementById('importPreviewSub').textContent = newCount + ' new · ' + skipCount + ' already exist (will skip)';
+  document.getElementById('importPreviewList').innerHTML = importRows.map(r =>
+    '<div class="import-row">'
+    + '<div class="import-row-name">' + r.csvName + '</div>'
+    + '<div class="import-row-weeks">' + r.weekLabel + '</div>'
+    + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
+    + '</div>'
+  ).join('');
+  document.getElementById('importPreview').style.display = 'block';
+  document.getElementById('importBtn').style.display = newCount > 0 ? 'flex' : 'none';
+  document.getElementById('importDrop').style.display = 'none';
+}
+
+async function doImport() {
+  const toImport = importRows.filter(r => !r.exists);
+  if(!toImport.length) return;
+  document.getElementById('importBtn').style.display = 'none';
+  document.getElementById('importProgress').style.display = 'block';
+  let done = 0;
+  for(const row of toImport) {
+    try {
+      await window._addDoc(window._collection(window._db, 'campers'), {
+        ...row.data,
+        createdAt: window._serverTimestamp(),
+        updatedAt: window._serverTimestamp()
+      });
+    } catch(e) {
+      console.error('Import error for', row.csvName, e);
+    }
+    done++;
+    const pct = Math.round(done/toImport.length*100);
+    document.getElementById('importProgressFill').style.width = pct + '%';
+    document.getElementById('importProgressLabel').textContent = 'Importing ' + done + ' of ' + toImport.length + '…';
+  }
+  document.getElementById('importProgressLabel').textContent = 'Done! ' + done + ' campers imported.';
+  showToast(done + ' campers imported successfully!');
+  setTimeout(() => closeImport(), 1800);
+}
+
+// Initial render (while Firebase loads)
+renderStats();
+
+// Expose functions needed by the Firebase module script and inline onclick handlers
+window.updateWeekFilter = updateWeekFilter;
+window.renderRoster = renderRoster;
+window.rCal = rCal;
+window.showToast = showToast;
+window.openImport = openImport;
+window.closeImport = closeImport;
+window.doImport = doImport;
+window.handleImportDrop = handleImportDrop;
+window.handleImportFile = handleImportFile;
+window.showPage = showPage;
+window.openModal = openModal;
+window.closeModal = closeModal;
+window.openDetail = openDetail;
+window.closeDetail = closeDetail;
+window.saveCamper = saveCamper;
+window.deleteCamper = deleteCamper;
+window.selType = selType;
+window.togDay = togDay;
+window.togCare = togCare;
+window.syncCare = syncCare;
+window.setCalView = setCalView;
+window.calBack = calBack;
+window.calFwd = calFwd;
+window.calToday = calToday;
+</script>
+</body>
+</html>
