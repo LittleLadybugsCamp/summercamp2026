@@ -5,83 +5,88 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Summer Camp Manager</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    /* Apple-inspired color system with camp green accent */
-    --green: #2E844A;
-    --green-mid: #2E844A;
-    --green-light: #E8F2EA;
-    --green-border: rgba(46,132,74,0.25);
+    /* Warm, design-forward palette with camp green accent */
+    --green: #3A7D43;
+    --green-deep: #2E5C36;
+    --green-light: #E5EFE5;
+    --green-soft: #DCE9DC;
+    --green-border: rgba(58,125,67,0.18);
 
-    --amber: #B26A00;
-    --amber-light: #FFF4E0;
-    --amber-border: rgba(178,106,0,0.22);
+    --amber: #B5751E;
+    --amber-light: #FAEFD9;
 
-    --blue: #0A7AFF;
-    --blue-light: #E6F0FF;
-    --blue-border: rgba(10,122,255,0.22);
+    --blue: #3A7BB8;
+    --blue-light: #E6EFF6;
 
-    --purple: #8951E0;
-    --purple-light: #F1EAFB;
-    --purple-border: rgba(137,81,224,0.22);
+    --purple: #7A5BA8;
+    --purple-light: #ECE6F4;
 
-    --coral: #D63333;
-    --coral-light: #FCEBEB;
-    --coral-border: rgba(214,51,51,0.22);
+    --coral: #B95844;
+    --coral-light: #FAE7E2;
 
-    --teal: #0B8C7A;
-    --teal-light: #DFF2EF;
+    --teal: #2F8B7A;
+    --teal-light: #E0F0EC;
 
-    /* Surfaces — iOS grouped backgrounds */
-    --bg: #F2F2F7;
+    /* Warm surfaces */
+    --bg: #FBF8F2;
+    --sidebar-bg: #F2EAD9;
+    --sidebar-bg-hover: #EBE2CE;
     --surface: #FFFFFF;
-    --surface2: #F7F7F9;
-    --surface-translucent: rgba(255,255,255,0.72);
+    --surface2: #F8F4ED;
 
-    /* Borders — iOS separator colors */
-    --border: rgba(60,60,67,0.13);
-    --border-light: rgba(60,60,67,0.08);
+    /* Warm borders */
+    --border: rgba(80,55,20,0.09);
+    --border-light: rgba(80,55,20,0.05);
+    --border-strong: rgba(80,55,20,0.14);
 
-    /* Text — iOS label hierarchy */
-    --text: #1C1C1E;
-    --text-2: rgba(60,60,67,0.78);
-    --text-3: rgba(60,60,67,0.56);
-    --text-4: rgba(60,60,67,0.35);
+    /* Warm text hierarchy */
+    --text: #2A241C;
+    --text-2: #6B5F52;
+    --text-3: #9B8F82;
+    --text-4: #BDB3A6;
 
-    /* Apple-style multi-layer shadows */
-    --shadow: 0 0 0 0.5px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.04);
-    --shadow-md: 0 0 0 0.5px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
-    --shadow-lg: 0 0 0 0.5px rgba(0,0,0,0.06), 0 24px 48px rgba(0,0,0,0.16), 0 8px 16px rgba(0,0,0,0.08);
+    /* Soft layered shadows */
+    --shadow: 0 1px 2px rgba(60,40,15,0.04), 0 0 0 1px rgba(60,40,15,0.03);
+    --shadow-md: 0 4px 12px rgba(60,40,15,0.05), 0 1px 3px rgba(60,40,15,0.04);
+    --shadow-lg: 0 24px 48px rgba(60,40,15,0.12), 0 8px 16px rgba(60,40,15,0.06);
 
-    /* iOS-style radii */
     --radius-sm: 6px;
     --radius: 10px;
     --radius-lg: 14px;
-    --radius-xl: 20px;
+    --radius-xl: 18px;
+
+    --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+
+    /* Shared horizontal page padding — keeps top bar, stats, and content aligned */
+    --page-pad-x: 32px;
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+    font-family: var(--font-sans);
     background: var(--bg);
     color: var(--text);
     font-size: 14px;
-    line-height: 1.45;
+    line-height: 1.5;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
   }
 
   /* ── Layout ── */
   .app-shell { display: flex; min-height: 100vh; }
 
   .sidebar {
-    width: 232px;
+    width: 240px;
     flex-shrink: 0;
-    background: rgba(246,246,248,0.85);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    background: var(--sidebar-bg);
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
@@ -91,7 +96,7 @@
     z-index: 10;
   }
   .sidebar-logo {
-    padding: 18px 18px 14px;
+    padding: 22px 20px 18px;
   }
   .sidebar-logo-img {
     width: 100%;
@@ -114,24 +119,39 @@
   .logo-text { font-weight: 600; font-size: 15px; color: var(--text); line-height: 1.2; }
   .logo-sub { font-size: 11px; color: var(--text-3); font-weight: 400; }
 
-  .sidebar-nav { padding: 8px 10px; flex: 1; }
+  .sidebar-nav { padding: 12px 12px; flex: 1; }
   .nav-item {
-    display: flex; align-items: center; gap: 9px;
-    padding: 6px 10px;
-    border-radius: 7px;
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px 12px 10px 14px;
+    border-radius: 10px;
     cursor: pointer;
-    color: var(--text);
-    font-size: 13px;
+    color: var(--text-2);
+    font-size: 14px;
     font-weight: 500;
-    transition: background .12s ease;
-    margin-bottom: 1px;
+    transition: background .15s ease, color .15s ease;
+    margin-bottom: 2px;
     border: none; background: none; width: 100%; text-align: left;
     font-family: inherit;
+    position: relative;
+    letter-spacing: -0.005em;
   }
-  .nav-item i { font-size: 15px; flex-shrink: 0; color: var(--text-3); transition: color .12s; }
-  .nav-item:hover { background: rgba(60,60,67,0.06); }
-  .nav-item.active { background: var(--green); color: #fff; }
-  .nav-item.active i { color: #fff; }
+  .nav-item i { font-size: 17px; flex-shrink: 0; color: var(--text-3); transition: color .15s; }
+  .nav-item:hover { background: var(--sidebar-bg-hover); color: var(--text); }
+  .nav-item:hover i { color: var(--text-2); }
+  .nav-item.active {
+    background: rgba(255,255,255,0.6);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .nav-item.active i { color: var(--green); }
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: -12px; top: 8px; bottom: 8px;
+    width: 3px;
+    background: var(--green);
+    border-radius: 0 3px 3px 0;
+  }
 
   .sidebar-footer {
     padding: 12px 10px 20px;
@@ -155,73 +175,108 @@
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
   .main-content {
-    margin-left: 232px;
+    margin-left: 240px;
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
   }
   .top-bar {
-    background: rgba(255,255,255,0.78);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    background: var(--bg);
     border-bottom: 1px solid var(--border);
-    padding: 12px 24px;
+    padding: 22px var(--page-pad-x) 18px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     position: sticky; top: 0; z-index: 5;
   }
-  .top-bar-title { font-size: 17px; font-weight: 600; flex: 1; letter-spacing: -0.02em; color: var(--text); }
-  .page { display: none; padding: 22px 24px; }
+  .top-bar-title {
+    flex: 1;
+    font-family: var(--font-serif);
+    font-size: 30px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1.1;
+  }
+  /* When the top-bar-title contains the logo, tighten spacing */
+  .top-bar:has(.top-bar-logo) { padding: 10px var(--page-pad-x) 8px; }
+  .top-bar-logo {
+    display: block;
+    height: 80px;
+    width: auto;
+    mix-blend-mode: multiply;
+  }
+  .page { display: none; padding: 0; }
   .page.active { display: block; }
 
-  /* ── Buttons - Apple style ── */
+  /* ── Buttons ── */
   .btn {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 6px 13px;
-    border-radius: 7px;
-    border: 0.5px solid var(--border);
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border-strong);
     background: var(--surface);
     color: var(--text);
-    font-size: 13px;
+    font-size: 13.5px;
     font-family: inherit;
     font-weight: 500;
     cursor: pointer;
-    transition: all .12s ease;
+    transition: all .15s ease;
     white-space: nowrap;
-    box-shadow: 0 0.5px 1.5px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
   }
-  .btn:hover { background: var(--surface2); }
-  .btn:active { transform: scale(0.97); }
+  .btn:hover { background: var(--surface2); border-color: var(--text-3); }
+  .btn:active { transform: scale(0.98); }
   .btn-primary {
-    background: linear-gradient(180deg, #36975A 0%, #2E844A 100%);
-    border-color: rgba(0,0,0,0.05); color: #fff;
-    box-shadow: 0 0.5px 1.5px rgba(0,0,0,0.08), inset 0 0.5px 0 rgba(255,255,255,0.18);
+    background: var(--green);
+    border-color: var(--green); color: #fff;
   }
-  .btn-primary:hover { background: linear-gradient(180deg, #3CA663 0%, #2E844A 100%); }
-  .btn-sm { padding: 4px 10px; font-size: 12.5px; border-radius: 6px; }
+  .btn-primary:hover { background: var(--green-deep); border-color: var(--green-deep); }
+  .btn-sm { padding: 6px 12px; font-size: 12.5px; border-radius: 8px; }
   .btn-ghost {
     border-color: transparent; background: transparent;
-    box-shadow: none;
   }
-  .btn-ghost:hover { background: rgba(60,60,67,0.08); }
+  .btn-ghost:hover { background: var(--surface2); border-color: var(--border-light); }
   .btn-danger { color: var(--coral); }
-  .btn-danger:hover { background: var(--coral-light); }
-  .btn i { font-size: 14px; }
+  .btn-danger:hover { background: var(--coral-light); border-color: rgba(185,88,68,0.3); }
+  .btn i { font-size: 16px; }
 
-  /* ── Stats - Apple style ── */
-  .stats-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 22px; }
+  /* ── Stats — design-forward with serif numbers ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
   .stat-card {
     background: var(--surface);
-    border-radius: 12px;
-    padding: 14px 16px;
-    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px 20px;
+    transition: border-color .15s, transform .15s;
   }
-  .stat-label { font-size: 13px; color: var(--text-3); margin-bottom: 6px; font-weight: 500; letter-spacing: -0.01em; }
-  .stat-val { font-size: 30px; font-weight: 600; color: var(--text); line-height: 1.05; letter-spacing: -0.035em; font-feature-settings: "tnum"; }
-  .stat-sub { font-size: 12px; color: var(--text-3); margin-top: 4px; font-weight: 400; }
+  .stat-card:hover { border-color: var(--border-strong); }
+  .stat-card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+  .stat-label { font-size: 13px; color: var(--text-2); font-weight: 500; letter-spacing: -0.005em; }
+  .stat-icon {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: var(--green-light);
+    color: var(--green);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .stat-icon i { font-size: 16px; }
+  .stat-icon.amber { background: var(--amber-light); color: var(--amber); }
+  .stat-icon.blue  { background: var(--blue-light);  color: var(--blue); }
+  .stat-icon.purple { background: var(--purple-light); color: var(--purple); }
+  .stat-icon.coral { background: var(--coral-light); color: var(--coral); }
+  .stat-val {
+    font-family: var(--font-serif);
+    font-size: 38px;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-feature-settings: "tnum";
+  }
+  .stat-sub { font-size: 12.5px; color: var(--text-3); margin-top: 8px; font-weight: 400; letter-spacing: -0.005em; }
 
   /* ── Toolbar ── */
   .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
@@ -233,46 +288,45 @@
     font-size: 13.5px;
     color: var(--text);
     background: var(--surface);
-    border: 0.5px solid var(--border);
-    border-radius: 8px;
-    padding: 7px 11px;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 9px 13px;
     width: 100%;
     outline: none;
     transition: border-color .15s, box-shadow .15s;
-    box-shadow: 0 0.5px 1.5px rgba(0,0,0,0.03);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
   }
   input:focus, select:focus, textarea:focus {
-    border-color: var(--blue);
-    box-shadow: 0 0 0 3px rgba(10,122,255,0.18);
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(58,125,67,0.15);
   }
   select { cursor: pointer; }
   ::placeholder { color: var(--text-3); }
 
-  /* ── Camper cards - Apple style ── */
-  .camper-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+  /* ── Camper cards ── */
+  .camper-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
   .camper-card {
     background: var(--surface);
-    border-radius: 12px;
-    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
     cursor: pointer;
-    transition: transform .14s ease, box-shadow .14s ease;
-    box-shadow: var(--shadow);
+    transition: border-color .15s, transform .15s, box-shadow .15s;
     position: relative;
   }
-  .camper-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+  .camper-card:hover { border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-md); }
   .camper-card:active { transform: scale(0.99); }
-  .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
   .avatar {
-    width: 40px; height: 40px;
+    width: 44px; height: 44px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-weight: 600; font-size: 14px;
     flex-shrink: 0;
     letter-spacing: -0.02em;
   }
-  .card-name { font-weight: 600; font-size: 15px; letter-spacing: -0.02em; color: var(--text); }
-  .card-sub { font-size: 12.5px; color: var(--text-3); margin-top: 1px; font-weight: 400; }
+  .card-name { font-weight: 600; font-size: 15.5px; letter-spacing: -0.015em; color: var(--text); line-height: 1.3; }
+  .card-sub { font-size: 12.5px; color: var(--text-3); margin-top: 2px; font-weight: 400; }
   .badges { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
   .badge {
     font-size: 11px; padding: 3px 8px;
@@ -286,14 +340,14 @@
   .badge-post { background: var(--purple-light); color: var(--purple); }
   .badge-allergy { background: var(--coral-light); color: var(--coral); }
   .week-info { font-size: 11.5px; color: var(--text-3); margin-bottom: 7px; display: flex; align-items: center; gap: 4px; font-weight: 500; }
-  .day-pills { display: flex; gap: 3px; }
+  .day-pills { display: flex; gap: 4px; }
   .dp {
-    font-size: 11px; padding: 3px 8px;
+    font-size: 11px; padding: 4px 9px;
     border-radius: 6px;
     background: var(--surface2);
     color: var(--text-3);
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
   }
   .dp.on { background: var(--green); color: #fff; }
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-3); grid-column: 1/-1; font-size: 14px; letter-spacing: -0.01em; }
@@ -321,7 +375,7 @@
   }
   .modal-overlay.open .modal { transform: translateY(0) scale(1); }
   .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-  .modal-title { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+  .modal-title { font-family: var(--font-serif); font-size: 24px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; }
   .modal-close { background: none; border: none; cursor: pointer; color: var(--text-3); font-size: 20px; padding: 2px; border-radius: 6px; }
   .modal-close:hover { background: var(--surface2); }
   .form-section-label {
@@ -389,24 +443,24 @@
 
   /* ── Calendar header ── */
   .cal-header {
-    background: rgba(255,255,255,0.78);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    background: var(--bg);
     border-bottom: 1px solid var(--border);
     position: sticky; top: 0; z-index: 5;
   }
   .cal-header-row1 {
-    padding: 16px 24px 10px;
+    padding: 22px var(--page-pad-x) 12px;
     display: flex; align-items: center; justify-content: space-between; gap: 14px;
   }
   .cal-header-title {
-    display: flex; align-items: baseline; gap: 10px; min-width: 0;
+    display: flex; align-items: baseline; gap: 12px; min-width: 0;
   }
   .cal-header-title > span:first-child {
-    font-size: 22px; font-weight: 700; white-space: nowrap; color: var(--text); letter-spacing: -0.03em;
+    font-family: var(--font-serif);
+    font-size: 30px; font-weight: 500; white-space: nowrap; color: var(--text); letter-spacing: -0.02em;
   }
+  .cal-sub { font-size: 13px; color: var(--text-3); font-weight: 400; white-space: nowrap; }
   .cal-header-row2 {
-    padding: 0 24px 14px;
+    padding: 0 var(--page-pad-x) 18px;
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
   .cal-nav { display: flex; gap: 4px; align-items: center; }
@@ -415,21 +469,22 @@
   .cal-sub { font-size: 12px; color: var(--text-3); font-weight: 400; white-space: nowrap; }
   .view-toggle {
     display: flex;
-    background: var(--surface2);
-    padding: 2px;
-    border-radius: 9px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    padding: 3px;
+    border-radius: 10px;
     flex-shrink: 0;
   }
   .view-toggle-btn {
-    padding: 5px 14px; font-size: 13px; font-weight: 500;
+    padding: 6px 14px; font-size: 13px; font-weight: 500;
     background: transparent; border: none; cursor: pointer;
     color: var(--text-2); font-family: inherit;
     transition: all .14s ease; white-space: nowrap;
     display: flex; align-items: center; gap: 5px;
     border-radius: 7px;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
   }
-  .view-toggle-btn.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 0 0 0.5px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06); }
+  .view-toggle-btn.active { background: var(--green); color: #fff; font-weight: 500; }
   .view-toggle-btn:not(.active):hover { color: var(--text); }
 
   /* Weekly view */
@@ -549,7 +604,7 @@
     border-bottom: 0.5px solid var(--border);
     flex-shrink: 0;
   }
-  .day-popup-title { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+  .day-popup-title { font-family: var(--font-serif); font-size: 22px; font-weight: 500; letter-spacing: -0.02em; }
   .day-popup-sub { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
   .day-popup-close { background: var(--surface2); border: none; cursor: pointer; color: var(--text-3); width: 28px; height: 28px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; }
   .day-popup-close i { font-size: 16px; }
@@ -626,7 +681,7 @@
   .detail-overlay.open .detail-panel { transform: translateX(0); }
   .detail-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
   .detail-avatar { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600; flex-shrink: 0; letter-spacing: -0.02em; }
-  .detail-name { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; }
+  .detail-name { font-family: var(--font-serif); font-size: 26px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; }
   .detail-sub { font-size: 13px; color: var(--text-3); margin-top: 1px; }
   .detail-close { margin-left: auto; background: var(--surface2); border: none; cursor: pointer; color: var(--text-3); width: 28px; height: 28px; border-radius: 50%; padding: 0; display: flex; align-items: center; justify-content: center; }
   .detail-close i { font-size: 16px; }
@@ -712,12 +767,10 @@
   .mobile-nav {
     display: none;
     position: fixed; bottom: 0; left: 0; right: 0;
-    background: rgba(255,255,255,0.78);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    border-top: 0.5px solid var(--border);
+    background: var(--sidebar-bg);
+    border-top: 1px solid var(--border);
     z-index: 20;
-    padding: 6px 0 max(env(safe-area-inset-bottom), 8px);
+    padding: 8px 0 max(env(safe-area-inset-bottom), 10px);
   }
   .mobile-nav-inner { display: flex; justify-content: space-around; }
   .mobile-nav-btn {
@@ -740,9 +793,9 @@
   .mobile-sync-bar {
     display: none;
     align-items: center; justify-content: flex-end;
-    gap: 6px; padding: 4px 16px;
-    background: var(--surface2);
-    border-bottom: 0.5px solid var(--border-light);
+    gap: 6px; padding: 5px 16px;
+    background: var(--sidebar-bg);
+    border-bottom: 1px solid var(--border-light);
     font-size: 11.5px; color: var(--text-3);
     font-weight: 500;
   }
@@ -757,12 +810,14 @@
     /* ── Top bar ── */
     .top-bar { padding: 11px 14px; gap: 7px; flex-wrap: nowrap; }
     .top-bar-title { font-size: 15px; }
+    .top-bar-logo { height: 60px; }
+    .top-bar:has(.top-bar-logo) { padding: 6px 14px; }
     .btn-label { display: none; }
 
     /* ── Pages ── */
-    .page { padding: 14px; }
-    .page > div[style*="padding:28px"] { padding: 0 !important; }
-    .cal-page-inner { padding: 0 !important; }
+    /* .page padding handled by --page-pad-x variable now */
+    /* Inner div padding uses --page-pad-x variable */
+    /* cal-page-inner uses --page-pad-x */
 
     /* ── Stats grid ── */
     .stats-grid { grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 14px; }
@@ -891,7 +946,7 @@
     <!-- Roster page -->
     <div id="page-roster" class="page active">
       <div class="top-bar">
-        <div class="top-bar-title">Camper Roster</div>
+        <div class="top-bar-title"><img src="" alt="Little Ladybug Camp" class="top-bar-logo" id="topBarLogo"></div>
         <button class="btn" onclick="openImport()">
           <i class="ti ti-upload"></i> <span class="btn-label">Import CSV</span>
         </button>
@@ -899,7 +954,7 @@
           <i class="ti ti-plus"></i> <span class="btn-label">Add camper</span>
         </button>
       </div>
-      <div style="padding:28px">
+      <div style="padding:28px var(--page-pad-x)">
         <div class="stats-grid" id="statsGrid"></div>
         <div class="toolbar">
           <div class="search-wrap">
@@ -910,9 +965,6 @@
             <option value="all">All types</option>
             <option value="weekly">Weekly</option>
             <option value="daily">Daily</option>
-          </select>
-          <select id="weekFilter" onchange="wF=this.value;renderRoster()">
-            <option value="all">All weeks</option>
           </select>
         </div>
         <div class="camper-grid" id="camperGrid"></div>
@@ -927,7 +979,7 @@
           <option value="">— Select a week —</option>
         </select>
       </div>
-      <div style="padding:24px 28px">
+      <div style="padding:24px var(--page-pad-x)">
         <div class="stats-grid" id="weeklyStatsGrid"></div>
         <div class="toolbar">
           <div class="search-wrap"><i class="ti ti-search"></i><input id="weeklySearch" placeholder="Search this week's campers…" oninput="weeklySQ=this.value.toLowerCase();rWeekly()"></div>
@@ -967,7 +1019,7 @@
           </select>
         </div>
       </div>
-      <div class="cal-page-inner" style="padding:28px">
+      <div class="cal-page-inner" style="padding:28px var(--page-pad-x)">
         <div id="calGrid"></div>
       </div>
     </div>
@@ -1150,20 +1202,6 @@
     <div class="form-section-label">Authorized pickup persons</div>
     <div class="form-group"><label class="form-label">Additional pickup people</label><textarea id="fPickup" rows="2" placeholder="Full names and relationships, e.g. Grandma Rosa (Grandmother), Uncle Dave (Uncle)" style="resize:vertical"></textarea></div>
 
-    <div class="form-section-label">Payment</div>
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Payment method</label>
-        <select id="fPayMethod">
-          <option value="">— Select —</option>
-          <option value="Credit">Credit card</option>
-          <option value="E-transfer">E-transfer</option>
-          <option value="Cash">Cash</option>
-          <option value="Cheque">Cheque</option>
-        </select>
-      </div>
-      <div class="form-group"><label class="form-label">Grand total</label><input type="text" id="fGrandTotal" placeholder="e.g. $864.45"></div>
-    </div>
-
     <div class="modal-footer">
       <button class="btn btn-ghost btn-danger" id="deleteBtn" onclick="deleteCamper()" style="display:none"><i class="ti ti-trash"></i> Delete</button>
       <div class="modal-footer-right">
@@ -1305,25 +1343,9 @@ function showToast(msg, type='success') {
 
 // ── Week filter ──
 function updateWeekFilter() {
+  // Week filter removed from Roster page; kept as no-op for safety
   const sel = document.getElementById('weekFilter');
   if (!sel) return;
-  const current = sel.value;
-  sel.innerHTML = '<option value="all">All weeks</option>';
-  // Always show all 7 defined camp weeks
-  WEEKS.forEach(wk => {
-    sel.innerHTML += `<option value="${wk.start}" ${wk.start===current?'selected':''}>${esc(wk.label)}</option>`;
-  });
-  // Include any extra weekStart values from existing data not in WEEKS (custom entries)
-  const knownStarts = new Set(WEEKS.map(w => w.start));
-  const customStarts = [...new Set(window.campers.map(c => c.weekStart).filter(Boolean))]
-    .filter(w => !knownStarts.has(w))
-    .sort();
-  customStarts.forEach(w => {
-    const d = new Date(w + 'T00:00:00');
-    const label = 'Week of ' + d.toLocaleDateString('en-CA', {month:'short', day:'numeric'});
-    sel.innerHTML += `<option value="${w}" ${w===current?'selected':''}>${label}</option>`;
-  });
-  wF = sel.value;
 }
 
 // ── HTML escape (XSS prevention) ──
@@ -1394,9 +1416,27 @@ function renderStats() {
   const dailyUnique  = groups.filter(g => g.registrations.some(r => r.type==='daily')).length;
   const totalRegs = window.campers.length;
   document.getElementById('statsGrid').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Total campers</div><div class="stat-val">${totalUnique}</div><div class="stat-sub">${totalRegs} total registration${totalRegs===1?'':'s'}</div></div>
-    <div class="stat-card"><div class="stat-label">Weekly</div><div class="stat-val">${weeklyUnique}</div><div class="stat-sub">At least 1 weekly</div></div>
-    <div class="stat-card"><div class="stat-label">Daily</div><div class="stat-val">${dailyUnique}</div><div class="stat-sub">At least 1 daily</div></div>
+    <div class="stat-card">
+      <div class="stat-card-head">
+        <div class="stat-label">Total campers</div>
+        <div class="stat-icon"><i class="ti ti-users"></i></div>
+      </div>
+      <div class="stat-val">${totalUnique}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-head">
+        <div class="stat-label">Weekly</div>
+        <div class="stat-icon"><i class="ti ti-calendar-week"></i></div>
+      </div>
+      <div class="stat-val">${weeklyUnique}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-head">
+        <div class="stat-label">Daily</div>
+        <div class="stat-icon amber"><i class="ti ti-calendar-event"></i></div>
+      </div>
+      <div class="stat-val">${dailyUnique}</div>
+    </div>
   `;
 }
 
@@ -1470,10 +1510,36 @@ function rWeekly() {
   const wkLabel = weekLabel(weeklyWk);
 
   statsEl.innerHTML = `
-    <div class="stat-card"><div class="stat-label">${esc(wkLabel)}</div><div class="stat-val">${totalThisWeek}</div><div class="stat-sub">Total campers</div></div>
-    <div class="stat-card"><div class="stat-label">Weekly</div><div class="stat-val">${weeklyCount}</div><div class="stat-sub">Mon–Fri</div></div>
-    <div class="stat-card"><div class="stat-label">Daily</div><div class="stat-val">${dailyCount}</div><div class="stat-sub">Selected days</div></div>
-    <div class="stat-card"><div class="stat-label">With care</div><div class="stat-val">${preCount+postCount}</div><div class="stat-sub">${preCount} pre · ${postCount} post</div></div>
+    <div class="stat-card">
+      <div class="stat-card-head">
+        <div class="stat-label">${esc(wkLabel)}</div>
+        <div class="stat-icon"><i class="ti ti-users"></i></div>
+      </div>
+      <div class="stat-val">${totalThisWeek}</div>
+      <div class="stat-sub">Total campers</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-head">
+        <div class="stat-label">Weekly</div>
+        <div class="stat-icon"><i class="ti ti-calendar-week"></i></div>
+      </div>
+      <div class="stat-val">${weeklyCount}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-head">
+        <div class="stat-label">Daily</div>
+        <div class="stat-icon amber"><i class="ti ti-calendar-event"></i></div>
+      </div>
+      <div class="stat-val">${dailyCount}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-head">
+        <div class="stat-label">With care</div>
+        <div class="stat-icon blue"><i class="ti ti-sunrise"></i></div>
+      </div>
+      <div class="stat-val">${preCount+postCount}</div>
+      <div class="stat-sub">${preCount} pre · ${postCount} post</div>
+    </div>
   `;
 
   // Apply search and type filters
@@ -1609,11 +1675,6 @@ function openDetail(key) {
       <div class="detail-section-title">Authorized pickup persons</div>
       <div class="detail-row"><i class="ti ti-walk"></i><span>${esc(c.pickup)}</span></div>
     </div>`:''}
-    ${(c.payMethod || regs.some(r=>r.grandTotal))?`<div class="detail-section">
-      <div class="detail-section-title">Payment</div>
-      ${c.payMethod?`<div class="detail-row"><i class="ti ti-credit-card"></i><span>${esc(c.payMethod)}</span></div>`:''}
-      ${regs.filter(r=>r.grandTotal).map(r=>`<div class="detail-row"><i class="ti ti-receipt"></i><span>${esc(weekLabel(r.weekStart))}: <strong>${esc(r.grandTotal)}</strong></span></div>`).join('')}
-    </div>`:''}
   `;
   document.getElementById('detailOverlay').classList.add('open');
 }
@@ -1689,8 +1750,7 @@ function openModal(id=null) {
   document.getElementById('fEc2Phone').value = c?.ec2Phone||'';
   document.getElementById('fEc2Rel').value = c?.ec2Rel||'';
   document.getElementById('fPickup').value = c?.pickup||'';
-  document.getElementById('fPayMethod').value = c?.payMethod||'';
-  document.getElementById('fGrandTotal').value = c?.grandTotal||'';
+
   document.getElementById('modalOverlay').classList.add('open');
 }
 function closeModal() {
@@ -1730,8 +1790,6 @@ async function saveCamper() {
     ec2Phone: document.getElementById('fEc2Phone').value.trim(),
     ec2Rel: document.getElementById('fEc2Rel').value.trim(),
     pickup: document.getElementById('fPickup').value.trim(),
-    payMethod: document.getElementById('fPayMethod').value,
-    grandTotal: document.getElementById('fGrandTotal').value.trim(),
     updatedAt: window._serverTimestamp()
   };
   try {
@@ -1940,9 +1998,9 @@ function rCalMonth() {
       if(wt.daily.size) html += '<span style="color:var(--amber)">' + wt.daily.size + ' daily</span>';
       html += '</div>';
       if(wt.pre.size || wt.post.size) {
-        html += '<div style="font-size:10px;color:var(--text-3);text-align:center;margin-top:2px">';
-        if(wt.pre.size) html += '<span style="color:var(--blue)">↑' + wt.pre.size + '</span> ';
-        if(wt.post.size) html += '<span style="color:var(--purple)">↓' + wt.post.size + '</span>';
+        html += '<div style="font-size:10px;color:var(--text-3);text-align:center;margin-top:2px;line-height:1.5">';
+        if(wt.pre.size) html += '<div style="color:var(--blue)">' + wt.pre.size + ' pre-care</div>';
+        if(wt.post.size) html += '<div style="color:var(--purple)">' + wt.post.size + ' post-care</div>';
         html += '</div>';
       }
     }
@@ -2078,8 +2136,6 @@ function buildImportRows(csvRows) {
     const healthCard = row["Child's Health Card number"] || '';
     const medFull = [medical !== 'none' && medical !== 'N/a' ? medical : '', healthCard ? 'Health card: ' + healthCard : ''].filter(Boolean).join(' | ');
 
-    const payMethod  = row['How would you like to pay?'] || '';
-    const grandTotal = row['Grand total'] || '';
 
     // Create one entry per registered week
     WEEKS.forEach(wk => {
@@ -2106,9 +2162,7 @@ function buildImportRows(csvRows) {
           pickup, allergies,
           medical: medFull,
           notes, type: 'weekly', weekStart: wk.start,
-          campDays, preDays, postDays,
-          payMethod, grandTotal
-        }
+          campDays, preDays, postDays}
       });
     });
   });
@@ -2192,6 +2246,11 @@ document.addEventListener('keydown', (e) => {
   else if (document.getElementById('detailOverlay').classList.contains('open')) closeDetail();
   else if (document.getElementById('modalOverlay').classList.contains('open')) closeModal();
 });
+
+// Sync top-bar logo with sidebar logo
+const sidebarLogo = document.querySelector('.sidebar-logo-img');
+const topBarLogo = document.getElementById('topBarLogo');
+if (sidebarLogo && topBarLogo) topBarLogo.src = sidebarLogo.src;
 
 // Initial render (while Firebase loads)
 renderStats();
