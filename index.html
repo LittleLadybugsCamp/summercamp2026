@@ -949,6 +949,15 @@
     .top-bar:has(.top-bar-logo) { padding: 6px 14px; }
     .btn-label { display: none; }
 
+    /* Hide the green accent bar pseudo-element on mobile bottom nav buttons */
+    .mobile-nav-btn.active::before { display: none !important; }
+
+    /* Prevent calendar grid from pushing the page wider than viewport
+       (which was stretching the buttons above to double-width on Week view) */
+    .main-content { overflow-x: hidden; }
+    .cal-page-inner { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+    .cal-grid, .month-grid { min-width: 0; }
+
     /* ── Pages ── */
     /* .page padding handled by --page-pad-x variable now */
     /* Inner div padding uses --page-pad-x variable */
