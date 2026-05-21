@@ -763,6 +763,132 @@
   .reg-block-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 5px; letter-spacing: -0.01em; }
   .reg-block-type { display: flex; gap: 4px; }
 
+  /* ── Icon buttons ── */
+  .btn-icon {
+    padding: 9px;
+    width: 38px;
+    height: 38px;
+    justify-content: center;
+  }
+  .btn-icon i { font-size: 17px; }
+
+  /* ── Big page heading (Weekly Roster) — matches logo presence ── */
+  .top-bar-heading { padding: 14px var(--page-pad-x) 12px !important; }
+  .page-heading {
+    flex: 1;
+    font-family: var(--font-serif);
+    font-size: 56px;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--text);
+    margin: 0;
+  }
+
+  /* ── Reveal-able search bar ── */
+  .search-reveal {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px var(--page-pad-x);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    animation: searchSlide .18s ease-out;
+  }
+  .search-reveal .search-wrap { flex: 1; }
+  @keyframes searchSlide {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Calendar controls bar ── */
+  .cal-controls-bar {
+    padding: 18px var(--page-pad-x) 8px;
+    background: var(--bg);
+  }
+  .cal-week-group {
+    display: block !important;
+    margin-bottom: 14px;
+  }
+  .cal-week-group-label {
+    font-family: var(--font-serif);
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--text-2);
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+  .cal-week-group-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .cal-week-group-row .week-btn {
+    flex: 0 1 160px;
+  }
+
+  /* ── Week selection buttons ── */
+  .week-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .week-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: inherit;
+    text-align: left;
+    flex: 1 1 130px;
+    max-width: 200px;
+  }
+  .week-btn:hover { border-color: var(--text-3); transform: translateY(-1px); }
+  .week-btn-label {
+    font-weight: 600; font-size: 14px;
+    color: var(--text); letter-spacing: -0.01em;
+  }
+  .week-btn-dates {
+    font-size: 11.5px; color: var(--text-3); font-weight: 400;
+  }
+  .week-btn.active {
+    background: var(--green);
+    border-color: var(--green);
+  }
+  .week-btn.active .week-btn-label { color: #fff; }
+  .week-btn.active .week-btn-dates { color: rgba(255,255,255,0.88); }
+
+    /* ── Print modal options ── */
+  .print-options { display: flex; flex-direction: column; gap: 12px; }
+  .print-option {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .print-option-head {
+    display: flex; align-items: flex-start; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .print-option-head > i {
+    font-size: 22px;
+    color: var(--green);
+    background: var(--green-light);
+    width: 38px; height: 38px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 9px;
+    flex-shrink: 0;
+  }
+  .print-option-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
+  .print-option-desc { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
+
   /* ── Mobile Bottom Nav ── */
   .mobile-nav {
     display: none;
@@ -809,6 +935,15 @@
 
     /* ── Top bar ── */
     .top-bar { padding: 11px 14px; gap: 7px; flex-wrap: nowrap; }
+    .page-heading { font-size: 34px; }
+    .top-bar-heading { padding: 14px 14px 10px !important; }
+    .week-btn { flex: 1 1 calc(50% - 4px); max-width: none; padding: 8px 12px; }
+    .cal-controls-bar { padding: 14px 14px 6px; }
+    .cal-week-group-row .week-btn { flex: 1 1 calc(50% - 4px); }
+    .cal-week-group-label { font-size: 15px; margin-bottom: 6px; }
+    .week-btn-label { font-size: 13px; }
+    .week-btn-dates { font-size: 10.5px; }
+    .search-reveal { padding: 10px 14px; }
     .top-bar-title { font-size: 15px; }
     .top-bar-logo { height: 60px; }
     .top-bar:has(.top-bar-logo) { padding: 6px 14px; }
@@ -919,7 +1054,7 @@
     </div>
     <nav class="sidebar-nav">
       <button class="nav-item active" onclick="showPage('roster',this)">
-        <i class="ti ti-users"></i> Roster
+        <i class="ti ti-users"></i> Campers
       </button>
       <button class="nav-item" onclick="showPage('weekly',this)">
         <i class="ti ti-calendar-event"></i> Weekly Roster
@@ -947,6 +1082,9 @@
     <div id="page-roster" class="page active">
       <div class="top-bar">
         <div class="top-bar-title"><img src="" alt="Little Ladybug Camp" class="top-bar-logo" id="topBarLogo"></div>
+        <button class="btn btn-icon" onclick="toggleSearch('campersSearchBar','campersSearchInput')" aria-label="Search">
+          <i class="ti ti-search"></i>
+        </button>
         <button class="btn" onclick="openImport()">
           <i class="ti ti-upload"></i> <span class="btn-label">Import CSV</span>
         </button>
@@ -954,69 +1092,71 @@
           <i class="ti ti-plus"></i> <span class="btn-label">Add camper</span>
         </button>
       </div>
+      <div class="search-reveal" id="campersSearchBar" style="display:none">
+        <div class="search-wrap">
+          <i class="ti ti-search"></i>
+          <input id="campersSearchInput" type="text" placeholder="Search campers…" oninput="sQ=this.value.toLowerCase();renderRoster()">
+        </div>
+        <button class="btn btn-ghost btn-icon" onclick="closeSearch('campersSearchBar','campersSearchInput')" aria-label="Close search">
+          <i class="ti ti-x"></i>
+        </button>
+      </div>
       <div style="padding:28px var(--page-pad-x)">
         <div class="stats-grid" id="statsGrid"></div>
-        <div class="toolbar">
-          <div class="search-wrap">
-            <i class="ti ti-search"></i>
-            <input type="text" placeholder="Search campers…" oninput="sQ=this.value.toLowerCase();renderRoster()">
-          </div>
-          <select onchange="tF=this.value;renderRoster()">
-            <option value="all">All types</option>
-            <option value="weekly">Weekly</option>
-            <option value="daily">Daily</option>
-          </select>
-        </div>
         <div class="camper-grid" id="camperGrid"></div>
       </div>
     </div>
 
     <!-- Weekly Roster page -->
     <div id="page-weekly" class="page">
-      <div class="top-bar">
-        <div class="top-bar-title">Weekly Roster</div>
-        <select id="weekRosterSel" onchange="rWeekly()" style="font-size:13px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);cursor:pointer;font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;min-width:200px">
-          <option value="">— Select a week —</option>
-        </select>
+      <div class="top-bar top-bar-heading">
+        <h1 class="page-heading">Weekly Roster</h1>
+        <button class="btn btn-icon" onclick="toggleSearch('weeklySearchBar','weeklySearchInput')" aria-label="Search">
+          <i class="ti ti-search"></i>
+        </button>
+        <button class="btn btn-icon" onclick="openPrint()" aria-label="Print">
+          <i class="ti ti-printer"></i>
+        </button>
+      </div>
+      <div class="search-reveal" id="weeklySearchBar" style="display:none">
+        <div class="search-wrap">
+          <i class="ti ti-search"></i>
+          <input id="weeklySearchInput" type="text" placeholder="Search this week's campers…" oninput="weeklySQ=this.value.toLowerCase();rWeekly()">
+        </div>
+        <button class="btn btn-ghost btn-icon" onclick="closeSearch('weeklySearchBar','weeklySearchInput')" aria-label="Close search">
+          <i class="ti ti-x"></i>
+        </button>
       </div>
       <div style="padding:24px var(--page-pad-x)">
+        <div class="week-buttons" id="weekButtons"></div>
         <div class="stats-grid" id="weeklyStatsGrid"></div>
-        <div class="toolbar">
-          <div class="search-wrap"><i class="ti ti-search"></i><input id="weeklySearch" placeholder="Search this week's campers…" oninput="weeklySQ=this.value.toLowerCase();rWeekly()"></div>
-          <select onchange="weeklyTF=this.value;rWeekly()">
-            <option value="all">All types</option>
-            <option value="weekly">Weekly</option>
-            <option value="daily">Daily</option>
-          </select>
-        </div>
         <div class="camper-grid" id="weeklyCamperGrid"></div>
       </div>
     </div>
 
     <!-- Calendar page -->
     <div id="page-calendar" class="page">
-      <div class="cal-header">
-        <div class="cal-header-row1">
-          <div class="cal-header-title">
-            <span id="calMonthLabel">Calendar</span>
-            <span class="cal-sub" id="calWeekLabel"></span>
-          </div>
-          <div class="view-toggle">
-            <button class="view-toggle-btn" id="vBtnWeek" onclick="setCalView('week')"><i class="ti ti-calendar-week"></i> Week</button>
-            <button class="view-toggle-btn active" id="vBtnMonth" onclick="setCalView('month')"><i class="ti ti-calendar-month"></i> Month</button>
+      <div class="top-bar top-bar-heading">
+        <h1 class="page-heading">Calendar</h1>
+      </div>
+      <div class="cal-controls-bar">
+        <div class="cal-week-group">
+          <div class="cal-week-group-label">July</div>
+          <div class="cal-week-group-row" id="calWeekRowJul">
+            <button class="week-btn active" data-month="2026-07" onclick="selectCalMonth('2026-07')">
+              <div class="week-btn-label">Month</div>
+              <div class="week-btn-dates">All of July</div>
+            </button>
           </div>
         </div>
-        <div class="cal-header-row2">
-          <div class="cal-nav">
-            <button class="btn btn-ghost btn-sm" onclick="calBack()"><i class="ti ti-arrow-left"></i></button>
-            <button class="btn btn-sm" onclick="calToday()">Today</button>
-            <button class="btn btn-ghost btn-sm" onclick="calFwd()"><i class="ti ti-arrow-right"></i></button>
+        <div class="cal-week-group">
+          <div class="cal-week-group-label">August</div>
+          <div class="cal-week-group-row" id="calWeekRowAug">
+            <button class="week-btn" data-month="2026-08" onclick="selectCalMonth('2026-08')">
+              <div class="week-btn-label">Month</div>
+              <div class="week-btn-dates">All of August</div>
+            </button>
           </div>
-          <select onchange="cF=this.value;rCal()" style="font-size:13px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);cursor:pointer;font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;width:auto">
-            <option value="all">All campers</option>
-            <option value="weekly">Weekly only</option>
-            <option value="daily">Daily only</option>
-          </select>
         </div>
       </div>
       <div class="cal-page-inner" style="padding:28px var(--page-pad-x)">
@@ -1030,7 +1170,7 @@
     <div class="mobile-nav-inner">
       <button class="mobile-nav-btn nav-item active" onclick="showPage('roster',this)">
         <i class="ti ti-users"></i>
-        Roster
+        Campers
       </button>
       <button class="mobile-nav-btn nav-item" onclick="showPage('weekly',this)">
         <i class="ti ti-calendar-event"></i>
@@ -1044,6 +1184,23 @@
   </nav>
 </div>
 
+
+<!-- Print Modal -->
+<div class="modal-overlay" id="printOverlay" onclick="if(event.target===this)closePrintModal()">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">Print sign-in sheet</div>
+      <button class="btn btn-ghost btn-icon" onclick="closePrintModal()" aria-label="Close"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="printDaySelect">Pick a day</label>
+      <select id="printDaySelect" style="margin-bottom:16px"></select>
+    </div>
+    <button class="btn btn-primary" onclick="doPrint()" style="width:100%">
+      <i class="ti ti-printer"></i> Print
+    </button>
+  </div>
+</div>
 
 <!-- Day Popup -->
 <div class="day-popup-overlay" id="dayPopupOverlay" onclick="if(event.target===this)closeDayPopup()">
@@ -1256,12 +1413,10 @@ onSnapshot(campersRef, (snapshot) => {
   window._avatarIdx.clear();
   window.campers.forEach((c, i) => window._avatarIdx.set(c.id, i));
 
-  // Update week filter options
-  if (typeof window.updateWeekFilter === 'function') window.updateWeekFilter();
   if (typeof window.renderStats === 'function') window.renderStats();
   if (typeof window.renderRoster === 'function') window.renderRoster();
   if (typeof window.rCal === 'function' && document.getElementById('page-calendar').classList.contains('active')) window.rCal();
-  if (typeof window.populateWeeklyDropdown === 'function') window.populateWeeklyDropdown();
+  if (typeof window.populateWeekButtons === 'function') window.populateWeekButtons();
   if (typeof window.rWeekly === 'function' && document.getElementById('page-weekly').classList.contains('active')) window.rWeekly();
 
   // Hide loading
@@ -1306,8 +1461,10 @@ let cType = 'weekly';
 let sQ = '';
 let tF = 'all';
 let wF = 'all';
-let wO = 0;
-let cF = 'all';
+// Calendar state: explicit month/week selection (restricted to July & August)
+let selectedCalMonth = '2026-07';  // YYYY-MM
+let selectedCalWeek  = '2026-07-13'; // first Monday of Week 1
+let cF = 'all'; // calendar type filter — kept at 'all' since dropdown was removed
 // Weekly roster state
 let weeklyWk = '';   // selected week
 let weeklySQ = '';   // search
@@ -1324,7 +1481,7 @@ function showPage(id, btn) {
     if (onclickAttr.includes("showPage('" + id + "'")) x.classList.add('active');
   });
   if (id === 'calendar') rCal();
-  if (id === 'weekly') { populateWeeklyDropdown(); rWeekly(); }
+  if (id === 'weekly') { populateWeekButtons(); rWeekly(); }
 }
 
 // ── Toast ──
@@ -1339,13 +1496,6 @@ function showToast(msg, type='success') {
     t.classList.remove('show');
     setTimeout(() => t.remove(), 300);
   }, 3000);
-}
-
-// ── Week filter ──
-function updateWeekFilter() {
-  // Week filter removed from Roster page; kept as no-op for safety
-  const sel = document.getElementById('weekFilter');
-  if (!sel) return;
 }
 
 // ── HTML escape (XSS prevention) ──
@@ -1488,11 +1638,9 @@ function renderRoster() {
 
 // ── Weekly Roster page ──
 function rWeekly() {
-  const sel = document.getElementById('weekRosterSel');
-  if (!sel) return;
-  weeklyWk = sel.value;
   const statsEl = document.getElementById('weeklyStatsGrid');
   const gridEl  = document.getElementById('weeklyCamperGrid');
+  if (!statsEl || !gridEl) return;
 
   if (!weeklyWk) {
     statsEl.innerHTML = '';
@@ -1580,17 +1728,175 @@ function rWeekly() {
   }).join('');
 }
 
-function populateWeeklyDropdown() {
-  const sel = document.getElementById('weekRosterSel');
-  if (!sel || typeof WEEKS === 'undefined') return;
-  // Only repopulate if needed
-  if (sel.options.length > 1) return;
-  WEEKS.forEach(wk => {
+function populateWeekButtons() {
+  const container = document.getElementById('weekButtons');
+  if (!container || typeof WEEKS === 'undefined' || WEEKS.length === 0) return;
+
+  // Auto-select Week 1 if nothing is selected yet
+  if (!weeklyWk) weeklyWk = WEEKS[0].start;
+
+  // Only build the DOM once
+  if (container.children.length === 0) {
+    WEEKS.forEach(wk => {
+      const parts = wk.label.split(' (');
+      const name = parts[0];
+      const dates = parts[1] ? parts[1].replace(')', '') : '';
+      const btn = document.createElement('button');
+      btn.className = 'week-btn';
+      btn.dataset.weekStart = wk.start;
+      btn.onclick = () => selectWeek(wk.start);
+      btn.innerHTML = '<div class="week-btn-label">' + esc(name) + '</div>' +
+                      (dates ? '<div class="week-btn-dates">' + esc(dates) + '</div>' : '');
+      container.appendChild(btn);
+    });
+  }
+
+  // Always refresh active state — so returning to the page shows the previous selection
+  container.querySelectorAll('.week-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.weekStart === weeklyWk);
+  });
+}
+
+function selectWeek(weekStart) {
+  weeklyWk = weekStart;
+  document.querySelectorAll('#weekButtons .week-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.weekStart === weekStart);
+  });
+  rWeekly();
+}
+
+// ── Print flow ──
+function openPrint() {
+  if (!weeklyWk) {
+    showToast('Select a week first', 'error');
+    return;
+  }
+  // Populate day select with the 5 weekdays of the selected week
+  const sel = document.getElementById('printDaySelect');
+  sel.innerHTML = '';
+  const wkStart = new Date(weeklyWk + 'T00:00:00');
+  const dayNames = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  dayNames.forEach((name, i) => {
+    const d = new Date(wkStart);
+    d.setDate(d.getDate() + i);
+    const dateStr = d.toLocaleDateString('en-CA', { month:'short', day:'numeric' });
     const opt = document.createElement('option');
-    opt.value = wk.start;
-    opt.textContent = wk.label;
+    opt.value = i;
+    opt.textContent = name + ' — ' + dateStr;
     sel.appendChild(opt);
   });
+
+  // Default to today if today is in the selected week
+  const todayStr = dStr(new Date());
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(wkStart);
+    d.setDate(d.getDate() + i);
+    if (dStr(d) === todayStr) { sel.value = String(i); break; }
+  }
+
+  document.getElementById('printOverlay').classList.add('open');
+}
+
+function closePrintModal() {
+  document.getElementById('printOverlay').classList.remove('open');
+}
+
+function doPrint() {
+  if (!weeklyWk) return;
+
+  const title = 'Little Ladybugs Camp';
+  const dayIdx = parseInt(document.getElementById('printDaySelect').value, 10);
+  const wkStart = new Date(weeklyWk + 'T00:00:00');
+  const targetDate = new Date(wkStart);
+  targetDate.setDate(targetDate.getDate() + dayIdx);
+  const subtitle = targetDate.toLocaleDateString('en-CA', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  const dateLine = weekLabel(weeklyWk);
+  const campers = window.campers
+    .filter(c => c.weekStart === weeklyWk && (c.campDays || []).includes(dayIdx))
+    .sort((a,b) => ((a.last||'')+(a.first||'')).localeCompare((b.last||'')+(b.first||'')));
+
+  const rowsHtml = campers.length
+    ? campers.map(c =>
+        '<tr><td class="name-cell">' + esc(c.first || '') + ' ' + esc(c.last || '') +
+        '</td><td class="time-cell"></td><td class="time-cell"></td></tr>'
+      ).join('')
+    : '<tr><td colspan="3" class="empty">No campers attending.</td></tr>';
+
+  const dateTimePrinted = new Date().toLocaleString('en-CA', { dateStyle:'long', timeStyle:'short' });
+
+  // Build minimal standalone HTML — system fonts only, no external resources = instant render
+  const printHtml = '<!DOCTYPE html><html><head><title>' + esc(title) + ' — ' + esc(subtitle) + '</title>' +
+    '<style>' +
+      '@page { size: letter portrait; margin: 0.6in; }' +
+      'body { font-family: Georgia, "Times New Roman", serif; color: #000; margin: 0; padding: 0; -webkit-print-color-adjust: exact; }' +
+      'h1 { font-size: 26pt; font-weight: 500; letter-spacing: -0.02em; margin: 0 0 4pt 0; }' +
+      'h2 { font-size: 14pt; font-weight: 400; color: #444; margin: 0 0 4pt 0; }' +
+      '.meta { font-size: 10pt; color: #888; margin-bottom: 22pt; font-family: -apple-system, system-ui, sans-serif; }' +
+      '.list { width: 100%; border-collapse: collapse; }' +
+      '.list thead th { font-size: 9.5pt; font-weight: 600; color: #555; letter-spacing: 0.5pt; text-transform: uppercase; text-align: left; padding: 6pt 8pt; border-bottom: 1pt solid #555; border-right: 0.5pt solid #bbb; font-family: -apple-system, system-ui, sans-serif; }' +
+      '.list tbody td { padding: 0 8pt; height: 32pt; vertical-align: middle; border-bottom: 0.5pt solid #bbb; border-right: 0.5pt solid #bbb; }' +
+      '.list tbody td:last-child, .list thead th:last-child { border-right: none; }' +
+      '.list .name-cell { font-size: 13pt; font-family: -apple-system, system-ui, "Helvetica Neue", sans-serif; }' +
+      '.list .time-cell { width: 110pt; }' +
+      '.list tr { break-inside: avoid; page-break-inside: avoid; }' +
+      '.empty { font-size: 13pt; color: #888; font-style: italic; padding: 20pt; text-align: center; border-bottom: none !important; }' +
+      '.footer { margin-top: 22pt; padding-top: 8pt; border-top: 0.5pt solid #ccc; font-size: 10pt; color: #777; text-align: right; font-family: -apple-system, system-ui, sans-serif; }' +
+    '</style></head><body>' +
+    '<h1>' + esc(title) + '</h1>' +
+    '<h2>' + esc(subtitle) + '</h2>' +
+    '<div class="meta">' + esc(dateLine) + '</div>' +
+    '<table class="list">' +
+      '<thead><tr><th>Name</th><th>Sign in time</th><th>Sign out time</th></tr></thead>' +
+      '<tbody>' + rowsHtml + '</tbody>' +
+    '</table>' +
+    '<div class="footer">' + campers.length + ' camper' + (campers.length === 1 ? '' : 's') + ' · Printed ' + esc(dateTimePrinted) + '</div>' +
+    '</body></html>';
+
+  closePrintModal();
+
+  // Render in a hidden iframe and print only that — bypasses main page's CSS/fonts entirely
+  let iframe = document.getElementById('printFrame');
+  if (iframe) iframe.remove();
+  iframe = document.createElement('iframe');
+  iframe.id = 'printFrame';
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(printHtml);
+  doc.close();
+
+  iframe.contentWindow.focus();
+  iframe.contentWindow.print();
+
+  // Clean up the iframe after print dialog closes
+  setTimeout(() => { if (iframe && iframe.parentNode) iframe.remove(); }, 2000);
+}
+
+// ── Search reveal toggle ──
+function toggleSearch(barId, inputId) {
+  const bar = document.getElementById(barId);
+  if (!bar) return;
+  if (bar.style.display === 'none' || !bar.style.display) {
+    bar.style.display = 'flex';
+    setTimeout(() => {
+      const input = document.getElementById(inputId);
+      if (input) input.focus();
+    }, 50);
+  } else {
+    closeSearch(barId, inputId);
+  }
+}
+
+function closeSearch(barId, inputId) {
+  const bar = document.getElementById(barId);
+  const input = document.getElementById(inputId);
+  if (input && input.value) {
+    input.value = '';
+    input.dispatchEvent(new Event('input'));
+  }
+  if (bar) bar.style.display = 'none';
 }
 
 // ── Detail panel ──
@@ -1822,29 +2128,70 @@ async function deleteCamper() {
 
 // ── Calendar ──
 let calView = 'month'; // 'week' or 'month'
-let mO = 0; // month offset
 
-function setCalView(v) {
-  calView = v;
-  document.getElementById('vBtnWeek').classList.toggle('active', v==='week');
-  document.getElementById('vBtnMonth').classList.toggle('active', v==='month');
-  rCal();
+function selectCalMonth(monthStr) {
+  calView = 'month';
+  selectedCalMonth = monthStr;
+  updateCalButtonActive();
+  rCalMonth();
 }
-function calBack()  { if(calView==='week') { wO--; } else { mO--; } rCal(); }
-function calFwd()   { if(calView==='week') { wO++; } else { mO++; } rCal(); }
-function calToday() { wO=0; mO=0; rCal(); }
+
+function selectCalWeek(weekStart) {
+  calView = 'week';
+  selectedCalWeek = weekStart;
+  updateCalButtonActive();
+  rCalWeek();
+}
+
+function updateCalButtonActive() {
+  // Clear active from all calendar buttons
+  document.querySelectorAll('.cal-controls-bar .week-btn').forEach(b => b.classList.remove('active'));
+  // Set the right one
+  const selector = calView === 'month'
+    ? '.cal-controls-bar .week-btn[data-month="' + selectedCalMonth + '"]'
+    : '.cal-controls-bar .week-btn[data-week-start="' + selectedCalWeek + '"]';
+  const btn = document.querySelector(selector);
+  if (btn) btn.classList.add('active');
+}
+
+function populateCalWeekButtons() {
+  if (typeof WEEKS === 'undefined') return;
+  const julRow = document.getElementById('calWeekRowJul');
+  const augRow = document.getElementById('calWeekRowAug');
+  if (!julRow || !augRow) return;
+  // Skip if week buttons already exist (Month button is static so check for data-week-start)
+  if (julRow.querySelector('[data-week-start]') || augRow.querySelector('[data-week-start]')) {
+    updateCalButtonActive();
+    return;
+  }
+
+  WEEKS.forEach(wk => {
+    const parts = wk.label.split(' (');
+    const name = parts[0];
+    const dates = parts[1] ? parts[1].replace(')', '') : '';
+    const btn = document.createElement('button');
+    btn.className = 'week-btn';
+    btn.setAttribute('data-week-start', wk.start);
+    btn.onclick = () => selectCalWeek(wk.start);
+    btn.innerHTML = '<div class="week-btn-label">' + esc(name) + '</div>' +
+                    (dates ? '<div class="week-btn-dates">' + esc(dates) + '</div>' : '');
+    const wkMonth = wk.start.substring(0,7);
+    if (wkMonth === '2026-07') julRow.appendChild(btn);
+    else if (wkMonth === '2026-08') augRow.appendChild(btn);
+  });
+
+  updateCalButtonActive();
+}
 
 function rCal() {
+  populateCalWeekButtons();
   if(calView==='week') rCalWeek(); else rCalMonth();
 }
 
 function rCalWeek() {
-  const wMon = getMon(wO);
+  const wMon = new Date(selectedCalWeek + 'T00:00:00');
   const days = [0,1,2,3,4].map(i => { const d=new Date(wMon); d.setDate(d.getDate()+i); return d; });
   const today = dStr(new Date());
-  const months = [...new Set(days.map(d=>d.toLocaleDateString('en-CA',{month:'long',year:'numeric'})))];
-  document.getElementById('calMonthLabel').textContent = months.join(' / ');
-  document.getElementById('calWeekLabel').textContent = ' · ' + days[0].toLocaleDateString('en-CA',{month:'short',day:'numeric'}) + ' – ' + days[4].toLocaleDateString('en-CA',{month:'short',day:'numeric'});
   const wMs = dStr(wMon);
   const filt = window.campers.filter(c => {
     if(cF!=='all'&&c.type!==cF) return false;
@@ -1878,12 +2225,10 @@ function rCalWeek() {
 
 function rCalMonth() {
   window._dayPopupData = {}; // reset lookup for new render
-  const now = new Date();
-  const baseMonth = new Date(now.getFullYear(), now.getMonth() + mO, 1);
-  const year = baseMonth.getFullYear();
-  const month = baseMonth.getMonth();
-  document.getElementById('calMonthLabel').textContent = baseMonth.toLocaleDateString('en-CA',{month:'long',year:'numeric'});
-  document.getElementById('calWeekLabel').textContent = '';
+  const [yearStr, monthStr] = selectedCalMonth.split('-');
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10) - 1; // JS Date months are 0-indexed
+  const baseMonth = new Date(year, month, 1);
 
   // Build grid: Mon–Fri only (5 cols) + Weekly Total col (1 col) = 6 columns
   const firstDay = new Date(year, month, 1);
@@ -2245,6 +2590,13 @@ document.addEventListener('keydown', (e) => {
   else if (document.getElementById('importOverlay').classList.contains('open')) closeImport();
   else if (document.getElementById('detailOverlay').classList.contains('open')) closeDetail();
   else if (document.getElementById('modalOverlay').classList.contains('open')) closeModal();
+  else {
+    // Close any open search bar
+    const campersBar = document.getElementById('campersSearchBar');
+    const weeklyBar = document.getElementById('weeklySearchBar');
+    if (campersBar && campersBar.style.display === 'flex') closeSearch('campersSearchBar','campersSearchInput');
+    if (weeklyBar && weeklyBar.style.display === 'flex') closeSearch('weeklySearchBar','weeklySearchInput');
+  }
 });
 
 // Sync top-bar logo with sidebar logo
@@ -2256,12 +2608,17 @@ if (sidebarLogo && topBarLogo) topBarLogo.src = sidebarLogo.src;
 renderStats();
 
 // Expose functions needed by the Firebase module script and inline onclick handlers
-window.updateWeekFilter = updateWeekFilter;
 window.renderRoster = renderRoster;
 window.renderStats = renderStats;
 window.rCal = rCal;
 window.rWeekly = rWeekly;
-window.populateWeeklyDropdown = populateWeeklyDropdown;
+window.populateWeekButtons = populateWeekButtons;
+window.selectWeek = selectWeek;
+window.toggleSearch = toggleSearch;
+window.closeSearch = closeSearch;
+window.openPrint = openPrint;
+window.closePrintModal = closePrintModal;
+window.doPrint = doPrint;
 window.showToast = showToast;
 window.openImport = openImport;
 window.closeImport = closeImport;
@@ -2279,10 +2636,9 @@ window.selType = selType;
 window.togDay = togDay;
 window.togCare = togCare;
 window.syncCare = syncCare;
-window.setCalView = setCalView;
-window.calBack = calBack;
-window.calFwd = calFwd;
-window.calToday = calToday;
+window.selectCalMonth = selectCalMonth;
+window.selectCalWeek = selectCalWeek;
+window.populateCalWeekButtons = populateCalWeekButtons;
 window.showDayPopup = showDayPopup;
 window.closeDayPopup = closeDayPopup;
 </script>
