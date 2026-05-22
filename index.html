@@ -955,8 +955,11 @@
     /* Prevent calendar grid from pushing the page wider than viewport
        (which was stretching the buttons above to double-width on Week view) */
     .main-content { overflow-x: hidden; }
-    .cal-page-inner { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
-    .cal-grid, .month-grid { min-width: 0; }
+    .cal-page-inner { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    /* Force the grids wider than the viewport so the wrapper scrolls
+       horizontally and the Week Total column is reachable */
+    .month-grid { min-width: 600px; }
+    .cal-grid { min-width: 480px; }
 
     /* ── Pages ── */
     /* .page padding handled by --page-pad-x variable now */
@@ -1780,12 +1783,16 @@ function openPrint() {
     showToast('Select a week first', 'error');
     return;
   }
-  // Populate day select with the 5 weekdays of the selected week
+  // Populate day select with the weekdays of the selected week
   const sel = document.getElementById('printDaySelect');
   sel.innerHTML = '';
-  const wkStart = new Date(weeklyWk + 'T00:00:00');
+  const week = (typeof WEEKS !== 'undefined') ? WEEKS.find(w => w.start === weeklyWk) : null;
+  const mondayStr = (week && week.mondayDate) ? week.mondayDate : weeklyWk;
+  const holidays = (week && week.holidayDays) || [];
+  const wkStart = new Date(mondayStr + 'T00:00:00');
   const dayNames = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
   dayNames.forEach((name, i) => {
+    if (holidays.includes(i)) return; // skip holiday days (no camp)
     const d = new Date(wkStart);
     d.setDate(d.getDate() + i);
     const dateStr = d.toLocaleDateString('en-CA', { month:'short', day:'numeric' });
@@ -1798,6 +1805,7 @@ function openPrint() {
   // Default to today if today is in the selected week
   const todayStr = dStr(new Date());
   for (let i = 0; i < 5; i++) {
+    if (holidays.includes(i)) continue;
     const d = new Date(wkStart);
     d.setDate(d.getDate() + i);
     if (dStr(d) === todayStr) { sel.value = String(i); break; }
@@ -1815,7 +1823,9 @@ function doPrint() {
 
   const title = 'Little Ladybugs Camp';
   const dayIdx = parseInt(document.getElementById('printDaySelect').value, 10);
-  const wkStart = new Date(weeklyWk + 'T00:00:00');
+  const week = (typeof WEEKS !== 'undefined') ? WEEKS.find(w => w.start === weeklyWk) : null;
+  const mondayStr = (week && week.mondayDate) ? week.mondayDate : weeklyWk;
+  const wkStart = new Date(mondayStr + 'T00:00:00');
   const targetDate = new Date(wkStart);
   targetDate.setDate(targetDate.getDate() + dayIdx);
   const subtitle = targetDate.toLocaleDateString('en-CA', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
@@ -2198,27 +2208,30 @@ function rCal() {
 }
 
 function rCalWeek() {
-  const wMon = new Date(selectedCalWeek + 'T00:00:00');
+  const week = (typeof WEEKS !== 'undefined') ? WEEKS.find(w => w.start === selectedCalWeek) : null;
+  const mondayStr = (week && week.mondayDate) ? week.mondayDate : dStr(getMonOfDate(selectedCalWeek));
+  const holidays = (week && week.holidayDays) || [];
+  const wMon = new Date(mondayStr + 'T00:00:00');
   const days = [0,1,2,3,4].map(i => { const d=new Date(wMon); d.setDate(d.getDate()+i); return d; });
   const today = dStr(new Date());
-  const wMs = dStr(wMon);
   const filt = window.campers.filter(c => {
     if(cF!=='all'&&c.type!==cF) return false;
     if(!c.weekStart) return false;
-    return dStr(getMonOfDate(c.weekStart))===wMs;
+    return c.weekStart === selectedCalWeek;
   });
   document.getElementById('calGrid').className = 'cal-grid';
   document.getElementById('calGrid').innerHTML = days.map((d,i) => {
     const ds = dStr(d);
     const isToday = ds===today;
-    const ents = filt.filter(c => c.campDays?.includes(i));
+    const isHoliday = holidays.includes(i);
+    const ents = isHoliday ? [] : filt.filter(c => c.campDays?.includes(i));
     return '<div class="cal-col ' + (isToday?'cal-today':'') + '">'
       + '<div class="cal-day-header">'
       + '<div class="cal-day-name">' + DN[i] + '</div>'
       + '<div class="cal-day-num">' + d.getDate() + '</div>'
       + '<div class="cal-day-month">' + d.toLocaleDateString('en-CA',{month:'short'}) + '</div>'
       + '</div>'
-      + (!ents.length ? '<div class="cal-empty">—</div>' : '')
+      + (isHoliday ? '<div class="cal-empty">Holiday</div>' : (!ents.length ? '<div class="cal-empty">—</div>' : ''))
       + ents.map(c =>
           '<div class="cal-entry ' + (c.type==='weekly'?'cal-entry-w':'cal-entry-d') + '">'
           + '<div class="cal-entry-name">' + esc(c.first) + ' ' + esc((c.last||'')[0]) + '.</div>'
@@ -2253,11 +2266,15 @@ function rCalMonth() {
   function campDates(c) {
     if(!c.weekStart) return [];
     const mon = getMonOfDate(c.weekStart);
-    return (c.campDays||[]).map(d => {
-      const date = new Date(mon);
-      date.setDate(date.getDate() + d);
-      return { dateStr: dStr(date), dayIdx: d, camper: c };
-    });
+    const wk = WEEKS.find(w => w.start === c.weekStart);
+    const holidays = (wk && wk.holidayDays) || [];
+    return (c.campDays||[])
+      .filter(d => !holidays.includes(d))
+      .map(d => {
+        const date = new Date(mon);
+        date.setDate(date.getDate() + d);
+        return { dateStr: dStr(date), dayIdx: d, camper: c };
+      });
   }
   const allEntries = window.campers
     .filter(c => cF==='all' || c.type===cF)
@@ -2438,7 +2455,7 @@ const WEEKS = [
   { label: 'Week 1 (July 13-17)', start: '2026-07-13', campCol: 'Choose the weeks your child will attend camp >> Week 1 (July 13-17) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 1 (July 13-17) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 1 (July 13-17) >> Post-care' },
   { label: 'Week 2 (July 20-24)', start: '2026-07-20', campCol: 'Choose the weeks your child will attend camp >> Week 2 (July 20-24) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 2 (July 20-24) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 2 (July 20-24) >> Post-care' },
   { label: 'Week 3 (July 27-31)', start: '2026-07-27', campCol: 'Choose the weeks your child will attend camp >> Week 3 (July 27-31) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 3 (July 27-31) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 3 (July 27-31) >> Post-care' },
-  { label: 'Week 4 (Aug 4-7)',    start: '2026-08-04', campCol: 'Choose the weeks your child will attend camp >> Week 4 (Aug 4-7): >> Camp',    preCol: 'Choose the weeks your child will attend camp >> Week 4 (Aug 4-7): >> Pre-care',    postCol: 'Choose the weeks your child will attend camp >> Week 4 (Aug 4-7): >> Post-care' },
+  { label: 'Week 4 (Aug 4-7)',    start: '2026-08-04', mondayDate: '2026-08-03', holidayDays: [0], campCol: 'Choose the weeks your child will attend camp >> Week 4 (Aug 4-7): >> Camp',    preCol: 'Choose the weeks your child will attend camp >> Week 4 (Aug 4-7): >> Pre-care',    postCol: 'Choose the weeks your child will attend camp >> Week 4 (Aug 4-7): >> Post-care' },
   { label: 'Week 5 (Aug 10-14)', start: '2026-08-10', campCol: 'Choose the weeks your child will attend camp >> Week 5 (Aug 10-14) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 5 (Aug 10-14) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 5 (Aug 10-14) >> Post-care' },
   { label: 'Week 6 (Aug 17-21)', start: '2026-08-17', campCol: 'Choose the weeks your child will attend camp >> Week 6 (Aug 17-21) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 6 (Aug 17-21) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 6 (Aug 17-21) >> Post-care' },
   { label: 'Week 7 (Aug 24-28)', start: '2026-08-24', campCol: 'Choose the weeks your child will attend camp >> Week 7 (Aug 24-28) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 7 (Aug 24-28) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 7 (Aug 24-28) >> Post-care' },
