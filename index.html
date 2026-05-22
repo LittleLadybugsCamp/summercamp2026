@@ -386,6 +386,18 @@
     border-top: 0.5px solid var(--border);
   }
   .form-section-label:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+  .sync-note {
+    display: flex; align-items: flex-start; gap: 8px;
+    background: var(--blue-light);
+    border-radius: 10px;
+    padding: 11px 13px;
+    margin-bottom: 18px;
+    font-size: 12.5px;
+    color: var(--blue);
+    line-height: 1.4;
+    letter-spacing: -0.005em;
+  }
+  .sync-note i { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .form-group { margin-bottom: 12px; }
   .form-label { font-size: 12.5px; color: var(--text-2); margin-bottom: 5px; display: block; font-weight: 500; letter-spacing: -0.01em; }
@@ -1284,6 +1296,11 @@
       <button class="modal-close" onclick="closeModal()"><i class="ti ti-x"></i></button>
     </div>
 
+    <div id="syncNote" class="sync-note" style="display:none">
+      <i class="ti ti-info-circle"></i>
+      <span id="syncNoteText"></span>
+    </div>
+
     <div class="form-section-label">Personal info</div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">First name *</label><input type="text" id="fFirst" placeholder="Emma"></div>
@@ -2044,6 +2061,22 @@ function openModal(id=null) {
   const c = id ? window.campers.find(x=>x.id===id) : null;
   document.getElementById('modalTitle').textContent = c ? 'Edit camper' : 'Add camper';
   document.getElementById('deleteBtn').style.display = c ? 'flex' : 'none';
+
+  // Sync note: when editing a camper registered for multiple weeks
+  const syncNote = document.getElementById('syncNote');
+  if (c) {
+    const sibCount = window.campers.filter(x => camperKey(x) === camperKey(c)).length;
+    if (sibCount > 1) {
+      document.getElementById('syncNoteText').textContent =
+        `${c.first} ${c.last} is registered for ${sibCount} weeks. Personal, contact & medical info you change here will update all ${sibCount} weeks. The camp/care schedule below applies only to ${weekLabel(c.weekStart)}.`;
+      syncNote.style.display = 'flex';
+    } else {
+      syncNote.style.display = 'none';
+    }
+  } else {
+    syncNote.style.display = 'none';
+  }
+
   document.getElementById('fFirst').value = c?.first||'';
   document.getElementById('fLast').value = c?.last||'';
   document.getElementById('fAge').value = c?.age||'';
@@ -2092,7 +2125,9 @@ async function saveCamper() {
   const postDays = [...document.querySelectorAll('.care-day.post.sel')].map(x=>+x.dataset.d);
   const ws = document.getElementById('fWeekStart').value;
   const mon = ws ? dStr(getMonOfDate(ws)) : dStr(getMon(0));
-  const data = {
+
+  // Shared personal info — synced across ALL of this camper's week registrations
+  const sharedData = {
     first, last,
     age: +document.getElementById('fAge').value||null,
     parent: document.getElementById('fParent').value.trim(),
@@ -2102,8 +2137,6 @@ async function saveCamper() {
     allergies: document.getElementById('fAllergies').value.trim(),
     medical: document.getElementById('fMedical').value.trim(),
     notes: document.getElementById('fNotes').value.trim(),
-    type: cType, weekStart: mon,
-    campDays, preDays, postDays,
     parent2: document.getElementById('fParent2').value.trim(),
     phone2: document.getElementById('fPhone2').value.trim(),
     email2: document.getElementById('fEmail2').value.trim(),
@@ -2117,13 +2150,27 @@ async function saveCamper() {
     pickup: document.getElementById('fPickup').value.trim(),
     updatedAt: window._serverTimestamp()
   };
+  // Week-specific schedule — only applies to the single week being edited
+  const weekData = { type: cType, weekStart: mon, campDays, preDays, postDays };
+
   try {
     if(editingId) {
-      await window._updateDoc(window._doc(window._db, 'campers', editingId), data);
-      showToast('Camper updated!');
+      const editing = window.campers.find(x => x.id === editingId);
+      const key = editing ? camperKey(editing) : (first.toLowerCase()+'|'+last.toLowerCase());
+      // All week-registrations belonging to this camper (matched by their CURRENT name)
+      const siblings = window.campers.filter(c => camperKey(c) === key);
+      await Promise.all(siblings.map(c =>
+        window._updateDoc(
+          window._doc(window._db, 'campers', c.id),
+          c.id === editingId ? { ...sharedData, ...weekData } : { ...sharedData }
+        )
+      ));
+      showToast(siblings.length > 1
+        ? `Saved — personal info synced across ${siblings.length} weeks`
+        : 'Camper updated!');
     } else {
-      data.createdAt = window._serverTimestamp();
-      await window._addDoc(window._collection(window._db, 'campers'), data);
+      await window._addDoc(window._collection(window._db, 'campers'),
+        { ...sharedData, ...weekData, createdAt: window._serverTimestamp() });
       showToast('Camper added!');
     }
     closeModal();
