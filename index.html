@@ -398,6 +398,25 @@
     letter-spacing: -0.005em;
   }
   .sync-note i { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  /* Multi-select week buttons inside the add/edit modal */
+  .modal-week-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .modal-week-btn {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    padding: 9px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .14s;
+    font-family: inherit;
+    text-align: left;
+  }
+  .modal-week-btn:hover { border-color: var(--text-3); }
+  .modal-week-btn .mwb-label { font-weight: 600; font-size: 13.5px; color: var(--text); letter-spacing: -0.01em; }
+  .modal-week-btn .mwb-dates { font-size: 11px; color: var(--text-3); }
+  .modal-week-btn.active { background: var(--green); border-color: var(--green); }
+  .modal-week-btn.active .mwb-label { color: #fff; }
+  .modal-week-btn.active .mwb-dates { color: rgba(255,255,255,0.85); }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .form-group { margin-bottom: 12px; }
   .form-label { font-size: 12.5px; color: var(--text-2); margin-bottom: 5px; display: block; font-weight: 500; letter-spacing: -0.01em; }
@@ -1320,6 +1339,7 @@
     <div class="form-section-label">Medical &amp; allergies</div>
     <div class="form-group"><label class="form-label">Allergies (leave blank if none)</label><input type="text" id="fAllergies" placeholder="e.g. peanuts, bee stings"></div>
     <div class="form-group"><label class="form-label">Medical notes</label><input type="text" id="fMedical" placeholder="e.g. EpiPen, asthma inhaler"></div>
+    <div class="form-group"><label class="form-label">Health card number</label><input type="text" id="fHealthCard" placeholder="e.g. 1234567890AB"></div>
 
     <div class="form-group"><label class="form-label">Additional notes</label><textarea id="fNotes" rows="3" placeholder="Any additional notes, interests, special considerations…" style="resize:vertical"></textarea></div>
     </div>
@@ -1333,10 +1353,21 @@
         <div class="type-opt" id="typeDaily" onclick="selType('daily')">📆 Daily (select days)</div>
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Camp week</label>
-      <input type="date" id="fWeekStart">
+
+    <!-- Multi-select week buttons (new camper) -->
+    <div class="form-group" id="weekSelectGroup">
+      <label class="form-label" id="weekSelectLabel">Select weeks</label>
+      <div class="modal-week-grid" id="modalWeekButtons"></div>
     </div>
+
+    <!-- Fixed week label (editing one week's schedule) -->
+    <div class="form-group" id="weekFixedGroup" style="display:none">
+      <label class="form-label">Camp week</label>
+      <div id="weekFixedLabel" style="font-weight:600;font-size:14px;color:var(--text)"></div>
+    </div>
+
+    <input type="hidden" id="fWeekStart">
+
     <div class="form-group" id="dayPickerGroup" style="display:none">
       <label class="form-label">Camp days</label>
       <div class="days-row" id="dayGrid">
@@ -1366,6 +1397,7 @@
       </div>
     </div>
     </div>
+
 
     <div id="personalBottom">
     <div class="form-section-label">Second parent / guardian</div>
@@ -1973,8 +2005,8 @@ function openDetail(key) {
       <button class="detail-close" onclick="closeDetail()"><i class="ti ti-x"></i></button>
     </div>
     ${c.allergies?`<div class="allergy-alert"><i class="ti ti-alert-triangle"></i><strong>Allergy:</strong> ${esc(c.allergies)}</div>`:''}
-    <button class="btn" style="width:100%;margin-top:14px;justify-content:center" onclick="closeDetail();openModal('${c.id}','personal')">
-      <i class="ti ti-edit"></i> Edit personal info${regs.length>1?` (all ${regs.length} weeks)`:''}
+    <button class="btn" style="width:100%;margin-top:14px;justify-content:center" onclick="closeDetail();openModal('${c.id}','edit')">
+      <i class="ti ti-edit"></i> Edit camper${regs.length>1?` (${regs.length} weeks)`:''}
     </button>
     <div class="detail-section" style="margin-top:16px">
       <div class="detail-section-title">Contact</div>
@@ -1987,6 +2019,7 @@ function openDetail(key) {
       <div class="detail-section-title">Medical</div>
       ${c.allergies?`<div class="detail-row"><i class="ti ti-alert-triangle" style="color:var(--coral)"></i><span><strong>Allergies:</strong> ${esc(c.allergies)}</span></div>`:`<div class="detail-row"><i class="ti ti-circle-check" style="color:var(--green)"></i><span>No known allergies</span></div>`}
       ${c.medical?`<div class="detail-row"><i class="ti ti-pill"></i><span>${esc(c.medical)}</span></div>`:''}
+      ${c.healthCard?`<div class="detail-row"><i class="ti ti-id"></i><span><strong>Health card:</strong> ${esc(c.healthCard)}</span></div>`:''}
     </div>
 
     <div class="detail-section">
@@ -2036,11 +2069,40 @@ function closeDetail() {
 }
 
 // ── Modal helpers ──
+let modalSelectedWeeks = new Set();
+
+function populateModalWeeks() {
+  const container = document.getElementById('modalWeekButtons');
+  if (!container || typeof WEEKS === 'undefined') return;
+  container.innerHTML = '';
+  WEEKS.forEach(wk => {
+    const parts = wk.label.split(' (');
+    const name = parts[0];
+    const dates = parts[1] ? parts[1].replace(')', '') : '';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'modal-week-btn';
+    btn.dataset.weekStart = wk.start;
+    btn.onclick = () => toggleModalWeek(wk.start);
+    btn.innerHTML = '<div class="mwb-label">' + esc(name) + '</div>' +
+                    (dates ? '<div class="mwb-dates">' + esc(dates) + '</div>' : '');
+    container.appendChild(btn);
+  });
+}
+
+function toggleModalWeek(ws) {
+  if (modalSelectedWeeks.has(ws)) modalSelectedWeeks.delete(ws);
+  else modalSelectedWeeks.add(ws);
+  document.querySelectorAll('#modalWeekButtons .modal-week-btn').forEach(b => {
+    b.classList.toggle('active', modalSelectedWeeks.has(b.dataset.weekStart));
+  });
+}
+
 function selType(t) {
   cType = t;
   document.getElementById('typeWeekly').className = 'type-opt' + (t==='weekly'?' sel-weekly':'');
   document.getElementById('typeDaily').className = 'type-opt' + (t==='daily'?' sel-daily':'');
-  document.getElementById('dayPickerGroup').style.display = t==='daily'?'block':'none';
+  document.getElementById('dayPickerGroup').style.display = t==='daily'?'':'none';
   syncCare();
 }
 function getSelDays() {
@@ -2086,7 +2148,7 @@ function openModal(id=null, mode='full') {
     personalTop.style.display = 'none';
     personalBottom.style.display = 'none';
     scheduleSection.style.display = '';
-  } else { // full
+  } else { // full (new) or edit (existing) — show everything
     personalTop.style.display = '';
     personalBottom.style.display = '';
     scheduleSection.style.display = '';
@@ -2096,18 +2158,19 @@ function openModal(id=null, mode='full') {
   let title = 'Add camper';
   if (mode === 'personal') title = 'Edit personal info';
   else if (mode === 'schedule') title = c ? weekLabel(c.weekStart) : 'Edit week';
+  else if (mode === 'edit') title = 'Edit camper';
   else if (c) title = 'Edit camper';
   document.getElementById('modalTitle').textContent = title;
-  // Delete only makes sense when editing a specific week registration
-  document.getElementById('deleteBtn').style.display = (c && mode === 'schedule') ? 'flex' : 'none';
+  // Delete button: shows for schedule (one week) and edit (whole camper)
+  document.getElementById('deleteBtn').style.display = (c && (mode === 'schedule' || mode === 'edit')) ? 'flex' : 'none';
 
-  // Sync note: when editing personal info for a camper in multiple weeks
+  // Sync note: when editing a camper across multiple weeks
   const syncNote = document.getElementById('syncNote');
-  if (c && mode === 'personal') {
+  if (c && (mode === 'personal' || mode === 'edit')) {
     const sibCount = window.campers.filter(x => camperKey(x) === camperKey(c)).length;
     document.getElementById('syncNoteText').textContent = sibCount > 1
-      ? `This info is shared across all ${sibCount} of ${c.first}'s weeks. Changes save to every week at once.`
-      : `This info applies to ${c.first}'s registration.`;
+      ? `${c.first}'s personal info is shared across all ${sibCount} weeks. Toggle weeks below to add or remove registrations.`
+      : `Edit ${c.first}'s details and registered weeks below.`;
     syncNote.style.display = 'flex';
   } else {
     syncNote.style.display = 'none';
@@ -2122,10 +2185,42 @@ function openModal(id=null, mode='full') {
   document.getElementById('fAddress').value = c?.address||'';
   document.getElementById('fAllergies').value = c?.allergies||'';
   document.getElementById('fMedical').value = c?.medical||'';
+  document.getElementById('fHealthCard').value = c?.healthCard||'';
   document.getElementById('fNotes').value = c?.notes||'';
-  document.getElementById('fWeekStart').value = c?.weekStart || dStr(getMon(0));
+  document.getElementById('fWeekStart').value = c?.weekStart || '';
   cType = c?.type||'weekly';
   selType(cType);
+
+  // ── Week selection UI: multi-select buttons (new/edit) vs fixed week (schedule) ──
+  const weekSelGroup = document.getElementById('weekSelectGroup');
+  const weekFixedGroup = document.getElementById('weekFixedGroup');
+  modalSelectedWeeks = new Set();
+  if (mode === 'schedule') {
+    // Editing one existing week — show its label, hide the multi-select grid
+    weekSelGroup.style.display = 'none';
+    weekFixedGroup.style.display = '';
+    document.getElementById('weekFixedLabel').textContent = c ? weekLabel(c.weekStart) : '';
+  } else if (mode === 'edit') {
+    // Editing existing camper — show week buttons with their current weeks pre-selected
+    weekSelGroup.style.display = '';
+    weekFixedGroup.style.display = 'none';
+    populateModalWeeks();
+    const key = camperKey(c);
+    window.campers.filter(x => camperKey(x) === key).forEach(x => modalSelectedWeeks.add(x.weekStart));
+    document.querySelectorAll('#modalWeekButtons .modal-week-btn').forEach(b => {
+      b.classList.toggle('active', modalSelectedWeeks.has(b.dataset.weekStart));
+    });
+  } else if (mode === 'full') {
+    // New camper — show the multi-select week buttons, nothing pre-selected
+    weekSelGroup.style.display = '';
+    weekFixedGroup.style.display = 'none';
+    populateModalWeeks();
+  } else {
+    // personal mode — schedule section hidden anyway
+    weekSelGroup.style.display = 'none';
+    weekFixedGroup.style.display = 'none';
+  }
+
   document.querySelectorAll('#dayGrid .day-sel').forEach(el => {
     el.classList.toggle('sel', c ? c.campDays?.includes(+el.dataset.d) : +el.dataset.d===0);
   });
@@ -2165,6 +2260,7 @@ async function saveCamper() {
     address: document.getElementById('fAddress').value.trim(),
     allergies: document.getElementById('fAllergies').value.trim(),
     medical: document.getElementById('fMedical').value.trim(),
+    healthCard: document.getElementById('fHealthCard').value.trim(),
     notes: document.getElementById('fNotes').value.trim(),
     parent2: document.getElementById('fParent2').value.trim(),
     phone2: document.getElementById('fPhone2').value.trim(),
@@ -2197,26 +2293,65 @@ async function saveCamper() {
       return;
     }
 
-    // For 'schedule' and 'full' modes we need the week schedule
+    // ── Schedule details (camp days / care) ──
     const campDays = cType==='weekly' ? [0,1,2,3,4] : getSelDays();
-    if(!campDays.length) { showToast('Please select at least one camp day.', 'error'); return; }
+    if(cType==='daily' && !campDays.length) { showToast('Please select at least one camp day.', 'error'); return; }
     const preDays = [...document.querySelectorAll('.care-day.pre.sel')].map(x=>+x.dataset.d);
     const postDays = [...document.querySelectorAll('.care-day.post.sel')].map(x=>+x.dataset.d);
-    const ws = document.getElementById('fWeekStart').value;
-    const mon = ws ? dStr(getMonOfDate(ws)) : dStr(getMon(0));
-    const weekData = { type: cType, weekStart: mon, campDays, preDays, postDays };
 
     if (modalMode === 'schedule') {
-      // ── Edit just this week's schedule (no personal fields touched) ──
-      await window._updateDoc(window._doc(window._db, 'campers', editingId),
-        { ...weekData, updatedAt: window._serverTimestamp() });
+      // ── Edit just this week's schedule (week stays the same, no personal fields touched) ──
+      const existing = window.campers.find(x => x.id === editingId);
+      await window._updateDoc(window._doc(window._db, 'campers', editingId), {
+        type: cType,
+        weekStart: existing ? existing.weekStart : document.getElementById('fWeekStart').value,
+        campDays, preDays, postDays,
+        updatedAt: window._serverTimestamp()
+      });
       showToast('Week schedule updated!');
-    } else {
-      // ── New camper (full) ──
+    } else if (modalMode === 'edit') {
+      // ── Edit existing camper: sync personal info + add/remove weeks + set schedule ──
       if(!first||!last) { showToast("Please enter the camper's name.", 'error'); return; }
-      await window._addDoc(window._collection(window._db, 'campers'),
-        { ...sharedData, ...weekData, createdAt: window._serverTimestamp() });
-      showToast('Camper added!');
+      const weeks = [...modalSelectedWeeks];
+      if(!weeks.length) { showToast('Please select at least one week.', 'error'); return; }
+      const editing = window.campers.find(x => x.id === editingId);
+      const key = editing ? camperKey(editing) : (first.toLowerCase()+'|'+last.toLowerCase());
+      const existing = window.campers.filter(x => camperKey(x) === key);
+      const byWeek = new Map(existing.map(x => [x.weekStart, x]));
+      const ops = [];
+      // Update existing weeks that are still selected; create newly selected weeks
+      for (const ws of weeks) {
+        const data = { ...sharedData, type: cType, weekStart: ws, campDays, preDays, postDays };
+        if (byWeek.has(ws)) {
+          ops.push(window._updateDoc(window._doc(window._db, 'campers', byWeek.get(ws).id), data));
+        } else {
+          ops.push(window._addDoc(window._collection(window._db, 'campers'),
+            { ...data, createdAt: window._serverTimestamp() }));
+        }
+      }
+      // Delete weeks that were de-selected
+      for (const x of existing) {
+        if (!weeks.includes(x.weekStart)) {
+          ops.push(window._deleteDoc(window._doc(window._db, 'campers', x.id)));
+        }
+      }
+      await Promise.all(ops);
+      showToast(weeks.length > 1 ? `Saved — ${weeks.length} weeks updated` : 'Camper updated!');
+    } else {
+      // ── New camper (full) — create one registration per selected week ──
+      if(!first||!last) { showToast("Please enter the camper's name.", 'error'); return; }
+      const weeks = [...modalSelectedWeeks];
+      if(!weeks.length) { showToast('Please select at least one week.', 'error'); return; }
+      await Promise.all(weeks.map(ws =>
+        window._addDoc(window._collection(window._db, 'campers'), {
+          ...sharedData,
+          type: cType,
+          weekStart: ws,
+          campDays, preDays, postDays,
+          createdAt: window._serverTimestamp()
+        })
+      ));
+      showToast(weeks.length > 1 ? `Camper added for ${weeks.length} weeks!` : 'Camper added!');
     }
     closeModal();
   } catch(e) {
@@ -2227,10 +2362,20 @@ async function saveCamper() {
 async function deleteCamper() {
   if(!editingId) return;
   const c = window.campers.find(x=>x.id===editingId);
-  if(!confirm('Remove ' + (c?.first||'') + ' ' + (c?.last||'') + '? This cannot be undone.')) return;
+  if(!c) return;
   try {
-    await window._deleteDoc(window._doc(window._db, 'campers', editingId));
-    showToast('Camper deleted.');
+    if (modalMode === 'edit') {
+      // Delete ALL of this camper's week registrations
+      const sibs = window.campers.filter(x => camperKey(x) === camperKey(c));
+      if(!confirm('Remove ' + (c.first||'') + ' ' + (c.last||'') + ' from all ' + sibs.length + ' week(s)? This cannot be undone.')) return;
+      await Promise.all(sibs.map(x => window._deleteDoc(window._doc(window._db, 'campers', x.id))));
+      showToast(`Deleted ${c.first} ${c.last} (${sibs.length} weeks).`);
+    } else {
+      // Delete just this one week registration
+      if(!confirm('Remove ' + (c.first||'') + ' ' + (c.last||'') + ' from ' + weekLabel(c.weekStart) + '? This cannot be undone.')) return;
+      await window._deleteDoc(window._doc(window._db, 'campers', editingId));
+      showToast('Week registration removed.');
+    }
     closeModal();
   } catch(e) {
     showToast('Error deleting: ' + e.message, 'error');
