@@ -1301,6 +1301,7 @@
       <span id="syncNoteText"></span>
     </div>
 
+    <div id="personalTop">
     <div class="form-section-label">Personal info</div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">First name *</label><input type="text" id="fFirst" placeholder="Emma"></div>
@@ -1320,6 +1321,10 @@
     <div class="form-group"><label class="form-label">Allergies (leave blank if none)</label><input type="text" id="fAllergies" placeholder="e.g. peanuts, bee stings"></div>
     <div class="form-group"><label class="form-label">Medical notes</label><input type="text" id="fMedical" placeholder="e.g. EpiPen, asthma inhaler"></div>
 
+    <div class="form-group"><label class="form-label">Additional notes</label><textarea id="fNotes" rows="3" placeholder="Any additional notes, interests, special considerations…" style="resize:vertical"></textarea></div>
+    </div>
+
+    <div id="scheduleSection">
     <div class="form-section-label">Camp registration</div>
     <div class="form-group">
       <label class="form-label">Camp type *</label>
@@ -1360,8 +1365,9 @@
         <div class="care-day post" data-d="4" onclick="togCare(this,'post')">Fri</div>
       </div>
     </div>
-    <div class="form-group"><label class="form-label">Additional notes</label><textarea id="fNotes" rows="3" placeholder="Any additional notes, interests, special considerations…" style="resize:vertical"></textarea></div>
+    </div>
 
+    <div id="personalBottom">
     <div class="form-section-label">Second parent / guardian</div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Name</label><input type="text" id="fParent2" placeholder="Guardian name"></div>
@@ -1387,6 +1393,8 @@
 
     <div class="form-section-label">Authorized pickup persons</div>
     <div class="form-group"><label class="form-label">Additional pickup people</label><textarea id="fPickup" rows="2" placeholder="Full names and relationships, e.g. Grandma Rosa (Grandmother), Uncle Dave (Uncle)" style="resize:vertical"></textarea></div>
+    </div>
+
 
     <div class="modal-footer">
       <button class="btn btn-ghost btn-danger" id="deleteBtn" onclick="deleteCamper()" style="display:none"><i class="ti ti-trash"></i> Delete</button>
@@ -1965,6 +1973,9 @@ function openDetail(key) {
       <button class="detail-close" onclick="closeDetail()"><i class="ti ti-x"></i></button>
     </div>
     ${c.allergies?`<div class="allergy-alert"><i class="ti ti-alert-triangle"></i><strong>Allergy:</strong> ${esc(c.allergies)}</div>`:''}
+    <button class="btn" style="width:100%;margin-top:14px;justify-content:center" onclick="closeDetail();openModal('${c.id}','personal')">
+      <i class="ti ti-edit"></i> Edit personal info${regs.length>1?` (all ${regs.length} weeks)`:''}
+    </button>
     <div class="detail-section" style="margin-top:16px">
       <div class="detail-section-title">Contact</div>
       ${c.parent?`<div class="detail-row"><i class="ti ti-user"></i><span>${esc(c.parent)}</span></div>`:''}
@@ -1990,7 +2001,7 @@ function openDetail(key) {
               <div class="reg-block-title">${esc(weekLabel(r.weekStart))}</div>
               <div class="reg-block-type"><span class="badge ${r.type==='weekly'?'badge-weekly':'badge-daily'}">${r.type==='weekly'?'Weekly':'Daily'}</span></div>
             </div>
-            <button class="btn btn-sm btn-ghost" onclick="closeDetail();openModal('${r.id}')"><i class="ti ti-edit"></i> Edit</button>
+            <button class="btn btn-sm btn-ghost" onclick="closeDetail();openModal('${r.id}','schedule')"><i class="ti ti-edit"></i> Edit</button>
           </div>
           <div class="detail-row"><i class="ti ti-tent" style="color:var(--green)"></i><span><strong>Camp:</strong> ${campDayNames}</span></div>
           ${r.preDays?.length?`<div class="detail-row"><i class="ti ti-sunrise" style="color:var(--blue)"></i><span><strong>Pre-care:</strong> ${preDayNames}</span></div>`:''}
@@ -2056,23 +2067,48 @@ function togCare(el, k) {
   el.classList.toggle('sel');
 }
 
-function openModal(id=null) {
-  editingId = id;
-  const c = id ? window.campers.find(x=>x.id===id) : null;
-  document.getElementById('modalTitle').textContent = c ? 'Edit camper' : 'Add camper';
-  document.getElementById('deleteBtn').style.display = c ? 'flex' : 'none';
+let modalMode = 'full'; // 'full' (new camper) | 'personal' | 'schedule'
 
-  // Sync note: when editing a camper registered for multiple weeks
+function openModal(id=null, mode='full') {
+  editingId = id;
+  modalMode = mode;
+  const c = id ? window.campers.find(x=>x.id===id) : null;
+
+  // Toggle which sections are visible based on mode
+  const personalTop = document.getElementById('personalTop');
+  const personalBottom = document.getElementById('personalBottom');
+  const scheduleSection = document.getElementById('scheduleSection');
+  if (mode === 'personal') {
+    personalTop.style.display = '';
+    personalBottom.style.display = '';
+    scheduleSection.style.display = 'none';
+  } else if (mode === 'schedule') {
+    personalTop.style.display = 'none';
+    personalBottom.style.display = 'none';
+    scheduleSection.style.display = '';
+  } else { // full
+    personalTop.style.display = '';
+    personalBottom.style.display = '';
+    scheduleSection.style.display = '';
+  }
+
+  // Title + delete button
+  let title = 'Add camper';
+  if (mode === 'personal') title = 'Edit personal info';
+  else if (mode === 'schedule') title = c ? weekLabel(c.weekStart) : 'Edit week';
+  else if (c) title = 'Edit camper';
+  document.getElementById('modalTitle').textContent = title;
+  // Delete only makes sense when editing a specific week registration
+  document.getElementById('deleteBtn').style.display = (c && mode === 'schedule') ? 'flex' : 'none';
+
+  // Sync note: when editing personal info for a camper in multiple weeks
   const syncNote = document.getElementById('syncNote');
-  if (c) {
+  if (c && mode === 'personal') {
     const sibCount = window.campers.filter(x => camperKey(x) === camperKey(c)).length;
-    if (sibCount > 1) {
-      document.getElementById('syncNoteText').textContent =
-        `${c.first} ${c.last} is registered for ${sibCount} weeks. Personal, contact & medical info you change here will update all ${sibCount} weeks. The camp/care schedule below applies only to ${weekLabel(c.weekStart)}.`;
-      syncNote.style.display = 'flex';
-    } else {
-      syncNote.style.display = 'none';
-    }
+    document.getElementById('syncNoteText').textContent = sibCount > 1
+      ? `This info is shared across all ${sibCount} of ${c.first}'s weeks. Changes save to every week at once.`
+      : `This info applies to ${c.first}'s registration.`;
+    syncNote.style.display = 'flex';
   } else {
     syncNote.style.display = 'none';
   }
@@ -2118,15 +2154,8 @@ function closeModal() {
 async function saveCamper() {
   const first = document.getElementById('fFirst').value.trim();
   const last = document.getElementById('fLast').value.trim();
-  if(!first||!last) { showToast("Please enter the camper's name.", 'error'); return; }
-  const campDays = cType==='weekly' ? [0,1,2,3,4] : getSelDays();
-  if(!campDays.length) { showToast('Please select at least one camp day.', 'error'); return; }
-  const preDays = [...document.querySelectorAll('.care-day.pre.sel')].map(x=>+x.dataset.d);
-  const postDays = [...document.querySelectorAll('.care-day.post.sel')].map(x=>+x.dataset.d);
-  const ws = document.getElementById('fWeekStart').value;
-  const mon = ws ? dStr(getMonOfDate(ws)) : dStr(getMon(0));
 
-  // Shared personal info — synced across ALL of this camper's week registrations
+  // Gather shared personal info
   const sharedData = {
     first, last,
     age: +document.getElementById('fAge').value||null,
@@ -2150,25 +2179,41 @@ async function saveCamper() {
     pickup: document.getElementById('fPickup').value.trim(),
     updatedAt: window._serverTimestamp()
   };
-  // Week-specific schedule — only applies to the single week being edited
-  const weekData = { type: cType, weekStart: mon, campDays, preDays, postDays };
 
   try {
-    if(editingId) {
+    if (modalMode === 'personal') {
+      // ── Edit personal info → propagate to ALL of this camper's weeks ──
+      if(!first||!last) { showToast("Please enter the camper's name.", 'error'); return; }
       const editing = window.campers.find(x => x.id === editingId);
       const key = editing ? camperKey(editing) : (first.toLowerCase()+'|'+last.toLowerCase());
-      // All week-registrations belonging to this camper (matched by their CURRENT name)
       const siblings = window.campers.filter(c => camperKey(c) === key);
       await Promise.all(siblings.map(c =>
-        window._updateDoc(
-          window._doc(window._db, 'campers', c.id),
-          c.id === editingId ? { ...sharedData, ...weekData } : { ...sharedData }
-        )
+        window._updateDoc(window._doc(window._db, 'campers', c.id), { ...sharedData })
       ));
       showToast(siblings.length > 1
-        ? `Saved — personal info synced across ${siblings.length} weeks`
-        : 'Camper updated!');
+        ? `Saved — synced across ${siblings.length} weeks`
+        : 'Personal info updated!');
+      closeModal();
+      return;
+    }
+
+    // For 'schedule' and 'full' modes we need the week schedule
+    const campDays = cType==='weekly' ? [0,1,2,3,4] : getSelDays();
+    if(!campDays.length) { showToast('Please select at least one camp day.', 'error'); return; }
+    const preDays = [...document.querySelectorAll('.care-day.pre.sel')].map(x=>+x.dataset.d);
+    const postDays = [...document.querySelectorAll('.care-day.post.sel')].map(x=>+x.dataset.d);
+    const ws = document.getElementById('fWeekStart').value;
+    const mon = ws ? dStr(getMonOfDate(ws)) : dStr(getMon(0));
+    const weekData = { type: cType, weekStart: mon, campDays, preDays, postDays };
+
+    if (modalMode === 'schedule') {
+      // ── Edit just this week's schedule (no personal fields touched) ──
+      await window._updateDoc(window._doc(window._db, 'campers', editingId),
+        { ...weekData, updatedAt: window._serverTimestamp() });
+      showToast('Week schedule updated!');
     } else {
+      // ── New camper (full) ──
+      if(!first||!last) { showToast("Please enter the camper's name.", 'error'); return; }
       await window._addDoc(window._collection(window._db, 'campers'),
         { ...sharedData, ...weekData, createdAt: window._serverTimestamp() });
       showToast('Camper added!');
