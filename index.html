@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
     /* Warm, design-forward palette with camp green accent */
@@ -1307,6 +1308,34 @@
   <div class="detail-panel" id="detailPanel"></div>
 </div>
 
+<div class="modal-overlay" id="invoiceOverlay" onclick="if(event.target===this)closeInvoice()">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <span class="modal-title" id="invoiceTitle">Generate invoice</span>
+      <button class="modal-close" onclick="closeInvoice()"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="invoiceBody" style="padding:4px 2px">
+      <div class="sync-note" style="display:flex">
+        <i class="ti ti-info-circle"></i>
+        <span id="invoiceSummary"></span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Invoice number</label>
+        <input type="text" id="fInvoiceNumber" placeholder="e.g. 1042" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Invoice date</label>
+        <input type="date" id="fInvoiceDate">
+      </div>
+      <div style="margin-top:8px;font-size:12.5px;color:var(--text-3)" id="invoiceTotalsPreview"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeInvoice()">Cancel</button>
+      <button class="btn btn-primary" id="invoiceGenBtn" onclick="generateInvoiceFiles()"><i class="ti ti-download"></i> Download PDF + Word</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add/Edit Modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
   <div class="modal">
@@ -2005,9 +2034,14 @@ function openDetail(key) {
       <button class="detail-close" onclick="closeDetail()"><i class="ti ti-x"></i></button>
     </div>
     ${c.allergies?`<div class="allergy-alert"><i class="ti ti-alert-triangle"></i><strong>Allergy:</strong> ${esc(c.allergies)}</div>`:''}
-    <button class="btn" style="width:100%;margin-top:14px;justify-content:center" onclick="closeDetail();openModal('${c.id}','edit')">
-      <i class="ti ti-edit"></i> Edit camper${regs.length>1?` (${regs.length} weeks)`:''}
-    </button>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn" style="flex:1;justify-content:center" onclick="closeDetail();openModal('${c.id}','edit')">
+        <i class="ti ti-edit"></i> Edit camper${regs.length>1?` (${regs.length} wks)`:''}
+      </button>
+      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openInvoice('${esc(key)}')">
+        <i class="ti ti-file-invoice"></i> Print invoice
+      </button>
+    </div>
     <div class="detail-section" style="margin-top:16px">
       <div class="detail-section-title">Contact</div>
       ${c.parent?`<div class="detail-row"><i class="ti ti-user"></i><span>${esc(c.parent)}</span></div>`:''}
@@ -2698,6 +2732,61 @@ const WEEKS = [
   { label: 'Week 7 (Aug 24-28)', start: '2026-08-24', campCol: 'Choose the weeks your child will attend camp >> Week 7 (Aug 24-28) >> Camp', preCol: 'Choose the weeks your child will attend camp >> Week 7 (Aug 24-28) >> Pre-care', postCol: 'Choose the weeks your child will attend camp >> Week 7 (Aug 24-28) >> Post-care' },
 ];
 
+// ── Daily registration free-text parser ──
+const MONTH_MAP = {january:0,february:1,march:2,april:3,may:4,june:5,july:6,august:7,september:8,october:9,november:10,december:11,jan:0,feb:1,mar:2,apr:3,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11};
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAY_ABBR = ['Mon','Tue','Wed','Thu','Fri'];
+
+function mapDateToWeek(date) {
+  const day = date.getDay();
+  const monday = new Date(date);
+  monday.setDate(date.getDate() - ((day + 6) % 7));
+  const ms = dStr(monday);
+  return WEEKS.find(w => (w.mondayDate || w.start) === ms) || null;
+}
+
+// Parses free text like "July 7,8,10, 27,28 29 with pre care" into matched
+// camp days grouped by week, plus any dates that couldn't be matched.
+function parseDailyRegistration(text) {
+  const result = { byWeek: {}, unmatched: [], pre: false, post: false, raw: (text || '').trim() };
+  if (!result.raw) return result;
+  const lower = result.raw.toLowerCase();
+
+  // Care detection (handles "pre care", "pre-care", "pre and post care", "post-care only", etc.)
+  const bothPattern = /(pre\s*(?:and|&|\+|,|\/|\s)\s*post)|(post\s*(?:and|&|\+|,|\/|\s)\s*pre)/;
+  result.pre  = /pre[\s-]*care/.test(lower)  || bothPattern.test(lower);
+  result.post = /post[\s-]*care/.test(lower) || bothPattern.test(lower);
+
+  // Month markers with positions
+  const months = []; let m;
+  const mr = /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\b/gi;
+  while ((m = mr.exec(lower)) !== null) months.push({ idx: m.index, month: MONTH_MAP[m[1].toLowerCase()] });
+
+  // Day numbers (ranges + singles), without splitting longer numbers like 2026
+  const dayTokens = [];
+  const numRe = /(?<!\d)(\d{1,2})\s*(?:-|–|to|through)\s*(\d{1,2})(?!\d)|(?<!\d)(\d{1,2})(?!\d)/g;
+  while ((m = numRe.exec(lower)) !== null) {
+    const pos = m.index;
+    if (m[1] && m[2]) { const a = +m[1], b = +m[2]; for (let d = Math.min(a,b); d <= Math.max(a,b); d++) dayTokens.push({ pos, day: d }); }
+    else if (m[3]) dayTokens.push({ pos, day: +m[3] });
+  }
+
+  const defMonth = months.length ? months[0].month : 6; // default July (camp season)
+  dayTokens.forEach(t => {
+    if (t.day < 1 || t.day > 31) return;
+    let mon = defMonth;
+    for (const mm of months) { if (mm.idx <= t.pos) mon = mm.month; else break; }
+    const date = new Date(2026, mon, t.day);
+    const wk = mapDateToWeek(date);
+    const di = (date.getDay() + 6) % 7;
+    if (!wk || di > 4) { result.unmatched.push(MONTH_ABBR[mon] + ' ' + t.day); return; }
+    if (wk.holidayDays && wk.holidayDays.includes(di)) { result.unmatched.push(MONTH_ABBR[mon] + ' ' + t.day + ' (holiday)'); return; }
+    if (!result.byWeek[wk.start]) result.byWeek[wk.start] = { week: wk, days: new Set() };
+    result.byWeek[wk.start].days.add(di);
+  });
+  return result;
+}
+
 function buildImportRows(csvRows) {
   importRows = [];
   // Each CSV row may register for multiple weeks → create one camper entry per week
@@ -2744,6 +2833,9 @@ function buildImportRows(csvRows) {
     const healthCard = row["Child's Health Card number"] || '';
     const medFull = [medical !== 'none' && medical !== 'N/a' ? medical : '', healthCard ? 'Health card: ' + healthCard : ''].filter(Boolean).join(' | ');
 
+    // Payment method (used only for invoice generation, not displayed anywhere)
+    const payMethod = row["How would you like to pay?"] || '';
+
 
     // Create one entry per registered week
     WEEKS.forEach(wk => {
@@ -2769,31 +2861,125 @@ function buildImportRows(csvRows) {
           ec1Name, ec1Phone, ec1Rel, ec2Name, ec2Phone, ec2Rel,
           pickup, allergies,
           medical: medFull,
+          healthCard,
+          payMethod,
           notes, type: 'weekly', weekStart: wk.start,
           campDays, preDays, postDays}
       });
     });
+
+    // ── Daily registration handling ──
+    const dailyCampCol = 'Choose the weeks your child will attend camp >> Daily rate ($55 per day) >> Camp';
+    const dailyPreCol  = 'Choose the weeks your child will attend camp >> Daily rate ($55 per day) >> Pre-care';
+    const dailyPostCol = 'Choose the weeks your child will attend camp >> Daily rate ($55 per day) >> Post-care';
+    const dailyFreeCol = 'Please state the days you would like to sign up for. Also state if you would like pre-care and/or post-care. Daily rate is $55 per day. Pre-care is $10 a day and post-care is $10 a day.';
+
+    const dailyFreeText = (row[dailyFreeCol] || '').trim();
+    const isDaily = (row[dailyCampCol] || '').toLowerCase() === 'camp' || dailyFreeText !== '';
+
+    if (isDaily) {
+      const parsed = parseDailyRegistration(dailyFreeText);
+      const wantPre  = parsed.pre  || (row[dailyPreCol]  || '').toLowerCase() === 'pre-care';
+      const wantPost = parsed.post || (row[dailyPostCol] || '').toLowerCase() === 'post-care';
+
+      const commonData = {
+        first, last, age: null,
+        parent, email, phone, address,
+        parent2, email2, phone2, address2,
+        ec1Name, ec1Phone, ec1Rel, ec2Name, ec2Phone, ec2Rel,
+        pickup, allergies, medical: medFull, healthCard, payMethod, notes
+      };
+
+      const matchedWeeks = Object.values(parsed.byWeek);
+      matchedWeeks.forEach(({ week, days }) => {
+        const campDays = [...days].sort((a,b)=>a-b);
+        const preDays  = wantPre  ? campDays.slice() : [];
+        const postDays = wantPost ? campDays.slice() : [];
+        const existingMatch = window.campers.some(c =>
+          c.first === first && c.last === last && c.weekStart === week.start);
+        importRows.push({
+          csvName: fullName,
+          weekLabel: week.label,
+          weekStart: week.start,
+          exists: existingMatch,
+          isDaily: true,
+          parsedDays: campDays,
+          wantPre, wantPost,
+          rawDaily: parsed.raw,
+          unmatched: parsed.unmatched,
+          data: { ...commonData, type: 'daily', weekStart: week.start, campDays, preDays, postDays }
+        });
+      });
+
+      // If nothing could be matched but there is free text, surface a non-importable warning row
+      if (!matchedWeeks.length && (dailyFreeText || parsed.unmatched.length)) {
+        importRows.push({
+          csvName: fullName,
+          weekLabel: 'Daily — needs review',
+          weekStart: '',
+          exists: false,
+          isDaily: true,
+          needsReview: true,
+          rawDaily: parsed.raw,
+          unmatched: parsed.unmatched,
+          wantPre, wantPost,
+          data: null
+        });
+      }
+    }
   });
 
   // Show preview
+  const importable = importRows.filter(r => r.data && !r.exists);
   document.getElementById('importPreviewTitle').textContent = importRows.length + ' registrations found';
-  const newCount = importRows.filter(r=>!r.exists).length;
-  const skipCount = importRows.filter(r=>r.exists).length;
-  document.getElementById('importPreviewSub').textContent = newCount + ' new · ' + skipCount + ' already exist (will skip)';
-  document.getElementById('importPreviewList').innerHTML = importRows.map(r =>
-    '<div class="import-row">'
-    + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
-    + '<div class="import-row-weeks">' + r.weekLabel + '</div>'
-    + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
-    + '</div>'
-  ).join('');
+  const newCount = importable.length;
+  const skipCount = importRows.filter(r => r.exists).length;
+  const reviewCount = importRows.filter(r => r.needsReview).length;
+  let subParts = [newCount + ' new', skipCount + ' already exist (will skip)'];
+  if (reviewCount) subParts.push(reviewCount + ' need review');
+  document.getElementById('importPreviewSub').textContent = subParts.join(' · ');
+
+  document.getElementById('importPreviewList').innerHTML = importRows.map(r => {
+    if (r.needsReview) {
+      return '<div class="import-row" style="flex-wrap:wrap;background:#fdf3e7">'
+        + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
+        + '<div class="import-row-weeks">Daily registration</div>'
+        + '<span class="import-status" style="background:#f59e0b;color:#fff">Review</span>'
+        + '<div style="flex-basis:100%;margin-top:6px;font-size:12px;color:var(--text-2)">'
+        +   '<div>Free text: "<em>' + esc(r.rawDaily || '(empty)') + '</em>"</div>'
+        +   (r.unmatched.length ? '<div style="color:#b45309;margin-top:2px">Could not match: ' + esc(r.unmatched.join(', ')) + '. Add this camper manually.</div>'
+                                : '<div style="color:#b45309;margin-top:2px">No camp days could be parsed. Add this camper manually.</div>')
+        + '</div></div>';
+    }
+    if (r.isDaily) {
+      const dayNames = r.parsedDays.map(d => DAY_ABBR[d]).join(', ');
+      const careParts = [];
+      if (r.wantPre) careParts.push('pre-care');
+      if (r.wantPost) careParts.push('post-care');
+      const careStr = careParts.length ? ' · ' + careParts.join(' + ') : '';
+      return '<div class="import-row" style="flex-wrap:wrap">'
+        + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
+        + '<div class="import-row-weeks">' + esc(r.weekLabel) + ' <span style="opacity:.6">· Daily</span></div>'
+        + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
+        + '<div style="flex-basis:100%;margin-top:5px;font-size:12px;color:var(--text-2)">'
+        +   '<strong>' + esc(dayNames) + '</strong>' + esc(careStr)
+        +   (r.unmatched && r.unmatched.length ? '<span style="color:#b45309"> · couldn\'t match: ' + esc(r.unmatched.join(', ')) + '</span>' : '')
+        +   '<div style="opacity:.65;margin-top:1px">from: "' + esc(r.rawDaily) + '"</div>'
+        + '</div></div>';
+    }
+    return '<div class="import-row">'
+      + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
+      + '<div class="import-row-weeks">' + r.weekLabel + '</div>'
+      + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
+      + '</div>';
+  }).join('');
   document.getElementById('importPreview').style.display = 'block';
   document.getElementById('importBtn').style.display = newCount > 0 ? 'flex' : 'none';
   document.getElementById('importDrop').style.display = 'none';
 }
 
 async function doImport() {
-  const toImport = importRows.filter(r => !r.exists);
+  const toImport = importRows.filter(r => r.data && !r.exists);
   if(!toImport.length) return;
   document.getElementById('importBtn').style.display = 'none';
   document.getElementById('importProgress').style.display = 'block';
@@ -2867,6 +3053,323 @@ const sidebarLogo = document.querySelector('.sidebar-logo-img');
 const topBarLogo = document.getElementById('topBarLogo');
 if (sidebarLogo && topBarLogo) topBarLogo.src = sidebarLogo.src;
 
+// ════════════════════ INVOICE GENERATION ════════════════════
+// Template week names + pricing
+const INVOICE_WEEKS = [
+  { wk: 1, name: 'Survival Adventure',  dates: 'July 13-17', start: '2026-07-13', camp: 255 },
+  { wk: 2, name: 'Imagination Station', dates: 'July 20-24', start: '2026-07-20', camp: 255 },
+  { wk: 3, name: 'Art Party',           dates: 'July 27-31', start: '2026-07-27', camp: 255 },
+  { wk: 4, name: 'STEM Quest',          dates: 'Aug 4-7',    start: '2026-08-04', camp: 210 },
+  { wk: 5, name: 'Science Explorers',   dates: 'Aug 10-14',  start: '2026-08-10', camp: 255 },
+  { wk: 6, name: 'Passport Adventure',  dates: 'Aug 17-21',  start: '2026-08-17', camp: 255 },
+  { wk: 7, name: 'Carnival Fun',        dates: 'Aug 24-28',  start: '2026-08-24', camp: 255 },
+];
+const PRE_CARE_PRICE = 40, POST_CARE_PRICE = 40, HST_RATE = 0.13;
+const ETRANSFER_EMAIL = 'littleladybugscamp@gmail.com';
+
+let invoiceCamperKey = null;
+
+// Build the line-item + totals model for a camper from their registrations
+function buildInvoiceData(key) {
+  const regs = window.campers.filter(c => camperKey(c) === key);
+  if (!regs.length) return null;
+  const byWeek = new Map(regs.map(r => [r.weekStart, r]));
+  // Representative record for personal/payment info
+  const rep = regs[0];
+
+  const rows = INVOICE_WEEKS.map(w => {
+    const reg = byWeek.get(w.start);
+    if (!reg) return { ...w, attending: false, camp: null, pre: null, post: null, total: null };
+    const camp = w.camp;
+    const pre  = (reg.preDays && reg.preDays.length)  ? PRE_CARE_PRICE  : null;
+    const post = (reg.postDays && reg.postDays.length) ? POST_CARE_PRICE : null;
+    const total = camp + (pre||0) + (post||0);
+    return { ...w, attending: true, camp, pre, post, total };
+  });
+
+  const subtotal = rows.reduce((s, r) => s + (r.total || 0), 0);
+  const hst = Math.round(subtotal * HST_RATE * 100) / 100;
+  const grand = Math.round((subtotal + hst) * 100) / 100;
+
+  return {
+    rows, subtotal, hst, grand,
+    parent: rep.parent || '',
+    address: rep.address || '',
+    email: rep.email || '',
+    payMethod: (rep.payMethod || '').trim(),
+    childName: `${rep.first||''} ${rep.last||''}`.trim()
+  };
+}
+
+function money(n) {
+  return n == null ? '' : '$' + n.toFixed(2);
+}
+
+// Footer text based on payment method
+function invoiceFooterText(payMethod) {
+  if (!payMethod) return 'Thank you for registering.';
+  const isEtransfer = /e-?transfer/i.test(payMethod);
+  if (isEtransfer) {
+    return 'Thank you for registering and payment via E-transfer. E-transfer payments can be made to ' + ETRANSFER_EMAIL + '.';
+  }
+  return 'Thank you for registering and payment via ' + payMethod + '.';
+}
+
+function openInvoice(key) {
+  invoiceCamperKey = key;
+  const data = buildInvoiceData(key);
+  if (!data) { showToast('No registration data found.', 'error'); return; }
+  closeDetail();
+  document.getElementById('invoiceTitle').textContent = 'Invoice — ' + data.childName;
+  const weeksAttending = data.rows.filter(r => r.attending).length;
+  document.getElementById('invoiceSummary').textContent =
+    `${data.childName} · ${weeksAttending} week${weeksAttending===1?'':'s'}. Enter the invoice number, then download.`;
+  document.getElementById('fInvoiceNumber').value = '';
+  document.getElementById('fInvoiceDate').value = dStr(new Date());
+  document.getElementById('invoiceTotalsPreview').innerHTML =
+    `Subtotal: <strong>${money(data.subtotal)}</strong> &nbsp;·&nbsp; HST (13%): <strong>${money(data.hst)}</strong> &nbsp;·&nbsp; Grand total: <strong>${money(data.grand)}</strong>`;
+  document.getElementById('invoiceOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('fInvoiceNumber').focus(), 50);
+}
+
+function closeInvoice() {
+  document.getElementById('invoiceOverlay').classList.remove('open');
+  invoiceCamperKey = null;
+}
+
+function fmtInvoiceDate(iso) {
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-').map(Number);
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return `${months[m-1]} ${d}, ${y}`;
+}
+
+async function generateInvoiceFiles() {
+  const data = buildInvoiceData(invoiceCamperKey);
+  if (!data) { showToast('No data.', 'error'); return; }
+  const invNum = document.getElementById('fInvoiceNumber').value.trim();
+  if (!invNum) { showToast('Please enter an invoice number.', 'error'); document.getElementById('fInvoiceNumber').focus(); return; }
+  const invDate = fmtInvoiceDate(document.getElementById('fInvoiceDate').value);
+  const footer = invoiceFooterText(data.payMethod);
+  const safeName = (data.childName || 'camper').replace(/[^a-z0-9]+/gi, '_');
+
+  const btn = document.getElementById('invoiceGenBtn');
+  btn.disabled = true;
+  try {
+    buildInvoicePDF(data, invNum, invDate, footer, `Invoice_${safeName}_${invNum}.pdf`);
+    buildInvoiceWord(data, invNum, invDate, footer, `Invoice_${safeName}_${invNum}.doc`);
+    showToast('Invoice downloaded (PDF + Word).');
+    closeInvoice();
+  } catch (e) {
+    showToast('Error generating invoice: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---- PDF (jsPDF) ----
+function buildInvoicePDF(data, invNum, invDate, footer, filename) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const M = 50;                 // margin
+  const green = [122, 143, 122];      // accent bar
+  const headerBeige = [247, 226, 199];
+  const rowAlt = [242, 242, 242];
+  const grandBg = [122, 143, 122];
+
+  // Logo — drawn large and centered, preserving its natural aspect ratio
+  // (the website logo already contains the "Little Ladybugs Camp" wording,
+  //  so no separate text line is needed).
+  const logoTop = 40;
+  let logoBottom = logoTop;            // tracks where the logo ends so the rest flows below it
+  try {
+    const logo = document.querySelector('.sidebar-logo-img');
+    if (logo && logo.src) {
+      const nw = logo.naturalWidth || 1;
+      const nh = logo.naturalHeight || 1;
+      const targetW = 240;             // preferred width in pt
+      const maxH = 90;                 // cap so a tall logo doesn't dominate
+      let w = targetW, h = w * (nh / nw);
+      if (h > maxH) { h = maxH; w = h * (nw / nh); }
+      const x = pageW / 2 - w / 2;     // horizontally centered
+      doc.addImage(logo.src, 'JPEG', x, logoTop, w, h);
+      logoBottom = logoTop + h;
+    }
+  } catch(e) {}
+
+  // "Invoice" on the next line below the logo
+  const invoiceY = logoBottom + 34;
+  doc.setFont('times', 'normal'); doc.setFontSize(30); doc.setTextColor(30);
+  doc.text('Invoice', pageW/2, invoiceY, { align: 'center' });
+
+  // green accent bar below the heading
+  const barY = invoiceY + 14;
+  doc.setFillColor(...green); doc.rect(0, barY, pageW, 10, 'F');
+
+  // Bill To / Invoice meta
+  let y = barY + 38;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(40);
+  doc.text('Bill To:', M, y);
+  doc.text('Invoice Date:', pageW - M - 150, y);
+  doc.setFont('helvetica', 'normal');
+  doc.text(invDate, pageW - M - 150, y + 15);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Invoice Number: ' + invNum, pageW - M - 150, y + 32);
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
+  let by = y + 16;
+  [data.parent, data.address, data.email].filter(Boolean).forEach(line => {
+    doc.text(String(line), M, by); by += 14;
+  });
+
+  // Table
+  let ty = Math.max(by, y + 60) + 10;
+  const cols = [
+    { x: M,      w: 40,  label: 'Week',        align: 'left' },
+    { x: M+40,   w: 200, label: 'Week name',   align: 'left' },
+    { x: M+240,  w: 60,  label: 'Camp',        align: 'left' },
+    { x: M+300,  w: 60,  label: 'Pre-care',    align: 'left' },
+    { x: M+360,  w: 60,  label: 'Post-care',   align: 'left' },
+    { x: M+420,  w: 92,  label: 'Weekly total',align: 'left' },
+  ];
+  const tableW = 512;
+  const rowH = 30;
+
+  // header row
+  doc.setFillColor(...headerBeige); doc.rect(M, ty, tableW, 22, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(60);
+  cols.forEach(c => doc.text(c.label, c.x + 5, ty + 14));
+  ty += 22;
+
+  // data rows
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(40);
+  data.rows.forEach((r, i) => {
+    if (i % 2 === 1) { doc.setFillColor(...rowAlt); doc.rect(M, ty, tableW, rowH, 'F'); }
+    const cells = [
+      String(r.wk),
+      `${r.name} (${r.dates})`,
+      r.camp != null ? money(r.camp) : '',
+      r.pre  != null ? money(r.pre)  : '',
+      r.post != null ? money(r.post) : '',
+      r.total!= null ? money(r.total): '',
+    ];
+    doc.setFontSize(9);
+    cells.forEach((txt, ci) => {
+      const c = cols[ci];
+      // wrap week name if needed
+      if (ci === 1) {
+        const lines = doc.splitTextToSize(txt, c.w - 8);
+        doc.text(lines, c.x + 5, ty + (lines.length > 1 ? 13 : 19));
+      } else {
+        doc.text(txt, c.x + 5, ty + 19);
+      }
+    });
+    ty += rowH;
+  });
+
+  // Subtotal / HST / Grand total rows
+  const totalsRows = [
+    ['Subtotal', money(data.subtotal), false],
+    ['HST', money(data.hst), false],
+    ['Grand total', money(data.grand), true],
+  ];
+  doc.setFontSize(10);
+  totalsRows.forEach(([label, val, isGrand]) => {
+    if (isGrand) {
+      doc.setFillColor(...grandBg); doc.rect(M, ty, tableW, 24, 'F');
+      doc.setTextColor(255); doc.setFont('helvetica','bold');
+    } else {
+      doc.setFillColor(...rowAlt); doc.rect(M, ty, tableW, 24, 'F');
+      doc.setTextColor(40); doc.setFont('helvetica','bold');
+    }
+    doc.text(label, cols[4].x - 60, ty + 16);
+    doc.setFont('helvetica', isGrand ? 'bold' : 'normal');
+    doc.text(val, cols[5].x + 5, ty + 16);
+    ty += 24;
+  });
+
+  // Footer thank-you box
+  ty += 30;
+  doc.setDrawColor(180); doc.setFillColor(245, 241, 232);
+  const boxLines = doc.splitTextToSize(footer, tableW - 30);
+  const boxH = 24 + boxLines.length * 14;
+  doc.rect(M, ty, tableW, boxH, 'FD');
+  doc.setTextColor(40); doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text(boxLines, M + 15, ty + 22);
+
+  // bottom address line
+  doc.setFontSize(9.5); doc.setTextColor(70);
+  doc.text('8 Aberdeen Street Caledonia, ON N3W 1C8. GST/HST: 74975 1954 RT0001',
+    pageW/2, doc.internal.pageSize.getHeight() - 40, { align: 'center' });
+
+  doc.save(filename);
+}
+
+// ---- Word (.doc HTML) ----
+function buildInvoiceWord(data, invNum, invDate, footer, filename) {
+  const logo = document.querySelector('.sidebar-logo-img');
+  const logoSrc = logo ? logo.src : '';
+  // Width preserving the logo's natural aspect ratio (the logo already includes the camp name)
+  let logoW = 300;
+  if (logo && logo.naturalWidth) {
+    const ratio = logo.naturalHeight / logo.naturalWidth;
+    if (300 * ratio > 110) logoW = Math.round(110 / ratio);
+  }
+  const rowsHtml = data.rows.map((r, i) => `
+    <tr style="background:${i%2? '#f2f2f2':'#ffffff'}">
+      <td style="background:#f7e2c7;padding:8px;border:1px solid #ddd">${r.wk}</td>
+      <td style="padding:8px;border:1px solid #ddd">${esc(r.name)} (${esc(r.dates)})</td>
+      <td style="padding:8px;border:1px solid #ddd">${r.camp!=null?money(r.camp):''}</td>
+      <td style="padding:8px;border:1px solid #ddd">${r.pre!=null?money(r.pre):''}</td>
+      <td style="padding:8px;border:1px solid #ddd">${r.post!=null?money(r.post):''}</td>
+      <td style="padding:8px;border:1px solid #ddd">${r.total!=null?money(r.total):''}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><title>Invoice ${esc(invNum)}</title></head>
+<body style="font-family:Calibri,Arial,sans-serif;color:#333;font-size:11pt">
+  <div style="text-align:center">
+    ${logoSrc?`<img src="${logoSrc}" width="${logoW}" style="display:block;margin:0 auto"/>`:''}
+    <div style="font-size:28pt;font-family:Georgia,serif;margin-top:6px">Invoice</div>
+  </div>
+  <div style="height:10px;background:#7a8f7a;margin:10px 0 20px"></div>
+  <table width="100%" style="margin-bottom:20px"><tr>
+    <td style="vertical-align:top">
+      <strong>Bill To:</strong><br>
+      ${esc(data.parent)}<br>${esc(data.address)}<br>${esc(data.email)}
+    </td>
+    <td style="vertical-align:top;text-align:right">
+      <strong>Invoice Date:</strong> ${esc(invDate)}<br>
+      <strong>Invoice Number:</strong> ${esc(invNum)}
+    </td>
+  </tr></table>
+  <table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:10pt">
+    <tr style="background:#f7e2c7;font-weight:bold">
+      <td style="padding:8px;border:1px solid #ddd">Week</td>
+      <td style="padding:8px;border:1px solid #ddd">Week name</td>
+      <td style="padding:8px;border:1px solid #ddd">Camp</td>
+      <td style="padding:8px;border:1px solid #ddd">Pre-care</td>
+      <td style="padding:8px;border:1px solid #ddd">Post-care</td>
+      <td style="padding:8px;border:1px solid #ddd">Weekly total</td>
+    </tr>
+    ${rowsHtml}
+    <tr style="background:#f2f2f2"><td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">Subtotal</td><td style="padding:8px;border:1px solid #ddd">${money(data.subtotal)}</td></tr>
+    <tr style="background:#f2f2f2"><td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">HST</td><td style="padding:8px;border:1px solid #ddd">${money(data.hst)}</td></tr>
+    <tr style="background:#7a8f7a;color:#fff"><td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">Grand total</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold">${money(data.grand)}</td></tr>
+  </table>
+  <div style="border:1px solid #ccc;background:#f5f1e8;padding:14px;margin-top:30px;font-size:11pt">${esc(footer)}</div>
+  <div style="text-align:center;margin-top:30px;font-size:9.5pt;color:#555">8 Aberdeen Street Caledonia, ON N3W 1C8. GST/HST: 74975 1954 RT0001</div>
+</body></html>`;
+
+  const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 // Initial render (while Firebase loads)
 renderStats();
 
@@ -2904,6 +3407,9 @@ window.selectCalWeek = selectCalWeek;
 window.populateCalWeekButtons = populateCalWeekButtons;
 window.showDayPopup = showDayPopup;
 window.closeDayPopup = closeDayPopup;
+window.openInvoice = openInvoice;
+window.closeInvoice = closeInvoice;
+window.generateInvoiceFiles = generateInvoiceFiles;
 </script>
 </body>
 </html>
