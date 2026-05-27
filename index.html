@@ -1107,21 +1107,10 @@
         <i class="ti ti-calendar-week"></i> Calendar
       </button>
     </nav>
-    <div class="sidebar-footer">
-      <div class="sync-status">
-        <div class="sync-dot loading" id="syncDot"></div>
-        <span id="syncLabel">Connecting…</span>
-      </div>
-    </div>
   </aside>
 
   <!-- Main -->
   <main class="main-content">
-    <!-- Mobile sync bar -->
-    <div class="mobile-sync-bar">
-      <div class="sync-dot loading" id="syncDotMobile"></div>
-      <span id="syncLabelMobile">Connecting…</span>
-    </div>
     <!-- Roster page -->
     <div id="page-roster" class="page active">
       <div class="top-bar">
@@ -1527,21 +1516,12 @@ onSnapshot(campersRef, (snapshot) => {
 }, (err) => {
   console.error(err);
   if (typeof window.showToast === 'function') window.showToast('Connection error: ' + err.message, 'error');
-  document.getElementById('syncLabel').textContent = 'Offline';
-  document.getElementById('syncDot').className = 'sync-dot';
-  document.getElementById('syncLabelMobile').textContent = 'Offline';
-  document.getElementById('syncDotMobile').className = 'sync-dot';
   const ls = document.getElementById('loadingScreen');
   ls.style.opacity = '0';
   setTimeout(() => ls.style.display='none', 300);
 });
 
-window._setSynced = function() {
-  document.getElementById('syncDot').className = 'sync-dot connected';
-  document.getElementById('syncLabel').textContent = 'Synced';
-  document.getElementById('syncDotMobile').className = 'sync-dot connected';
-  document.getElementById('syncLabelMobile').textContent = 'Synced';
-};
+window._setSynced = function() {};
 
 </script>
 
@@ -1607,16 +1587,19 @@ function esc(s) {
     .replace(/'/g, '&#39;');
 }
 
-// ── Date helpers ──
-function getMon(off=0) {
-  const d = new Date();
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day===0?-6:1);
-  const m = new Date(d.setDate(diff + off*7));
-  m.setHours(0,0,0,0);
-  return m;
+// ── Initials for avatars (robust when a name part is missing) ──
+function initials(first, last) {
+  return ((first||'').charAt(0) + (last||'').charAt(0)).toUpperCase();
 }
-function dStr(d) { return d.toISOString().slice(0,10); }
+
+// ── Date helpers ──
+function dStr(d) {
+  // Format from local date parts to avoid toISOString()'s UTC shift,
+  // which could roll the date back/forward a day depending on timezone.
+  return d.getFullYear() + '-' +
+         String(d.getMonth()+1).padStart(2,'0') + '-' +
+         String(d.getDate()).padStart(2,'0');
+}
 function getMonOfDate(s) {
   const d = new Date(s + 'T00:00:00');
   const day = d.getDay();
@@ -1707,14 +1690,14 @@ function renderRoster() {
     const firstReg = g.registrations[0];
     const idx = (window._avatarIdx.get(firstReg.id) || 0) % AV.length;
     const [bg,fg] = AV[idx];
-    const ini = ((g.first||'')[0]+(g.last||'')[0]||'').toUpperCase();
+    const ini = initials(g.first, g.last);
     const wkCount = g.registrations.length;
     const hasWeekly = g.registrations.some(r => r.type === 'weekly');
     const hasDaily  = g.registrations.some(r => r.type === 'daily');
     const hasAllergy = g.registrations.some(r => r.allergies);
     const hasPre  = g.registrations.some(r => r.preDays?.length);
     const hasPost = g.registrations.some(r => r.postDays?.length);
-    return `<div class="camper-card" onclick="openDetail('${esc(g.key)}')">
+    return `<div class="camper-card" onclick="openDetail('${firstReg.id}')">
       <div class="card-header">
         <div class="avatar" style="background:${bg};color:${fg}">${esc(ini)}</div>
         <div>
@@ -1806,8 +1789,8 @@ function rWeekly() {
   gridEl.innerHTML = filtered.map(c => {
     const idx = (window._avatarIdx.get(c.id) || 0) % AV.length;
     const [bg,fg] = AV[idx];
-    const ini = ((c.first||'')[0]+(c.last||'')[0]||'').toUpperCase();
-    return `<div class="camper-card" onclick="openDetail('${esc(camperKey(c))}')">
+    const ini = initials(c.first, c.last);
+    return `<div class="camper-card" onclick="openDetail('${c.id}')">
       <div class="card-header">
         <div class="avatar" style="background:${bg};color:${fg}">${esc(ini)}</div>
         <div>
@@ -2022,7 +2005,7 @@ function openDetail(key) {
 
   const idx = (window._avatarIdx.get(c.id) || 0) % AV.length;
   const [bg,fg] = AV[idx];
-  const ini = ((c.first||'')[0]+(c.last||'')[0]||'').toUpperCase();
+  const ini = initials(c.first, c.last);
 
   document.getElementById('detailPanel').innerHTML = `
     <div class="detail-header">
@@ -2038,7 +2021,7 @@ function openDetail(key) {
       <button class="btn" style="flex:1;justify-content:center" onclick="closeDetail();openModal('${c.id}','edit')">
         <i class="ti ti-edit"></i> Edit camper${regs.length>1?` (${regs.length} wks)`:''}
       </button>
-      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openInvoice('${esc(key)}')">
+      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openInvoice('${c.id}')">
         <i class="ti ti-file-invoice"></i> Print invoice
       </button>
     </div>
@@ -2831,7 +2814,8 @@ function buildImportRows(csvRows) {
     const allergies = allergiesYN === 'yes' ? (row['List all allergies/sensitivities'] || '') : '';
     const medical = row["Please list any other important medical information for your child (medications, puffers, learning disabilities, etc.)"] || '';
     const healthCard = row["Child's Health Card number"] || '';
-    const medFull = [medical !== 'none' && medical !== 'N/a' ? medical : '', healthCard ? 'Health card: ' + healthCard : ''].filter(Boolean).join(' | ');
+    // Cleaned medical notes only — health card is stored/shown separately (avoids duplication)
+    const medFull = /^(n\/?a|none|nil\.?)$/i.test(medical.trim()) ? '' : medical.trim();
 
     // Payment method (used only for invoice generation, not displayed anywhere)
     const payMethod = row["How would you like to pay?"] || '';
@@ -3065,34 +3049,70 @@ const INVOICE_WEEKS = [
   { wk: 7, name: 'Carnival Fun',        dates: 'Aug 24-28',  start: '2026-08-24', camp: 255 },
 ];
 const PRE_CARE_PRICE = 40, POST_CARE_PRICE = 40, HST_RATE = 0.13;
+// Daily (per-day) rates
+const DAILY_CAMP_PRICE = 55, DAILY_CARE_PRICE = 10;
 const ETRANSFER_EMAIL = 'littleladybugscamp@gmail.com';
 
 let invoiceCamperKey = null;
 
-// Build the line-item + totals model for a camper from their registrations
+// Format a single daily date label, e.g. "Mon, Jul 27"
+function fmtDailyDate(weekStart, dayIdx) {
+  const mon = getMonOfDate(weekStart);
+  const d = new Date(mon);
+  d.setDate(d.getDate() + dayIdx);
+  return d.toLocaleDateString('en-CA', { weekday:'short', month:'short', day:'numeric' });
+}
+
+// Build the line-item + totals model for a camper from their registrations.
+// Weekly registrations → one row per week (weekly pricing).
+// Daily registrations  → one row per selected day (daily pricing: $55 camp, $10 pre, $10 post).
+// Only attended items appear. Totals math is identical for both: subtotal → 13% HST → grand.
 function buildInvoiceData(key) {
   const regs = window.campers.filter(c => camperKey(c) === key);
   if (!regs.length) return null;
-  const byWeek = new Map(regs.map(r => [r.weekStart, r]));
-  // Representative record for personal/payment info
+  // Chronological order
+  regs.sort((a,b) => (a.weekStart||'').localeCompare(b.weekStart||''));
   const rep = regs[0];
 
-  const rows = INVOICE_WEEKS.map(w => {
-    const reg = byWeek.get(w.start);
-    if (!reg) return { ...w, attending: false, camp: null, pre: null, post: null, total: null };
-    const camp = w.camp;
-    const pre  = (reg.preDays && reg.preDays.length)  ? PRE_CARE_PRICE  : null;
-    const post = (reg.postDays && reg.postDays.length) ? POST_CARE_PRICE : null;
-    const total = camp + (pre||0) + (post||0);
-    return { ...w, attending: true, camp, pre, post, total };
+  const lineItems = [];
+  regs.forEach(reg => {
+    const wkInfo = INVOICE_WEEKS.find(w => w.start === reg.weekStart);
+    if (reg.type === 'daily') {
+      // One row per camp day with daily rates
+      (reg.campDays || []).slice().sort((a,b)=>a-b).forEach(d => {
+        const camp = DAILY_CAMP_PRICE;
+        const pre  = (reg.preDays  || []).includes(d) ? DAILY_CARE_PRICE : null;
+        const post = (reg.postDays || []).includes(d) ? DAILY_CARE_PRICE : null;
+        lineItems.push({
+          desc: fmtDailyDate(reg.weekStart, d),
+          camp, pre, post,
+          total: camp + (pre||0) + (post||0),
+          daily: true
+        });
+      });
+    } else {
+      // Weekly registration — one row, weekly pricing
+      const camp = wkInfo ? wkInfo.camp : 255;
+      const pre  = (reg.preDays  && reg.preDays.length)  ? PRE_CARE_PRICE  : null;
+      const post = (reg.postDays && reg.postDays.length) ? POST_CARE_PRICE : null;
+      const dates = wkInfo ? wkInfo.dates : fmtWk(reg.weekStart);
+      const namePart = wkInfo ? `Week ${wkInfo.wk} — ${wkInfo.name}` : weekLabel(reg.weekStart);
+      lineItems.push({
+        desc: `${namePart} (${dates})`,
+        camp, pre, post,
+        total: camp + (pre||0) + (post||0),
+        daily: false
+      });
+    }
   });
 
-  const subtotal = rows.reduce((s, r) => s + (r.total || 0), 0);
+  const subtotal = lineItems.reduce((s, r) => s + (r.total || 0), 0);
   const hst = Math.round(subtotal * HST_RATE * 100) / 100;
   const grand = Math.round((subtotal + hst) * 100) / 100;
+  const weekCount = new Set(regs.map(r => r.weekStart)).size;
 
   return {
-    rows, subtotal, hst, grand,
+    lineItems, weekCount, subtotal, hst, grand,
     parent: rep.parent || '',
     address: rep.address || '',
     email: rep.email || '',
@@ -3115,13 +3135,19 @@ function invoiceFooterText(payMethod) {
   return 'Thank you for registering and payment via ' + payMethod + '.';
 }
 
-function openInvoice(key) {
+function openInvoice(keyOrId) {
+  // Accept either a group key ("first|last") or a single camper id
+  let key = keyOrId;
+  if (keyOrId && !keyOrId.includes('|')) {
+    const c = window.campers.find(x => x.id === keyOrId);
+    if (c) key = camperKey(c);
+  }
   invoiceCamperKey = key;
   const data = buildInvoiceData(key);
   if (!data) { showToast('No registration data found.', 'error'); return; }
   closeDetail();
   document.getElementById('invoiceTitle').textContent = 'Invoice — ' + data.childName;
-  const weeksAttending = data.rows.filter(r => r.attending).length;
+  const weeksAttending = data.weekCount;
   document.getElementById('invoiceSummary').textContent =
     `${data.childName} · ${weeksAttending} week${weeksAttending===1?'':'s'}. Enter the invoice number, then download.`;
   document.getElementById('fInvoiceNumber').value = '';
@@ -3226,15 +3252,14 @@ function buildInvoicePDF(data, invNum, invDate, footer, filename) {
   // Table
   let ty = Math.max(by, y + 60) + 10;
   const cols = [
-    { x: M,      w: 40,  label: 'Week',        align: 'left' },
-    { x: M+40,   w: 200, label: 'Week name',   align: 'left' },
-    { x: M+240,  w: 60,  label: 'Camp',        align: 'left' },
-    { x: M+300,  w: 60,  label: 'Pre-care',    align: 'left' },
-    { x: M+360,  w: 60,  label: 'Post-care',   align: 'left' },
-    { x: M+420,  w: 92,  label: 'Weekly total',align: 'left' },
+    { x: M,      w: 232, label: 'Description', align: 'left' },
+    { x: M+232,  w: 70,  label: 'Camp',        align: 'left' },
+    { x: M+302,  w: 70,  label: 'Pre-care',    align: 'left' },
+    { x: M+372,  w: 70,  label: 'Post-care',   align: 'left' },
+    { x: M+442,  w: 70,  label: 'Total',       align: 'left' },
   ];
   const tableW = 512;
-  const rowH = 30;
+  const rowH = 26;
 
   // header row
   doc.setFillColor(...headerBeige); doc.rect(M, ty, tableW, 22, 'F');
@@ -3242,13 +3267,12 @@ function buildInvoicePDF(data, invNum, invDate, footer, filename) {
   cols.forEach(c => doc.text(c.label, c.x + 5, ty + 14));
   ty += 22;
 
-  // data rows
+  // data rows — one per line item (weekly week or daily day)
   doc.setFont('helvetica', 'normal'); doc.setTextColor(40);
-  data.rows.forEach((r, i) => {
+  data.lineItems.forEach((r, i) => {
     if (i % 2 === 1) { doc.setFillColor(...rowAlt); doc.rect(M, ty, tableW, rowH, 'F'); }
     const cells = [
-      String(r.wk),
-      `${r.name} (${r.dates})`,
+      r.desc,
       r.camp != null ? money(r.camp) : '',
       r.pre  != null ? money(r.pre)  : '',
       r.post != null ? money(r.post) : '',
@@ -3257,12 +3281,11 @@ function buildInvoicePDF(data, invNum, invDate, footer, filename) {
     doc.setFontSize(9);
     cells.forEach((txt, ci) => {
       const c = cols[ci];
-      // wrap week name if needed
-      if (ci === 1) {
-        const lines = doc.splitTextToSize(txt, c.w - 8);
-        doc.text(lines, c.x + 5, ty + (lines.length > 1 ? 13 : 19));
+      if (ci === 0) {
+        const lines = doc.splitTextToSize(String(txt), c.w - 8);
+        doc.text(lines, c.x + 5, ty + (lines.length > 1 ? 11 : 17));
       } else {
-        doc.text(txt, c.x + 5, ty + 19);
+        doc.text(String(txt), c.x + 5, ty + 17);
       }
     });
     ty += rowH;
@@ -3271,7 +3294,7 @@ function buildInvoicePDF(data, invNum, invDate, footer, filename) {
   // Subtotal / HST / Grand total rows
   const totalsRows = [
     ['Subtotal', money(data.subtotal), false],
-    ['HST', money(data.hst), false],
+    ['HST (13%)', money(data.hst), false],
     ['Grand total', money(data.grand), true],
   ];
   doc.setFontSize(10);
@@ -3283,9 +3306,9 @@ function buildInvoicePDF(data, invNum, invDate, footer, filename) {
       doc.setFillColor(...rowAlt); doc.rect(M, ty, tableW, 24, 'F');
       doc.setTextColor(40); doc.setFont('helvetica','bold');
     }
-    doc.text(label, cols[4].x - 60, ty + 16);
+    doc.text(label, cols[4].x - 8, ty + 16, { align: 'right' });
     doc.setFont('helvetica', isGrand ? 'bold' : 'normal');
-    doc.text(val, cols[5].x + 5, ty + 16);
+    doc.text(val, cols[4].x + 5, ty + 16);
     ty += 24;
   });
 
@@ -3316,10 +3339,9 @@ function buildInvoiceWord(data, invNum, invDate, footer, filename) {
     const ratio = logo.naturalHeight / logo.naturalWidth;
     if (300 * ratio > 110) logoW = Math.round(110 / ratio);
   }
-  const rowsHtml = data.rows.map((r, i) => `
+  const rowsHtml = data.lineItems.map((r, i) => `
     <tr style="background:${i%2? '#f2f2f2':'#ffffff'}">
-      <td style="background:#f7e2c7;padding:8px;border:1px solid #ddd">${r.wk}</td>
-      <td style="padding:8px;border:1px solid #ddd">${esc(r.name)} (${esc(r.dates)})</td>
+      <td style="padding:8px;border:1px solid #ddd">${esc(r.desc)}</td>
       <td style="padding:8px;border:1px solid #ddd">${r.camp!=null?money(r.camp):''}</td>
       <td style="padding:8px;border:1px solid #ddd">${r.pre!=null?money(r.pre):''}</td>
       <td style="padding:8px;border:1px solid #ddd">${r.post!=null?money(r.post):''}</td>
@@ -3346,17 +3368,16 @@ function buildInvoiceWord(data, invNum, invDate, footer, filename) {
   </tr></table>
   <table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;font-size:10pt">
     <tr style="background:#f7e2c7;font-weight:bold">
-      <td style="padding:8px;border:1px solid #ddd">Week</td>
-      <td style="padding:8px;border:1px solid #ddd">Week name</td>
+      <td style="padding:8px;border:1px solid #ddd">Description</td>
       <td style="padding:8px;border:1px solid #ddd">Camp</td>
       <td style="padding:8px;border:1px solid #ddd">Pre-care</td>
       <td style="padding:8px;border:1px solid #ddd">Post-care</td>
-      <td style="padding:8px;border:1px solid #ddd">Weekly total</td>
+      <td style="padding:8px;border:1px solid #ddd">Total</td>
     </tr>
     ${rowsHtml}
-    <tr style="background:#f2f2f2"><td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">Subtotal</td><td style="padding:8px;border:1px solid #ddd">${money(data.subtotal)}</td></tr>
-    <tr style="background:#f2f2f2"><td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">HST</td><td style="padding:8px;border:1px solid #ddd">${money(data.hst)}</td></tr>
-    <tr style="background:#7a8f7a;color:#fff"><td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">Grand total</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold">${money(data.grand)}</td></tr>
+    <tr style="background:#f2f2f2"><td colspan="4" style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">Subtotal</td><td style="padding:8px;border:1px solid #ddd">${money(data.subtotal)}</td></tr>
+    <tr style="background:#f2f2f2"><td colspan="4" style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">HST (13%)</td><td style="padding:8px;border:1px solid #ddd">${money(data.hst)}</td></tr>
+    <tr style="background:#7a8f7a;color:#fff"><td colspan="4" style="padding:8px;border:1px solid #ddd;text-align:right;font-weight:bold">Grand total</td><td style="padding:8px;border:1px solid #ddd;font-weight:bold">${money(data.grand)}</td></tr>
   </table>
   <div style="border:1px solid #ccc;background:#f5f1e8;padding:14px;margin-top:30px;font-size:11pt">${esc(footer)}</div>
   <div style="text-align:center;margin-top:30px;font-size:9.5pt;color:#555">8 Aberdeen Street Caledonia, ON N3W 1C8. GST/HST: 74975 1954 RT0001</div>
