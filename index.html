@@ -1145,6 +1145,11 @@
   .admin-row-refunded td { background: #FBF8F2; }
   .admin-row-refunded .admin-inp[disabled] { opacity: .55; cursor: not-allowed; }
   .admin-refund { font-weight: 600; color: #8A6D2F; }
+  .admin-totals-row td {
+    border-top: 2px solid var(--border); background: var(--sidebar-bg);
+    font-weight: 700; color: var(--text); font-size: 14px; padding: 12px 14px;
+  }
+  .admin-totals-row td:first-child { color: var(--text-3); font-weight: 600; }
   .admin-restore {
     background: none; border: 1px solid var(--border); border-radius: 8px;
     padding: 4px 8px; cursor: pointer; color: var(--green-deep);
@@ -1157,7 +1162,17 @@
     background: var(--bg); cursor: pointer; font-size: 13px;
     user-select: none;
   }
-  .invoice-format-toggle input[type=checkbox] { accent-color: var(--green); cursor: pointer; }
+  .invoice-format-toggle input[type=checkbox] {
+    accent-color: var(--green); cursor: pointer;
+    width: 18px; height: 18px; flex: 0 0 auto; margin: 0;
+  }
+  .invoice-format-toggle span { flex: 1; min-width: 0; }
+  .jf-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px;
+    background: #C0392B; color: #fff; border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+  }
   .admin-invoice-cell { display: flex; align-items: center; gap: 8px; }
   .admin-pdf-link {
     background: none; border: none; cursor: pointer; color: var(--green-deep);
@@ -1215,6 +1230,9 @@
         <div class="top-bar-title"><img src="" alt="Little Ladybug Camp" class="top-bar-logo" id="topBarLogo"></div>
         <button class="btn btn-icon" onclick="toggleSearch('campersSearchBar','campersSearchInput')" aria-label="Search">
           <i class="ti ti-search"></i>
+        </button>
+        <button class="btn" onclick="openJotformSync()" id="jotformSyncBtn">
+          <i class="ti ti-refresh"></i> <span class="btn-label">Sync JotForm</span><span class="jf-badge" id="jotformBadge" style="display:none">0</span>
         </button>
         <button class="btn" onclick="openImport()">
           <i class="ti ti-upload"></i> <span class="btn-label">Import CSV</span>
@@ -1464,10 +1482,10 @@
 <div class="modal-overlay" id="importOverlay" onclick="if(event.target===this)closeImport()">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
-      <span class="modal-title">Import from JotForm CSV</span>
+      <span class="modal-title" id="importModalTitle">Import from JotForm CSV</span>
       <button class="modal-close" onclick="closeImport()"><i class="ti ti-x"></i></button>
     </div>
-    <p style="font-size:13px;color:var(--text-2);margin-bottom:16px">
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:16px" id="importIntro">
       Upload a CSV exported from JotForm. Each row will be imported as a camper registration.
       Existing campers with the same name + week will be skipped.
     </p>
@@ -1500,6 +1518,45 @@
         </button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- JotForm Sync -->
+<div class="modal-overlay" id="jotformOverlay" onclick="if(event.target===this)closeJotformSync()">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <span class="modal-title">Sync from JotForm</span>
+      <button class="modal-close" onclick="closeJotformSync()"><i class="ti ti-x"></i></button>
+    </div>
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:14px">
+      Pull new registrations directly from your JotForm form — no CSV needed. New entries are matched
+      against existing campers, so the same registration won't be added twice.
+    </p>
+    <div class="form-group">
+      <label class="form-label" for="jfFormId">Form ID</label>
+      <input type="text" id="jfFormId" placeholder="e.g. 240123456789012" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="jfApiKey">API key</label>
+      <input type="password" id="jfApiKey" placeholder="Your JotForm API key" autocomplete="off">
+    </div>
+    <label class="invoice-format-toggle">
+      <input type="checkbox" id="jfAuto" onchange="saveJotformSettings()">
+      <span>Auto-import new registrations every 5 minutes while the app is open</span>
+    </label>
+    <div id="jfStatus" style="font-size:12.5px;color:var(--text-3);margin-top:10px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeJotformSync()">Close</button>
+      <div class="modal-footer-right">
+        <button class="btn btn-primary" id="jfSyncBtn" onclick="jotformSyncNow()">
+          <i class="ti ti-refresh"></i> Sync now
+        </button>
+      </div>
+    </div>
+    <p style="font-size:11px;color:var(--text-3);margin-top:12px;line-height:1.5">
+      Saved securely in your camp database, so you only enter it once — it works on every device and after every update.
+      Get a key from JotForm → Account → API → Create New Key (read access is enough).
+    </p>
   </div>
 </div>
 
@@ -1716,6 +1773,15 @@ onSnapshot(adminRef, (snap) => {
     window.renderAdmin();
   }
 }, (err) => console.error('admin snapshot error', err));
+
+// Persisted app settings (e.g. JotForm credentials) — stored in Firestore so they
+// survive re-downloads, work on every device, and across file:// and the live site.
+const settingsRef = doc(db, "settings", "jotform");
+onSnapshot(settingsRef, (snap) => {
+  window.jotformConfig = snap.exists() ? snap.data() : {};
+  window._jfConfigLoaded = true;
+  if (typeof window.onJotformConfigLoaded === 'function') window.onJotformConfigLoaded();
+}, (err) => console.error('settings snapshot error', err));
 
 // Listen for real-time updates
 onSnapshot(campersRef, (snapshot) => {
@@ -2909,6 +2975,9 @@ function rCalMonth() {
 let importRows = [];
 
 function openImport() {
+  jotformSyncActive = false;
+  document.getElementById('importModalTitle').textContent = 'Import from JotForm CSV';
+  document.getElementById('importIntro').style.display = '';
   document.getElementById('importOverlay').classList.add('open');
   document.getElementById('importPreview').style.display = 'none';
   document.getElementById('importBtn').style.display = 'none';
@@ -3253,7 +3322,202 @@ async function doImport() {
   }
   document.getElementById('importProgressLabel').textContent = 'Done! ' + done + ' campers imported.';
   showToast(done + ' campers imported successfully!');
+  if (jotformSyncActive) {
+    persistJotformConfig({ lastSync: window._jfMaxCreated || '' });
+    updateJotformBadge(0);
+    jotformSyncActive = false;
+  }
   setTimeout(() => closeImport(), 1800);
+}
+
+// ════════════════════ JOTFORM SYNC ════════════════════
+const JF = { key:'lbc_jf_key', form:'lbc_jf_form', last:'lbc_jf_last', auto:'lbc_jf_auto' };
+const JF_POLL_MS = 5 * 60 * 1000;
+let jotformSyncActive = false;   // true when the import preview was opened from a JotForm sync
+let jotformPollTimer = null;
+
+function getJotformSettings() {
+  const c = window.jotformConfig || {};
+  const g = (k) => { try { return localStorage.getItem(k) || ''; } catch(e) { return ''; } };
+  // Firestore config is authoritative; fall back to local cache until it loads
+  return {
+    apiKey: c.apiKey || g(JF.key),
+    formId: c.formId || g(JF.form),
+    last:   c.lastSync || g(JF.last),
+    auto:   (c.auto != null ? !!c.auto : g(JF.auto) === '1')
+  };
+}
+// Merge settings into Firestore (durable) and a local cache (instant)
+async function persistJotformConfig(patch) {
+  window.jotformConfig = { ...(window.jotformConfig || {}), ...patch };
+  try {
+    if (patch.apiKey  != null) localStorage.setItem(JF.key,  patch.apiKey);
+    if (patch.formId  != null) localStorage.setItem(JF.form, patch.formId);
+    if (patch.auto    != null) localStorage.setItem(JF.auto, patch.auto ? '1' : '0');
+    if (patch.lastSync!= null) localStorage.setItem(JF.last, patch.lastSync);
+  } catch(e) {}
+  try {
+    await window._setDoc(window._doc(window._db, 'settings', 'jotform'), patch, { merge: true });
+  } catch(e) { console.error('Could not save JotForm settings', e); }
+}
+function saveJotformSettings() {
+  return persistJotformConfig({
+    apiKey: document.getElementById('jfApiKey').value.trim(),
+    formId: document.getElementById('jfFormId').value.trim(),
+    auto:   document.getElementById('jfAuto').checked
+  });
+}
+function setJfStatus(t) { const e = document.getElementById('jfStatus'); if (e) e.textContent = t; }
+function openJotformSync() {
+  const s = getJotformSettings();
+  document.getElementById('jfApiKey').value = s.apiKey;
+  document.getElementById('jfFormId').value = s.formId;
+  document.getElementById('jfAuto').checked = s.auto;
+  setJfStatus(s.last ? ('Synced through ' + s.last) : 'Not synced yet.');
+  document.getElementById('jotformOverlay').classList.add('open');
+}
+function closeJotformSync() { document.getElementById('jotformOverlay').classList.remove('open'); }
+function updateJotformBadge(n) {
+  const b = document.getElementById('jotformBadge');
+  if (!b) return;
+  if (n > 0) { b.textContent = n > 99 ? '99+' : n; b.style.display = 'inline-flex'; }
+  else b.style.display = 'none';
+}
+
+// Fetch submissions from JotForm's REST API
+async function fetchJotformSubmissions(apiKey, formId, sinceStr) {
+  let url = `https://api.jotform.com/form/${encodeURIComponent(formId)}/submissions`
+          + `?apiKey=${encodeURIComponent(apiKey)}&limit=1000&orderby=created_at`;
+  if (sinceStr) url += `&filter=${encodeURIComponent(JSON.stringify({ 'created_at:gt': sinceStr }))}`;
+  const resp = await fetch(url);
+  let json;
+  try { json = await resp.json(); } catch(e) { throw new Error('Unexpected response from JotForm'); }
+  if (!resp.ok || json.responseCode !== 200) {
+    throw new Error(json && json.message ? json.message : ('JotForm API error ' + resp.status));
+  }
+  return json.content || [];
+}
+
+// Convert one submission's answers into a flat row object matching the CSV column names
+function jotformAnswerToRow(answers) {
+  const row = {};
+  for (const key in answers) {
+    const a = answers[key];
+    if (!a || !a.text) continue;
+    const label = a.text;
+    const value = a.answer;
+    if (value == null || value === '') continue;
+
+    if (typeof value === 'string' || typeof value === 'number') {
+      row[label] = String(value);
+    } else if (Array.isArray(value)) {
+      row[label] = value.join(', ');
+    } else if (typeof value === 'object') {
+      if ('first' in value || 'last' in value) {
+        row[label] = [value.prefix, value.first, value.middle, value.last, value.suffix].filter(Boolean).join(' ').trim();
+      } else if ('addr_line1' in value || 'city' in value || 'postal' in value || 'state' in value) {
+        row[label] = [value.addr_line1, value.addr_line2, value.city, value.state, value.postal, value.country].filter(Boolean).join(' ').trim();
+      } else {
+        // Matrix question → one column per selected cell: "Question >> Row >> Column"
+        for (const rowKey in value) {
+          const sel = value[rowKey];
+          if (Array.isArray(sel)) {
+            sel.forEach(col => { if (col) row[`${label} >> ${rowKey} >> ${col}`] = col; });
+          } else if (typeof sel === 'string' && sel) {
+            row[`${label} >> ${rowKey} >> ${sel}`] = sel;
+          }
+        }
+      }
+    }
+  }
+  return row;
+}
+function submissionsToRows(subs) { return subs.map(s => jotformAnswerToRow(s.answers || {})); }
+function maxCreated(subs, fallback) {
+  return subs.reduce((m, s) => (s.created_at && s.created_at > m ? s.created_at : m), fallback || '');
+}
+
+function openImportPreview(title) {
+  document.getElementById('importModalTitle').textContent = title;
+  document.getElementById('importIntro').style.display = 'none';
+  document.getElementById('importDrop').style.display = 'none';
+  document.getElementById('importPreview').style.display = 'block';
+  document.getElementById('importOverlay').classList.add('open');
+}
+
+// Manual sync: fetch everything, dedupe, and show the review preview
+async function jotformSyncNow() {
+  const apiKey = document.getElementById('jfApiKey').value.trim();
+  const formId = document.getElementById('jfFormId').value.trim();
+  if (!apiKey || !formId) { showToast('Enter your Form ID and API key first.', 'error'); return; }
+  saveJotformSettings();
+  startJotformAutoPoll(); // (re)start polling with new settings
+  const btn = document.getElementById('jfSyncBtn');
+  btn.disabled = true;
+  setJfStatus('Fetching submissions…');
+  try {
+    const subs = await fetchJotformSubmissions(apiKey, formId, null);
+    if (!subs.length) { setJfStatus('No submissions found on this form.'); return; }
+    window._jfMaxCreated = maxCreated(subs, '');
+    jotformSyncActive = true;
+    buildImportRows(submissionsToRows(subs));
+    const importable = importRows.filter(r => r.data && !r.exists).length;
+    closeJotformSync();
+    if (!importable) {
+      jotformSyncActive = false;
+      persistJotformConfig({ lastSync: window._jfMaxCreated || '' });
+      updateJotformBadge(0);
+      showToast('JotForm is up to date — no new registrations.');
+      return;
+    }
+    openImportPreview('JotForm registrations to import');
+  } catch (e) {
+    setJfStatus('Error: ' + e.message);
+    showToast('JotForm sync failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Background poll: auto-import when enabled, otherwise just update the badge
+async function jotformPoll() {
+  const s = getJotformSettings();
+  if (!s.apiKey || !s.formId) return;
+  if (document.getElementById('importOverlay').classList.contains('open')) return; // don't clobber an open import
+  try {
+    const subs = await fetchJotformSubmissions(s.apiKey, s.formId, s.last || null);
+    if (!subs.length) { if (s.last) updateJotformBadge(0); return; }
+    const newMax = maxCreated(subs, s.last);
+    if (s.auto) {
+      jotformSyncActive = false;
+      buildImportRows(submissionsToRows(subs));
+      const toImport = importRows.filter(r => r.data && !r.exists);
+      let done = 0;
+      for (const row of toImport) {
+        try {
+          await window._addDoc(window._collection(window._db, 'campers'), {
+            ...row.data, createdAt: window._serverTimestamp(), updatedAt: window._serverTimestamp()
+          });
+          done++;
+        } catch (e) { console.error('JotForm auto-import error', e); }
+      }
+      persistJotformConfig({ lastSync: newMax });
+      updateJotformBadge(0);
+      if (done) showToast(done + ' new registration' + (done === 1 ? '' : 's') + ' auto-imported from JotForm.');
+    } else {
+      updateJotformBadge(subs.length); // passive nudge
+    }
+  } catch (e) {
+    console.error('JotForm poll error', e);
+  }
+}
+
+function startJotformAutoPoll() {
+  if (jotformPollTimer) clearInterval(jotformPollTimer);
+  const s = getJotformSettings();
+  if (!s.apiKey || !s.formId) return;
+  jotformPollTimer = setInterval(jotformPoll, JF_POLL_MS);
+  setTimeout(jotformPoll, 8000); // quick first check after load
 }
 
 // ── Day Popup ──
@@ -3291,6 +3555,7 @@ document.addEventListener('keydown', (e) => {
   else if (document.getElementById('adminGate').classList.contains('open')) closeAdminGate();
   else if (document.getElementById('refundOverlay').classList.contains('open')) closeRefundModal();
   else if (document.getElementById('invImportOverlay').classList.contains('open')) closeInvoiceImport();
+  else if (document.getElementById('jotformOverlay').classList.contains('open')) closeJotformSync();
   else if (document.getElementById('importOverlay').classList.contains('open')) closeImport();
   else if (document.getElementById('detailOverlay').classList.contains('open')) closeDetail();
   else if (document.getElementById('modalOverlay').classList.contains('open')) closeModal();
@@ -3720,7 +3985,7 @@ function renderAdmin() {
     body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-3);padding:30px">No campers found</td></tr>';
     return;
   }
-  body.innerHTML = groups.map(g => {
+  const rowsHtml = groups.map(g => {
     const id = adminId(g.key);
     const rec = window.adminData.get(id) || {};
     const firstReg = g.registrations[0];
@@ -3785,6 +4050,33 @@ function renderAdmin() {
             onchange="updateAdminField('${keyEsc}','adminNotes',this.value)"></td>
     </tr>`;
   }).join('');
+
+  // Totals (active campers only; refunded excluded). Paid-in-full counts as fully paid.
+  let totalInvoiced = 0, totalPaid = 0, totalOwed = 0;
+  groups.forEach(g => {
+    if (g.registrations[0] && g.registrations[0].refunded) return;
+    const r = window.adminData.get(adminId(g.key)) || {};
+    const total = parseFloat(r.totalAmount) || 0;
+    totalInvoiced += total;
+    if (r.paidInFull) {
+      totalPaid += total;
+    } else {
+      const paid = parseFloat(r.amountPaid) || 0;
+      totalPaid += paid;
+      totalOwed += Math.max(0, total - paid);
+    }
+  });
+  const totalsRow = `<tr class="admin-totals-row">
+      <td colspan="3" style="text-align:right">Totals</td>
+      <td>${money(totalInvoiced)}</td>
+      <td></td>
+      <td></td>
+      <td>${money(totalPaid)}</td>
+      <td>${money(totalOwed)}</td>
+      <td></td>
+    </tr>`;
+
+  body.innerHTML = rowsHtml + totalsRow;
 }
 
 // Write a single admin field (merges into the camper's admin record)
@@ -4183,6 +4475,9 @@ async function saveAllImportedInvoices() {
 
 // Initial render (while Firebase loads)
 renderStats();
+startJotformAutoPoll();
+// Re-evaluate polling once the persisted JotForm config arrives from Firestore
+window.onJotformConfigLoaded = function() { startJotformAutoPoll(); };
 
 // Expose functions needed by the Firebase module script and inline onclick handlers
 window.renderRoster = renderRoster;
@@ -4233,6 +4528,10 @@ window.openRefundModal = openRefundModal;
 window.closeRefundModal = closeRefundModal;
 window.confirmRefund = confirmRefund;
 window.restoreCamper = restoreCamper;
+window.openJotformSync = openJotformSync;
+window.closeJotformSync = closeJotformSync;
+window.jotformSyncNow = jotformSyncNow;
+window.saveJotformSettings = saveJotformSettings;
 window.openInvoiceImport = openInvoiceImport;
 window.closeInvoiceImport = closeInvoiceImport;
 window.handleInvoicePdfFiles = handleInvoicePdfFiles;
