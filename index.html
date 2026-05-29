@@ -206,6 +206,7 @@
     display: block;
     height: 80px;
     width: auto;
+    max-width: 100%;
     mix-blend-mode: multiply;
   }
   .page { display: none; padding: 0; }
@@ -966,7 +967,7 @@
     .main-content { margin-left: 0; padding-bottom: 72px; }
 
     /* ── Top bar ── */
-    .top-bar { padding: 11px 14px; gap: 7px; flex-wrap: nowrap; }
+    .top-bar { padding: 11px 14px; gap: 6px; flex-wrap: nowrap; }
     .page-heading { font-size: 34px; }
     .top-bar-heading { padding: 14px 14px 10px !important; }
     .week-btn { flex: 1 1 calc(50% - 4px); max-width: none; padding: 8px 12px; }
@@ -976,8 +977,8 @@
     .week-btn-label { font-size: 13px; }
     .week-btn-dates { font-size: 10.5px; }
     .search-reveal { padding: 10px 14px; }
-    .top-bar-title { font-size: 15px; }
-    .top-bar-logo { height: 60px; }
+    .top-bar-title { font-size: 15px; min-width: 0; overflow: hidden; }
+    .top-bar-logo { height: 44px; }
     .top-bar:has(.top-bar-logo) { padding: 6px 14px; }
     .btn-label { display: none; }
 
@@ -1187,6 +1188,9 @@
     .stats-grid { grid-template-columns: 1fr 1fr; }
     .month-cell { min-height: 56px; }
     .top-bar .btn-label { display: none; }
+    .top-bar-logo { height: 38px; }
+    .top-bar { gap: 4px; padding: 10px 10px; }
+    .top-bar .btn { padding: 7px 8px; }
   }
 </style>
 </head>
