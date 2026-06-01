@@ -3178,8 +3178,9 @@ function buildImportRows(csvRows) {
       const preDays  = hasPre  ? [0,1,2,3,4] : [];
       const postDays = hasPost ? [0,1,2,3,4] : [];
 
+      const fl = first.toLowerCase(), ll = last.toLowerCase();
       const existingMatch = window.campers.some(c =>
-        c.first === first && c.last === last && c.weekStart === wk.start
+        (c.first||'').toLowerCase() === fl && (c.last||'').toLowerCase() === ll && c.weekStart === wk.start
       );
 
       importRows.push({
@@ -3226,8 +3227,9 @@ function buildImportRows(csvRows) {
         const campDays = [...days].sort((a,b)=>a-b);
         const preDays  = wantPre  ? campDays.slice() : [];
         const postDays = wantPost ? campDays.slice() : [];
+        const fl = first.toLowerCase(), ll = last.toLowerCase();
         const existingMatch = window.campers.some(c =>
-          c.first === first && c.last === last && c.weekStart === week.start);
+          (c.first||'').toLowerCase() === fl && (c.last||'').toLowerCase() === ll && c.weekStart === week.start);
         importRows.push({
           csvName: fullName,
           weekLabel: week.label,
@@ -3309,19 +3311,31 @@ function buildImportRows(csvRows) {
   document.getElementById('importDrop').style.display = 'none';
 }
 
+// Helper: keep window.campers in sync with a just-written camper doc
+// without creating duplicates if the Firestore snapshot has already landed.
+function mirrorCamperInsert(id, data) {
+  if (!window.campers.some(c => c.id === id)) {
+    window.campers.push({ id, ...data });
+  }
+}
+
 async function doImport() {
   const toImport = importRows.filter(r => r.data && !r.exists);
   if(!toImport.length) return;
   document.getElementById('importBtn').style.display = 'none';
   document.getElementById('importProgress').style.display = 'block';
   let done = 0;
+  const newKeys = new Set();
   for(const row of toImport) {
     try {
-      await window._addDoc(window._collection(window._db, 'campers'), {
+      const ref = await window._addDoc(window._collection(window._db, 'campers'), {
         ...row.data,
         createdAt: window._serverTimestamp(),
         updatedAt: window._serverTimestamp()
       });
+      // Mirror in memory so buildInvoiceData finds them immediately
+      mirrorCamperInsert(ref.id, row.data);
+      newKeys.add(camperKey(row.data));
     } catch(e) {
       console.error('Import error for', row.csvName, e);
     }
@@ -3330,8 +3344,17 @@ async function doImport() {
     document.getElementById('importProgressFill').style.width = pct + '%';
     document.getElementById('importProgressLabel').textContent = 'Importing ' + done + ' of ' + toImport.length + '…';
   }
-  document.getElementById('importProgressLabel').textContent = 'Done! ' + done + ' campers imported.';
-  showToast(done + ' campers imported successfully!');
+
+  // Auto-generate one invoice per new unique camper
+  let invoiceCount = 0;
+  for (const key of newKeys) {
+    try {
+      if (await autoGenerateInvoiceForKey(key)) invoiceCount++;
+    } catch(e) { console.error('Auto-invoice error for', key, e); }
+  }
+  const invoiceSuffix = invoiceCount ? `, ${invoiceCount} invoice${invoiceCount===1?'':'s'} generated` : '';
+  document.getElementById('importProgressLabel').textContent = `Done! ${done} campers imported${invoiceSuffix}.`;
+  showToast(`${done} campers imported${invoiceSuffix}.`);
   if (jotformSyncActive) {
     persistJotformConfig({ lastSync: window._jfMaxCreated || '' });
     updateJotformBadge(0);
@@ -3503,17 +3526,29 @@ async function jotformPoll() {
       buildImportRows(submissionsToRows(subs));
       const toImport = importRows.filter(r => r.data && !r.exists);
       let done = 0;
+      const newKeys = new Set();
       for (const row of toImport) {
         try {
-          await window._addDoc(window._collection(window._db, 'campers'), {
+          const ref = await window._addDoc(window._collection(window._db, 'campers'), {
             ...row.data, createdAt: window._serverTimestamp(), updatedAt: window._serverTimestamp()
           });
+          mirrorCamperInsert(ref.id, row.data);
+          newKeys.add(camperKey(row.data));
           done++;
         } catch (e) { console.error('JotForm auto-import error', e); }
       }
+      // Generate an invoice for each new unique camper
+      let invoiceCount = 0;
+      for (const key of newKeys) {
+        try { if (await autoGenerateInvoiceForKey(key)) invoiceCount++; }
+        catch (e) { console.error('Auto-invoice error for', key, e); }
+      }
       persistJotformConfig({ lastSync: newMax });
       updateJotformBadge(0);
-      if (done) showToast(done + ' new registration' + (done === 1 ? '' : 's') + ' auto-imported from JotForm.');
+      if (done) {
+        const suffix = invoiceCount ? ` (${invoiceCount} invoice${invoiceCount===1?'':'s'} generated)` : '';
+        showToast(done + ' new registration' + (done === 1 ? '' : 's') + ' auto-imported from JotForm' + suffix + '.');
+      }
     } else {
       updateJotformBadge(subs.length); // passive nudge
     }
@@ -4017,6 +4052,7 @@ function renderAdmin() {
     const invoiceCell = hasPdf
       ? `<div class="admin-invoice-cell">
            <button class="admin-pdf-link" onclick="viewInvoicePdf('${keyEsc}')" title="Open saved invoice PDF"><i class="ti ti-file-invoice"></i>${esc(invNum||'View PDF')}</button>
+           <i class="ti ti-mail admin-pdf-icon" title="Email invoice to parent" onclick="emailInvoice('${keyEsc}')"></i>
            <i class="ti ti-pencil admin-pdf-icon" title="Edit invoice number" onclick="editInvoiceNumber('${keyEsc}')"></i>
          </div>`
       : `<input class="admin-inp" type="text" value="${esc(invNum)}" placeholder="—"
@@ -4207,6 +4243,48 @@ async function saveInvoicePdf(key, invoiceNumber, fileName, dataUri) {
     { camperKey: key, hasInvoicePdf: true, updatedAt: window._serverTimestamp() }, { merge: true });
 }
 
+// Pick the next sequential invoice number, padded to 4 digits.
+// Reads adminData and finds the highest numeric invoice number already used.
+function nextInvoiceNumber() {
+  let max = 0;
+  if (window.adminData) {
+    for (const rec of window.adminData.values()) {
+      // Use the LAST digit chunk in the invoice number string so prefixed
+      // formats like "INV-2024-0121" correctly read "0121" rather than "2024".
+      const m = (rec.invoiceNumber || '').match(/\d+/g);
+      if (m && m.length) max = Math.max(max, parseInt(m[m.length - 1], 10));
+    }
+  }
+  return String(max + 1).padStart(4, '0');
+}
+
+// Silently generate an invoice PDF for a camper and save it to Admin.
+// Skips when the camper has no chargeable line items, or already has a saved invoice.
+async function autoGenerateInvoiceForKey(key) {
+  const existing = (window.adminData && window.adminData.get(adminId(key))) || {};
+  if (existing.hasInvoicePdf) return false; // don't overwrite an existing saved invoice
+  const data = buildInvoiceData(key);
+  if (!data || !data.lineItems.length || !data.grand) return false;
+  const invNum = nextInvoiceNumber();
+  const invDate = dStr(new Date());
+  const footer = invoiceFooterText(data.payMethod);
+  const safeName = (data.childName || 'camper').replace(/[^a-z0-9]+/gi, '_');
+  const filename = `Invoice_${safeName}_${invNum}.pdf`;
+  const pdfDoc = buildInvoicePDF(data, invNum, invDate, footer, filename);
+  const dataUri = pdfDoc.output('datauristring');
+  await saveInvoicePdf(key, invNum, filename, dataUri);
+  const patch = { invoiceNumber: invNum, totalAmount: data.grand };
+  if (!existing.paymentMethod && data.payMethod) {
+    const pm = normalizePaymentMethod(data.payMethod);
+    if (pm) patch.paymentMethod = pm;
+  }
+  await updateAdminFieldBulk(key, patch);
+  // Mirror in memory so the next auto-invoice in a batch picks the next number
+  const id = adminId(key);
+  window.adminData.set(id, { ...(window.adminData.get(id) || {}), camperKey: key, hasInvoicePdf: true, ...patch });
+  return true;
+}
+
 function dataUriToBlob(dataUri) {
   const comma = dataUri.indexOf(',');
   const meta = dataUri.slice(0, comma);
@@ -4229,6 +4307,79 @@ async function viewInvoicePdf(key) {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
     showToast('Error opening PDF: ' + e.message, 'error');
+  }
+}
+
+// ── Email invoice (opens a Gmail compose tab + downloads the PDF) ──
+// Placeholders supported in subject/body: {childName}, {parentName}, {invoiceNumber}, {total}
+const EMAIL_TEMPLATE = {
+  subject: 'Thank you for registering for Little Ladybugs Summer Camp 2026.',
+  body:
+`Dear {parentName},
+
+Thank you for registering {childName} for Little Ladybugs Camp. We are so excited to meet {childName} this summer! Please find your detailed invoice for your registration attached to this email. If you have any questions, please feel free to reach out to us.
+
+
+Sincerely,
+Miss Y
+Camp Director, RECE
+Little Ladybugs Camp Team
+📍 174 Caithness St East
+📞 647-231-4027`
+};
+
+async function emailInvoice(key) {
+  const group = groupCampers(true).find(g => g.key === key);
+  if (!group) { showToast('Could not find that camper.', 'error'); return; }
+  const rep = group.registrations[0];
+  const rec = window.adminData.get(adminId(key)) || {};
+  const parentEmail = (rep.email || '').trim();
+  const childName = `${rep.first||''} ${rep.last||''}`.trim();
+  const parentName = (rep.parent || '').trim() || 'parent/guardian';
+  const invoiceNumber = rec.invoiceNumber || '';
+  const total = rec.totalAmount != null ? money(rec.totalAmount) : '';
+
+  const fill = (s) => String(s)
+    .replace(/\{childName\}/g,    childName)
+    .replace(/\{parentName\}/g,   parentName)
+    .replace(/\{invoiceNumber\}/g, invoiceNumber)
+    .replace(/\{total\}/g,        total);
+
+  const subject = fill(EMAIL_TEMPLATE.subject);
+  const body    = fill(EMAIL_TEMPLATE.body);
+  const url = 'https://mail.google.com/mail/?view=cm&fs=1'
+    + (parentEmail ? '&to=' + encodeURIComponent(parentEmail) : '')
+    + '&su=' + encodeURIComponent(subject)
+    + '&body=' + encodeURIComponent(body);
+
+  // Open Gmail compose first — this must happen synchronously inside the click
+  // event chain or Safari/Chrome will block the pop-up.
+  const win = window.open(url, '_blank');
+  if (!win) {
+    showToast("Couldn't open Gmail. Allow pop-ups for this site and try again.", 'error');
+    return;
+  }
+
+  // Then fetch the saved PDF and trigger a download
+  try {
+    const snap = await window._getDoc(window._doc(window._db, 'invoices', adminId(key)));
+    if (!snap.exists()) {
+      showToast('Gmail draft opened, but no saved PDF was found to attach.', 'error');
+      return;
+    }
+    const data = snap.data();
+    const blob = dataUriToBlob(data.pdfDataUri);
+    const burl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = burl;
+    a.download = data.fileName || `Invoice_${invoiceNumber || 'camper'}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(burl), 5000);
+    showToast('Gmail draft opened. The PDF was downloaded — drag it into the email to attach.');
+  } catch (e) {
+    showToast('Error preparing PDF: ' + e.message, 'error');
   }
 }
 
@@ -4534,6 +4685,7 @@ window.renderAdmin = renderAdmin;
 window.updateAdminField = updateAdminField;
 window.editInvoiceNumber = editInvoiceNumber;
 window.viewInvoicePdf = viewInvoicePdf;
+window.emailInvoice = emailInvoice;
 window.openRefundModal = openRefundModal;
 window.closeRefundModal = closeRefundModal;
 window.confirmRefund = confirmRefund;
