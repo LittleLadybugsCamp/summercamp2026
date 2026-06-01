@@ -4329,57 +4329,78 @@ Little Ladybugs Camp Team
 };
 
 async function emailInvoice(key) {
-  const group = groupCampers(true).find(g => g.key === key);
-  if (!group) { showToast('Could not find that camper.', 'error'); return; }
-  const rep = group.registrations[0];
-  const rec = window.adminData.get(adminId(key)) || {};
-  const parentEmail = (rep.email || '').trim();
-  const childName = `${rep.first||''} ${rep.last||''}`.trim();
-  const parentName = (rep.parent || '').trim() || 'parent/guardian';
-  const invoiceNumber = rec.invoiceNumber || '';
-  const total = rec.totalAmount != null ? money(rec.totalAmount) : '';
+  console.log('[emailInvoice v2] click for', key);
+  // Show an immediate toast so the user gets visual confirmation that the click
+  // registered — even before the async PDF fetch completes.
+  showToast('Preparing invoice email…');
 
-  const fill = (s) => String(s)
-    .replace(/\{childName\}/g,    childName)
-    .replace(/\{parentName\}/g,   parentName)
-    .replace(/\{invoiceNumber\}/g, invoiceNumber)
-    .replace(/\{total\}/g,        total);
-
-  const subject = fill(EMAIL_TEMPLATE.subject);
-  const body    = fill(EMAIL_TEMPLATE.body);
-  const url = 'https://mail.google.com/mail/?view=cm&fs=1'
-    + (parentEmail ? '&to=' + encodeURIComponent(parentEmail) : '')
-    + '&su=' + encodeURIComponent(subject)
-    + '&body=' + encodeURIComponent(body);
-
-  // Open Gmail compose first — this must happen synchronously inside the click
-  // event chain or Safari/Chrome will block the pop-up.
-  const win = window.open(url, '_blank');
-  if (!win) {
-    showToast("Couldn't open Gmail. Allow pop-ups for this site and try again.", 'error');
-    return;
-  }
-
-  // Then fetch the saved PDF and trigger a download
   try {
-    const snap = await window._getDoc(window._doc(window._db, 'invoices', adminId(key)));
-    if (!snap.exists()) {
-      showToast('Gmail draft opened, but no saved PDF was found to attach.', 'error');
-      return;
+    const group = groupCampers(true).find(g => g.key === key);
+    if (!group) { showToast('Could not find that camper.', 'error'); return; }
+    const rep = group.registrations[0];
+    const rec = window.adminData.get(adminId(key)) || {};
+    const parentEmail = (rep.email || '').trim();
+    const childName = `${rep.first||''} ${rep.last||''}`.trim();
+    const parentName = (rep.parent || '').trim() || 'parent/guardian';
+    const invoiceNumber = rec.invoiceNumber || '';
+    const total = rec.totalAmount != null ? money(rec.totalAmount) : '';
+
+    const fill = (s) => String(s)
+      .replace(/\{childName\}/g,    childName)
+      .replace(/\{parentName\}/g,   parentName)
+      .replace(/\{invoiceNumber\}/g, invoiceNumber)
+      .replace(/\{total\}/g,        total);
+
+    const subject = fill(EMAIL_TEMPLATE.subject);
+    const body    = fill(EMAIL_TEMPLATE.body);
+    const url = 'https://mail.google.com/mail/?view=cm&fs=1'
+      + (parentEmail ? '&to=' + encodeURIComponent(parentEmail) : '')
+      + '&su=' + encodeURIComponent(subject)
+      + '&body=' + encodeURIComponent(body);
+
+    // Do the download FIRST, while this tab is still focused. Once we open
+    // Gmail, focus shifts and Safari can suppress background-tab downloads.
+    let downloaded = false;
+    let pdfErr = null;
+    try {
+      const snap = await window._getDoc(window._doc(window._db, 'invoices', adminId(key)));
+      if (snap.exists()) {
+        const data = snap.data();
+        const blob = dataUriToBlob(data.pdfDataUri);
+        const burl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = burl;
+        a.download = data.fileName || `Invoice_${invoiceNumber || 'camper'}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(burl), 5000);
+        downloaded = true;
+      }
+    } catch (e) {
+      pdfErr = e;
+      console.error('PDF fetch failed', e);
     }
-    const data = snap.data();
-    const blob = dataUriToBlob(data.pdfDataUri);
-    const burl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = burl;
-    a.download = data.fileName || `Invoice_${invoiceNumber || 'camper'}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(burl), 5000);
-    showToast('Gmail draft opened. The PDF was downloaded — drag it into the email to attach.');
-  } catch (e) {
-    showToast('Error preparing PDF: ' + e.message, 'error');
+
+    if (pdfErr) {
+      showToast('Could not fetch invoice PDF: ' + pdfErr.message, 'error');
+    } else {
+      showToast(
+        downloaded
+          ? 'Invoice downloaded. Opening Gmail — drag the PDF into the email to attach it.'
+          : 'No saved invoice PDF found. Opening Gmail anyway.',
+        downloaded ? 'success' : 'error'
+      );
+    }
+
+    // Now open Gmail (focus will shift to the new tab here).
+    const win = window.open(url, '_blank');
+    if (!win) {
+      showToast("Couldn't open Gmail. Allow pop-ups for this site and try again.", 'error');
+    }
+  } catch (outerErr) {
+    console.error('emailInvoice fatal', outerErr);
+    showToast('Email error: ' + outerErr.message, 'error');
   }
 }
 
