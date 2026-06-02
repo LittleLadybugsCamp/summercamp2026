@@ -241,6 +241,22 @@
     border-color: transparent; background: transparent;
   }
   .btn-ghost:hover { background: var(--surface2); border-color: var(--border-light); }
+  .dropdown-wrap { position: relative; display: inline-block; }
+  .dropdown-menu {
+    display: none; position: absolute; right: 0; top: calc(100% + 6px);
+    background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    padding: 6px; min-width: 210px; z-index: 50;
+  }
+  .dropdown-menu.open { display: block; }
+  .dropdown-menu button {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: none; border: none; cursor: pointer; text-align: left;
+    padding: 9px 11px; border-radius: 8px; font-size: 13.5px;
+    font-family: inherit; color: var(--text);
+  }
+  .dropdown-menu button:hover { background: var(--surface2); }
+  .dropdown-menu button i { color: var(--green); font-size: 16px; }
   .btn-danger { color: var(--coral); }
   .btn-danger:hover { background: var(--coral-light); border-color: rgba(185,88,68,0.3); }
   .btn i { font-size: 16px; }
@@ -533,8 +549,15 @@
   .cal-day-name { font-size: 11px; color: var(--text-3); font-weight: 600; letter-spacing: -0.01em; }
   .cal-day-num { font-size: 24px; font-weight: 600; line-height: 1.2; letter-spacing: -0.04em; }
   .cal-day-month { font-size: 11px; color: var(--text-3); }
+  .cal-day-count {
+    display: inline-block; margin-top: 5px;
+    background: var(--green-light); color: var(--green);
+    font-size: 10.5px; font-weight: 600;
+    padding: 2px 9px; border-radius: 999px;
+  }
   .cal-today .cal-day-header { background: var(--green); }
   .cal-today .cal-day-name, .cal-today .cal-day-num, .cal-today .cal-day-month { color: #fff; }
+  .cal-today .cal-day-count { background: rgba(255,255,255,0.22); color: #fff; }
   .cal-entry {
     border-radius: 8px;
     padding: 7px 9px;
@@ -591,6 +614,14 @@
     background: var(--green); color: #fff;
   }
   .month-cell.other-month .month-cell-num { color: var(--text-4); }
+  .month-cell-count {
+    position: absolute; top: 6px; right: 6px;
+    background: var(--green-light); color: var(--green);
+    font-size: 10px; font-weight: 700;
+    min-width: 17px; height: 17px; padding: 0 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 999px;
+  }
   .month-entry {
     font-size: 10.5px; font-weight: 600;
     padding: 2px 6px;
@@ -1241,15 +1272,6 @@
         <button class="btn btn-icon" onclick="toggleSearch('campersSearchBar','campersSearchInput')" aria-label="Search">
           <i class="ti ti-search"></i>
         </button>
-        <button class="btn" onclick="openJotformSync()" id="jotformSyncBtn">
-          <i class="ti ti-refresh"></i> <span class="btn-label">Sync JotForm</span><span class="jf-badge" id="jotformBadge" style="display:none">0</span>
-        </button>
-        <button class="btn" onclick="openImport()">
-          <i class="ti ti-upload"></i> <span class="btn-label">Import CSV</span>
-        </button>
-        <button class="btn btn-primary" onclick="openModal()">
-          <i class="ti ti-plus"></i> <span class="btn-label">Add camper</span>
-        </button>
       </div>
       <div class="search-reveal" id="campersSearchBar" style="display:none">
         <div class="search-wrap">
@@ -1330,8 +1352,20 @@
         <button class="btn btn-icon" onclick="toggleSearch('adminSearchBar','adminSearchInput')" aria-label="Search">
           <i class="ti ti-search"></i>
         </button>
-        <button class="btn" onclick="openInvoiceImport()">
-          <i class="ti ti-file-import"></i> <span class="btn-label">Import invoice PDF</span>
+        <button class="btn" onclick="openJotformSync()" id="jotformSyncBtn">
+          <i class="ti ti-refresh"></i> <span class="btn-label">Sync JotForm</span><span class="jf-badge" id="jotformBadge" style="display:none">0</span>
+        </button>
+        <div class="dropdown-wrap">
+          <button class="btn" onclick="toggleImportMenu(event)" aria-haspopup="true">
+            <i class="ti ti-file-import"></i> <span class="btn-label">Import</span> <i class="ti ti-chevron-down" style="font-size:13px"></i>
+          </button>
+          <div class="dropdown-menu" id="importMenu">
+            <button onclick="closeImportMenu();openImport()"><i class="ti ti-upload"></i> Registrations (CSV)</button>
+            <button onclick="closeImportMenu();openInvoiceImport()"><i class="ti ti-file-invoice"></i> Past invoices (PDF)</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="openModal()">
+          <i class="ti ti-plus"></i> <span class="btn-label">Add camper</span>
         </button>
       </div>
       <div class="search-reveal" id="adminSearchBar" style="display:none">
@@ -2305,14 +2339,32 @@ function toggleSearch(barId, inputId) {
   if (!bar) return;
   if (bar.style.display === 'none' || !bar.style.display) {
     bar.style.display = 'flex';
-    setTimeout(() => {
-      const input = document.getElementById(inputId);
-      if (input) input.focus();
-    }, 50);
+    // Focus SYNCHRONOUSLY within the tap gesture so iOS Safari raises the
+    // keyboard immediately (a focus() inside setTimeout is ignored by iOS).
+    const input = document.getElementById(inputId);
+    if (input) input.focus();
   } else {
     closeSearch(barId, inputId);
   }
 }
+
+// ── Import dropdown (Admin page) ──
+function toggleImportMenu(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('importMenu');
+  if (menu) menu.classList.toggle('open');
+}
+function closeImportMenu() {
+  const menu = document.getElementById('importMenu');
+  if (menu) menu.classList.remove('open');
+}
+// Click anywhere outside the dropdown closes it
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('importMenu');
+  if (menu && menu.classList.contains('open') && !e.target.closest('.dropdown-wrap')) {
+    menu.classList.remove('open');
+  }
+});
 
 function closeSearch(barId, inputId) {
   const bar = document.getElementById(barId);
@@ -2828,6 +2880,7 @@ function rCalWeek() {
       + '<div class="cal-day-name">' + DN[i] + '</div>'
       + '<div class="cal-day-num">' + d.getDate() + '</div>'
       + '<div class="cal-day-month">' + d.toLocaleDateString('en-CA',{month:'short'}) + '</div>'
+      + (isHoliday ? '' : '<div class="cal-day-count">' + ents.length + (ents.length===1?' camper':' campers') + '</div>')
       + '</div>'
       + (isHoliday ? '<div class="cal-empty">Holiday</div>' : (!ents.length ? '<div class="cal-empty">—</div>' : ''))
       + ents.map(c =>
@@ -2942,7 +2995,8 @@ function rCalMonth() {
       html += '<div class="month-cell' + (!inMonth?' other-month':'') + (isToday?' today':'') + (clickable?' month-cell-clickable':'') + '"'
             + (clickable ? ' onclick="showDayPopup(\'' + ds + '\')"' : '')
             + '>';
-      html += '<div class="month-cell-num">' + cellDate.getDate() + '</div>';
+      html += '<div class="month-cell-num">' + cellDate.getDate() + '</div>'
+            + (ents.length ? '<span class="month-cell-count">' + ents.length + '</span>' : '');
       shown.forEach(e => {
         const name = esc(e.camper.first) + ' ' + esc((e.camper.last||'')[0]) + '.';
         const cls = e.camper.type==='weekly' ? 'month-entry-w' : 'month-entry-d';
@@ -4809,6 +4863,8 @@ window.rWeekly = rWeekly;
 window.populateWeekButtons = populateWeekButtons;
 window.selectWeek = selectWeek;
 window.toggleSearch = toggleSearch;
+window.toggleImportMenu = toggleImportMenu;
+window.closeImportMenu = closeImportMenu;
 window.closeSearch = closeSearch;
 window.openPrint = openPrint;
 window.closePrintModal = closePrintModal;
