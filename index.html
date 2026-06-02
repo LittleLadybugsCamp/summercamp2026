@@ -786,6 +786,73 @@
   .spinner { width: 22px; height: 22px; border: 2.5px solid rgba(60,60,67,0.15); border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ── Login screen ── */
+  .login-screen {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: none; align-items: center; justify-content: center;
+    z-index: 250; padding: 24px;
+  }
+  .login-screen.open { display: flex; }
+  .login-card {
+    width: 100%; max-width: 380px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: 0 12px 40px rgba(40,30,10,0.10);
+    padding: 36px 30px 30px;
+    text-align: center;
+  }
+  .login-logo { width: 96px; max-width: 60%; height: auto; margin: 0 auto 10px; display: block; }
+  .login-title { font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+  .login-sub { font-size: 13px; color: var(--text-3); margin-top: 4px; margin-bottom: 22px; }
+  .login-field { text-align: left; margin-bottom: 14px; }
+  .login-field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 5px; }
+  .login-field input {
+    width: 100%; box-sizing: border-box;
+    padding: 11px 13px; font-size: 15px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg); color: var(--text);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .login-field input:focus {
+    outline: none; border-color: var(--green);
+    box-shadow: 0 0 0 3px var(--green-light);
+  }
+  .login-btn {
+    width: 100%; margin-top: 6px;
+    padding: 12px; font-size: 15px; font-weight: 600;
+    color: #fff; background: var(--green);
+    border: none; border-radius: var(--radius); cursor: pointer;
+    transition: opacity .15s, transform .05s;
+  }
+  .login-btn:hover { opacity: .92; }
+  .login-btn:active { transform: scale(.99); }
+  .login-btn:disabled { opacity: .55; cursor: default; }
+  .login-error {
+    display: none; margin-top: 14px; padding: 9px 12px;
+    background: #FDECEA; color: #9A2A1E;
+    border: 1px solid #F3C9C3; border-radius: var(--radius);
+    font-size: 12.5px; text-align: left; line-height: 1.4;
+  }
+  .login-error.show { display: block; }
+  /* sign-out button in sidebar */
+  .sidebar-user {
+    margin-top: auto; padding: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .sidebar-user .su-name { font-weight: 600; color: var(--text-2); margin-bottom: 2px; }
+  .sidebar-user .su-role { color: var(--text-3); font-size: 11px; text-transform: capitalize; }
+  .sidebar-signout {
+    margin-top: 8px; width: 100%;
+    padding: 7px; font-size: 12.5px; font-weight: 600;
+    color: var(--text-2); background: transparent;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .sidebar-signout:hover { background: var(--bg); color: var(--text); }
+
   /* ── Toast ── */
   .toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
   .toast {
@@ -1239,6 +1306,26 @@
   <div class="spinner"></div>
 </div>
 
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <img src="" alt="Little Ladybugs Camp" class="login-logo" id="loginLogo">
+    <div class="login-title">Little Ladybugs Camp</div>
+    <div class="login-sub">Please sign in to continue</div>
+    <form id="loginForm" onsubmit="doSignIn(event)">
+      <div class="login-field">
+        <label for="loginEmail">Email</label>
+        <input id="loginEmail" type="email" autocomplete="username" required>
+      </div>
+      <div class="login-field">
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="login-btn" id="loginBtn" type="submit">Sign in</button>
+      <div class="login-error" id="loginError"></div>
+    </form>
+  </div>
+</div>
+
 <div class="toast-wrap" id="toastWrap"></div>
 
 <div class="app-shell">
@@ -1257,10 +1344,15 @@
       <button class="nav-item" data-page="calendar" onclick="showPage('calendar',this)">
         <i class="ti ti-calendar-week"></i> Calendar
       </button>
-      <button class="nav-item" data-page="admin" onclick="requestAdmin(this)">
+      <button class="nav-item" data-page="admin" id="adminNavItem" onclick="requestAdmin(this)">
         <i class="ti ti-lock"></i> Admin
       </button>
     </nav>
+    <div class="sidebar-user" id="sidebarUser" style="display:none">
+      <div class="su-name" id="suName"></div>
+      <div class="su-role" id="suRole"></div>
+      <button class="sidebar-signout" onclick="doSignOut()"><i class="ti ti-logout"></i> Sign out</button>
+    </div>
   </aside>
 
   <!-- Main -->
@@ -1482,7 +1574,7 @@
         <i class="ti ti-calendar-week"></i>
         Calendar
       </button>
-      <button class="mobile-nav-btn nav-item" data-page="admin" onclick="requestAdmin(this)">
+      <button class="mobile-nav-btn nav-item" data-page="admin" id="adminNavItemMobile" onclick="requestAdmin(this)">
         <i class="ti ti-lock"></i>
         Admin
       </button>
@@ -1779,6 +1871,9 @@ import {
   getFirestore, collection, onSnapshot,
   addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBiOFJO1cvC388rLNEErnapOVXviGRyJGQ",
@@ -1804,60 +1899,105 @@ window._collection = collection;
 window._setDoc = setDoc;
 window._getDoc = getDoc;
 
-const campersRef = collection(db, "campers");
+// ── Authentication ──────────────────────────────────────────────
+const auth = getAuth(app);
+window._auth = auth;
+window._authSignIn  = (email, pw) => signInWithEmailAndPassword(auth, email, pw);
+window._authSignOut = () => signOut(auth);
 
-// Real-time listener for admin/payment records (small docs, safe to stream)
-const adminRef = collection(db, "admin");
-onSnapshot(adminRef, (snap) => {
-  window.adminData = new Map();
-  snap.forEach(d => window.adminData.set(d.id, { id: d.id, ...d.data() }));
-  if (typeof window.renderAdmin === 'function' &&
-      document.getElementById('page-admin') &&
-      document.getElementById('page-admin').classList.contains('active')) {
-    window.renderAdmin();
-  }
-}, (err) => console.error('admin snapshot error', err));
-
-// Persisted app settings (e.g. JotForm credentials) — stored in Firestore so they
-// survive re-downloads, work on every device, and across file:// and the live site.
+const campersRef  = collection(db, "campers");
+const adminRef    = collection(db, "admin");
 const settingsRef = doc(db, "settings", "jotform");
-onSnapshot(settingsRef, (snap) => {
-  window.jotformConfig = snap.exists() ? snap.data() : {};
-  window._jfConfigLoaded = true;
-  if (typeof window.onJotformConfigLoaded === 'function') window.onJotformConfigLoaded();
-}, (err) => console.error('settings snapshot error', err));
 
-// Listen for real-time updates
-onSnapshot(campersRef, (snapshot) => {
-  window.campers = [];
-  snapshot.forEach(d => {
-    window.campers.push({ id: d.id, ...d.data() });
-  });
-  // Sort by last name
-  window.campers.sort((a,b) => (a.last||'').localeCompare(b.last||''));
-  // Build avatar color index map (O(1) lookup vs O(n) indexOf in render)
-  window._avatarIdx.clear();
-  window.campers.forEach((c, i) => window._avatarIdx.set(c.id, i));
+// Real-time listeners are only started AFTER a verified sign-in, so that once
+// the database rules are locked down they never fire while signed-out (which
+// would throw permission errors). Sign-out tears them back down.
+let _unsubscribers = [];
 
-  if (typeof window.renderStats === 'function') window.renderStats();
-  if (typeof window.renderRoster === 'function') window.renderRoster();
-  if (typeof window.rCal === 'function' && document.getElementById('page-calendar').classList.contains('active')) window.rCal();
-  if (typeof window.populateWeekButtons === 'function') window.populateWeekButtons();
-  if (typeof window.rWeekly === 'function' && document.getElementById('page-weekly').classList.contains('active')) window.rWeekly();
+function startDataListeners() {
+  if (_unsubscribers.length) return; // already running
 
-  // Hide loading
-  const ls = document.getElementById('loadingScreen');
-  ls.style.opacity = '0';
-  setTimeout(() => ls.style.display='none', 300);
+  // Admin / payment records (small docs, safe to stream)
+  _unsubscribers.push(onSnapshot(adminRef, (snap) => {
+    window.adminData = new Map();
+    snap.forEach(d => window.adminData.set(d.id, { id: d.id, ...d.data() }));
+    if (typeof window.renderAdmin === 'function' &&
+        document.getElementById('page-admin') &&
+        document.getElementById('page-admin').classList.contains('active')) {
+      window.renderAdmin();
+    }
+  }, (err) => console.error('admin snapshot error', err)));
 
-  // Update sync status
-  window._setSynced();
-}, (err) => {
-  console.error(err);
-  if (typeof window.showToast === 'function') window.showToast('Connection error: ' + err.message, 'error');
-  const ls = document.getElementById('loadingScreen');
-  ls.style.opacity = '0';
-  setTimeout(() => ls.style.display='none', 300);
+  // Persisted app settings (e.g. JotForm credentials)
+  _unsubscribers.push(onSnapshot(settingsRef, (snap) => {
+    window.jotformConfig = snap.exists() ? snap.data() : {};
+    window._jfConfigLoaded = true;
+    if (typeof window.onJotformConfigLoaded === 'function') window.onJotformConfigLoaded();
+  }, (err) => console.error('settings snapshot error', err)));
+
+  // Campers roster
+  _unsubscribers.push(onSnapshot(campersRef, (snapshot) => {
+    window.campers = [];
+    snapshot.forEach(d => { window.campers.push({ id: d.id, ...d.data() }); });
+    window.campers.sort((a,b) => (a.last||'').localeCompare(b.last||''));
+    window._avatarIdx.clear();
+    window.campers.forEach((c, i) => window._avatarIdx.set(c.id, i));
+
+    if (typeof window.renderStats === 'function') window.renderStats();
+    if (typeof window.renderRoster === 'function') window.renderRoster();
+    if (typeof window.rCal === 'function' && document.getElementById('page-calendar').classList.contains('active')) window.rCal();
+    if (typeof window.populateWeekButtons === 'function') window.populateWeekButtons();
+    if (typeof window.rWeekly === 'function' && document.getElementById('page-weekly').classList.contains('active')) window.rWeekly();
+
+    const ls = document.getElementById('loadingScreen');
+    if (ls) { ls.style.opacity = '0'; setTimeout(() => ls.style.display='none', 300); }
+    window._setSynced();
+  }, (err) => {
+    console.error(err);
+    if (typeof window.showToast === 'function') window.showToast('Connection error: ' + err.message, 'error');
+    const ls = document.getElementById('loadingScreen');
+    if (ls) { ls.style.opacity = '0'; setTimeout(() => ls.style.display='none', 300); }
+  }));
+}
+
+function stopDataListeners() {
+  _unsubscribers.forEach(unsub => { try { unsub(); } catch (e) {} });
+  _unsubscribers = [];
+}
+
+// Decide what to show based on auth state. Runs on load and on every
+// sign-in / sign-out.
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    stopDataListeners();
+    window._userRole = null;
+    window._userName = null;
+    window._userEmail = null;
+    if (typeof window.showLogin === 'function') window.showLogin();
+    return;
+  }
+  // Signed in — confirm the account is provisioned and active.
+  try {
+    const usnap = await getDoc(doc(db, 'users', user.uid));
+    if (!usnap.exists() || usnap.data().active !== true) {
+      await signOut(auth);
+      if (typeof window.showLogin === 'function')
+        window.showLogin('Your access has been disabled. Please contact the camp administrator.');
+      return;
+    }
+    const ud = usnap.data();
+    window._userRole  = ud.role || 'employee';
+    window._userName  = ud.name || user.email;
+    window._userEmail = user.email;
+    if (typeof window.applyRoleUI === 'function') window.applyRoleUI();
+    if (typeof window.hideLogin === 'function') window.hideLogin();
+    startDataListeners();
+  } catch (err) {
+    console.error('auth role check failed', err);
+    await signOut(auth);
+    if (typeof window.showLogin === 'function')
+      window.showLogin('Could not verify your access (' + (err.code || err.message || 'error') + '). Please try again.');
+  }
 });
 
 window._setSynced = function() {};
@@ -1909,8 +2049,12 @@ function showPage(id, btn) {
   if (id === 'admin') renderAdmin();
 }
 
-// Admin page is password protected
+// Admin page is restricted to admins, and password protected on top of that
 function requestAdmin(btn) {
+  if (window._userRole && window._userRole !== 'admin') {
+    showToast('Admin access is restricted to administrators', 'error');
+    return;
+  }
   if (adminUnlocked) { showPage('admin', btn); return; }
   document.getElementById('adminGate').classList.add('open');
   setTimeout(() => { const p = document.getElementById('adminPass'); if (p) p.focus(); }, 50);
@@ -1930,6 +2074,96 @@ function submitAdminPass() {
 function closeAdminGate() {
   document.getElementById('adminGate').classList.remove('open');
   document.getElementById('adminPass').value = '';
+}
+
+// ── Login / authentication UI ──
+// These are called by the auth gate in the Firebase module (which runs after
+// this script has defined them).
+function showLogin(message) {
+  const ls = document.getElementById('loadingScreen');
+  if (ls) { ls.style.opacity = '0'; ls.style.display = 'none'; }
+  const screen = document.getElementById('loginScreen');
+  const err = document.getElementById('loginError');
+  const btn = document.getElementById('loginBtn');
+  const pw = document.getElementById('loginPassword');
+  if (pw) pw.value = '';
+  if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
+  if (err) {
+    if (message) { err.textContent = message; err.classList.add('show'); }
+    else { err.textContent = ''; err.classList.remove('show'); }
+  }
+  if (screen) screen.classList.add('open');
+  // Hide the app's user panel until signed in
+  const su = document.getElementById('sidebarUser');
+  if (su) su.style.display = 'none';
+  setTimeout(() => { const e = document.getElementById('loginEmail'); if (e) e.focus(); }, 60);
+}
+
+function hideLogin() {
+  const screen = document.getElementById('loginScreen');
+  if (screen) screen.classList.remove('open');
+}
+
+// Show/hide UI based on the signed-in user's role.
+function applyRoleUI() {
+  const isAdmin = window._userRole === 'admin';
+  // Employees don't see the Admin page at all
+  ['adminNavItem', 'adminNavItemMobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isAdmin ? '' : 'none';
+  });
+  // If a non-admin is somehow viewing Admin, bounce them to Campers
+  if (!isAdmin && document.getElementById('page-admin') &&
+      document.getElementById('page-admin').classList.contains('active')) {
+    showPage('roster');
+  }
+  // Sidebar user panel
+  const su = document.getElementById('sidebarUser');
+  const nameEl = document.getElementById('suName');
+  const roleEl = document.getElementById('suRole');
+  if (nameEl) nameEl.textContent = window._userName || window._userEmail || '';
+  if (roleEl) roleEl.textContent = isAdmin ? 'Administrator' : 'Employee';
+  if (su) su.style.display = '';
+}
+
+async function doSignIn(event) {
+  if (event) event.preventDefault();
+  const emailEl = document.getElementById('loginEmail');
+  const pwEl = document.getElementById('loginPassword');
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginError');
+  const email = (emailEl?.value || '').trim();
+  const pw = pwEl?.value || '';
+  if (!email || !pw) return;
+  if (err) { err.textContent = ''; err.classList.remove('show'); }
+  if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
+  try {
+    await window._authSignIn(email, pw);
+    // Success → onAuthStateChanged takes over (verifies role, hides login)
+  } catch (e) {
+    const code = e.code || '';
+    let msg = 'Sign-in failed. Please try again.';
+    if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' ||
+        code === 'auth/user-not-found' || code === 'auth/invalid-email') {
+      msg = 'Incorrect email or password.';
+    } else if (code === 'auth/too-many-requests') {
+      msg = 'Too many attempts. Please wait a few minutes and try again.';
+    } else if (code === 'auth/network-request-failed') {
+      msg = 'Network error. Check your connection and try again.';
+    } else if (e.message) {
+      msg = e.message;
+    }
+    if (err) { err.textContent = msg; err.classList.add('show'); }
+    if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
+    if (pwEl) { pwEl.value = ''; pwEl.focus(); }
+  }
+}
+
+async function doSignOut() {
+  // Reset admin gate so it re-locks next session
+  adminUnlocked = false;
+  try { await window._authSignOut(); } catch (e) { console.error(e); }
+  // onAuthStateChanged shows the login screen
 }
 
 // ── Toast ──
@@ -3686,6 +3920,8 @@ document.addEventListener('keydown', (e) => {
 const sidebarLogo = document.querySelector('.sidebar-logo-img');
 const topBarLogo = document.getElementById('topBarLogo');
 if (sidebarLogo && topBarLogo) topBarLogo.src = sidebarLogo.src;
+const loginLogo = document.getElementById('loginLogo');
+if (sidebarLogo && loginLogo) loginLogo.src = sidebarLogo.src;
 
 // ════════════════════ INVOICE GENERATION ════════════════════
 // Template week names + pricing
@@ -4898,6 +5134,11 @@ window.generateInvoiceFiles = generateInvoiceFiles;
 window.requestAdmin = requestAdmin;
 window.submitAdminPass = submitAdminPass;
 window.closeAdminGate = closeAdminGate;
+window.showLogin = showLogin;
+window.hideLogin = hideLogin;
+window.applyRoleUI = applyRoleUI;
+window.doSignIn = doSignIn;
+window.doSignOut = doSignOut;
 window.renderAdmin = renderAdmin;
 window.updateAdminField = updateAdminField;
 window.editInvoiceNumber = editInvoiceNumber;
