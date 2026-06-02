@@ -1986,7 +1986,10 @@ onAuthStateChanged(auth, async (user) => {
       return;
     }
     const ud = usnap.data();
-    window._userRole  = ud.role || 'employee';
+    // Normalize the stored role so a stray capital or space (e.g. "Admin ")
+    // still resolves correctly. Anything that isn't exactly admin → employee.
+    const rawRole = (ud.role == null ? '' : String(ud.role)).trim().toLowerCase();
+    window._userRole  = (rawRole === 'admin') ? 'admin' : 'employee';
     window._userName  = ud.name || user.email;
     window._userEmail = user.email;
     if (typeof window.applyRoleUI === 'function') window.applyRoleUI();
