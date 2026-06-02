@@ -3368,6 +3368,8 @@ const JF = { key:'lbc_jf_key', form:'lbc_jf_form', last:'lbc_jf_last', auto:'lbc
 const JF_POLL_MS = 5 * 60 * 1000;
 let jotformSyncActive = false;   // true when the import preview was opened from a JotForm sync
 let jotformPollTimer = null;
+let jotformKickoffTimer = null;
+let jotformPollInProgress = false;
 
 function getJotformSettings() {
   const c = window.jotformConfig || {};
@@ -3514,9 +3516,15 @@ async function jotformSyncNow() {
 
 // Background poll: auto-import when enabled, otherwise just update the badge
 async function jotformPoll() {
+  // Concurrency guard: if a poll is already running (e.g., the startup
+  // kickoff overlapped with another invocation), drop this one. Without
+  // this, two concurrent polls would both fetch the same backlog and
+  // each write camper docs — producing duplicates.
+  if (jotformPollInProgress) return;
   const s = getJotformSettings();
   if (!s.apiKey || !s.formId) return;
   if (document.getElementById('importOverlay').classList.contains('open')) return; // don't clobber an open import
+  jotformPollInProgress = true;
   try {
     const subs = await fetchJotformSubmissions(s.apiKey, s.formId, s.last || null);
     if (!subs.length) { if (s.last) updateJotformBadge(0); return; }
@@ -3554,15 +3562,22 @@ async function jotformPoll() {
     }
   } catch (e) {
     console.error('JotForm poll error', e);
+  } finally {
+    jotformPollInProgress = false;
   }
 }
 
 function startJotformAutoPoll() {
-  if (jotformPollTimer) clearInterval(jotformPollTimer);
+  // Clear ALL pending timers so re-entry can't schedule two parallel polls.
+  // (renderStats calls this at app load, and the Firestore settings snapshot
+  // calls it again — without clearing the kickoff timer, both 8-s setTimeouts
+  // would fire and import every new submission twice.)
+  if (jotformPollTimer)   { clearInterval(jotformPollTimer);  jotformPollTimer = null; }
+  if (jotformKickoffTimer) { clearTimeout(jotformKickoffTimer); jotformKickoffTimer = null; }
   const s = getJotformSettings();
   if (!s.apiKey || !s.formId) return;
   jotformPollTimer = setInterval(jotformPoll, JF_POLL_MS);
-  setTimeout(jotformPoll, 8000); // quick first check after load
+  jotformKickoffTimer = setTimeout(jotformPoll, 8000); // quick first check after load
 }
 
 // ── Day Popup ──
@@ -3694,6 +3709,7 @@ function buildInvoiceData(key) {
 
   return {
     lineItems, weekCount, subtotal, hst, grand,
+    hasDaily: regs.some(r => r.type === 'daily'),
     parent: rep.parent || '',
     address: rep.address || '',
     email: rep.email || '',
@@ -3706,14 +3722,19 @@ function money(n) {
   return n == null ? '' : '$' + n.toFixed(2);
 }
 
-// Footer text based on payment method
-function invoiceFooterText(payMethod) {
-  if (!payMethod) return 'Thank you for registering.';
-  const isEtransfer = /e-?transfer/i.test(payMethod);
-  if (isEtransfer) {
-    return 'Thank you for registering and payment via E-transfer. E-transfer payments can be made to ' + ETRANSFER_EMAIL + '.';
+// Invoice footer text — varies by payment method, with a special case for any
+// invoice that contains daily registrations (those customers need to know both
+// payment options, since daily totals may push them to prefer one or the other).
+function invoiceFooterText(payMethod, hasDaily) {
+  if (hasDaily) {
+    return `Thank you for registering. E-transfers can be sent to ${ETRANSFER_EMAIL}. `
+         + `For credit card payments, please email us so we can send you a payment link.`;
   }
-  return 'Thank you for registering and payment via ' + payMethod + '.';
+  const pm = normalizePaymentMethod(payMethod);
+  if (pm === 'Credit')     return 'Thank you for registering and payment via credit card.';
+  if (pm === 'E-transfer') return `Thank you for registering. E-transfers can be sent to ${ETRANSFER_EMAIL}.`;
+  if (pm === 'Cash')       return 'Thank you for registering and payment via cash.';
+  return 'Thank you for registering.';
 }
 
 function openInvoice(keyOrId) {
@@ -3765,7 +3786,7 @@ async function generateInvoiceFiles() {
   const invNum = document.getElementById('fInvoiceNumber').value.trim();
   if (!invNum) { showToast('Please enter an invoice number.', 'error'); document.getElementById('fInvoiceNumber').focus(); return; }
   const invDate = fmtInvoiceDate(document.getElementById('fInvoiceDate').value);
-  const footer = invoiceFooterText(data.payMethod);
+  const footer = invoiceFooterText(data.payMethod, data.hasDaily);
   const safeName = (data.childName || 'camper').replace(/[^a-z0-9]+/gi, '_');
 
   const btn = document.getElementById('invoiceGenBtn');
@@ -3814,38 +3835,35 @@ function buildInvoicePDF(data, invNum, invDate, footer, filename) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
-  const M = 50;                 // margin
-  const green = [122, 143, 122];      // accent bar
+  const pageH = doc.internal.pageSize.getHeight();
+  const M = 50;                  // side margin
+  const FOOTER_RESERVED = 60;    // bottom space reserved for the address footer
+  const green = [122, 143, 122];
   const headerBeige = [247, 226, 199];
   const rowAlt = [242, 242, 242];
   const grandBg = [122, 143, 122];
 
   // Logo — drawn large and centered, preserving its natural aspect ratio
-  // (the website logo already contains the "Little Ladybugs Camp" wording,
-  //  so no separate text line is needed).
   const logoTop = 40;
-  let logoBottom = logoTop;            // tracks where the logo ends so the rest flows below it
+  let logoBottom = logoTop;
   try {
     const logo = document.querySelector('.sidebar-logo-img');
     if (logo && logo.src) {
       const nw = logo.naturalWidth || 1;
       const nh = logo.naturalHeight || 1;
-      const targetW = 240;             // preferred width in pt
-      const maxH = 90;                 // cap so a tall logo doesn't dominate
+      const targetW = 240, maxH = 90;
       let w = targetW, h = w * (nh / nw);
       if (h > maxH) { h = maxH; w = h * (nw / nh); }
-      const x = pageW / 2 - w / 2;     // horizontally centered
+      const x = pageW / 2 - w / 2;
       doc.addImage(logo.src, 'JPEG', x, logoTop, w, h);
       logoBottom = logoTop + h;
     }
   } catch(e) {}
 
-  // "Invoice" on the next line below the logo
+  // "Invoice" heading + accent bar (first page only)
   const invoiceY = logoBottom + 34;
   doc.setFont('times', 'normal'); doc.setFontSize(30); doc.setTextColor(30);
   doc.text('Invoice', pageW/2, invoiceY, { align: 'center' });
-
-  // green accent bar below the heading
   const barY = invoiceY + 14;
   doc.setFillColor(...green); doc.rect(0, barY, pageW, 10, 'F');
 
@@ -3858,15 +3876,13 @@ function buildInvoicePDF(data, invNum, invDate, footer, filename) {
   doc.text(invDate, pageW - M - 150, y + 15);
   doc.setFont('helvetica', 'bold');
   doc.text('Invoice Number: ' + invNum, pageW - M - 150, y + 32);
-
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5);
   let by = y + 16;
   [data.parent, data.address, data.email].filter(Boolean).forEach(line => {
     doc.text(String(line), M, by); by += 14;
   });
 
-  // Table
-  let ty = Math.max(by, y + 60) + 10;
+  // Table layout
   const cols = [
     { x: M,      w: 232, label: 'Description', align: 'left' },
     { x: M+232,  w: 70,  label: 'Camp',        align: 'left' },
@@ -3877,70 +3893,156 @@ function buildInvoicePDF(data, invNum, invDate, footer, filename) {
   const tableW = 512;
   const rowH = 26;
 
-  // header row
-  doc.setFillColor(...headerBeige); doc.rect(M, ty, tableW, 22, 'F');
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(60);
-  cols.forEach(c => doc.text(c.label, c.x + 5, ty + 14));
-  ty += 22;
+  let ty = Math.max(by, y + 60) + 10;
 
-  // data rows — one per line item (weekly week or daily day)
-  doc.setFont('helvetica', 'normal'); doc.setTextColor(40);
-  data.lineItems.forEach((r, i) => {
-    if (i % 2 === 1) { doc.setFillColor(...rowAlt); doc.rect(M, ty, tableW, rowH, 'F'); }
-    const cells = [
-      r.desc,
-      r.camp != null ? money(r.camp) : '',
-      r.pre  != null ? money(r.pre)  : '',
-      r.post != null ? money(r.post) : '',
-      r.total!= null ? money(r.total): '',
-    ];
-    doc.setFontSize(9);
-    cells.forEach((txt, ci) => {
-      const c = cols[ci];
-      if (ci === 0) {
-        const lines = doc.splitTextToSize(String(txt), c.w - 8);
-        doc.text(lines, c.x + 5, ty + (lines.length > 1 ? 11 : 17));
-      } else {
-        doc.text(String(txt), c.x + 5, ty + 17);
-      }
-    });
-    ty += rowH;
-  });
+  // (Re)draw the column header on each page that has rows. Returns the new ty.
+  function drawTableHeader(yPos) {
+    doc.setFillColor(...headerBeige); doc.rect(M, yPos, tableW, 22, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(60);
+    cols.forEach(c => doc.text(c.label, c.x + 5, yPos + 14));
+    return yPos + 22;
+  }
 
-  // Subtotal / HST / Grand total rows
-  const totalsRows = [
-    ['Subtotal', money(data.subtotal), false],
-    ['HST (13%)', money(data.hst), false],
-    ['Grand total', money(data.grand), true],
-  ];
-  doc.setFontSize(10);
-  totalsRows.forEach(([label, val, isGrand]) => {
-    if (isGrand) {
-      doc.setFillColor(...grandBg); doc.rect(M, ty, tableW, 24, 'F');
-      doc.setTextColor(255); doc.setFont('helvetica','bold');
-    } else {
-      doc.setFillColor(...rowAlt); doc.rect(M, ty, tableW, 24, 'F');
-      doc.setTextColor(40); doc.setFont('helvetica','bold');
+  // ───────────────────────────────────────────────────────────────────
+  // LAYOUT PLANNING
+  // Instead of greedy-filling page 1 (which produces a sparse "totals
+  // alone" page 2), pre-plan the page breaks so the last page always
+  // carries some rows alongside the totals + thank-you block.
+  // ───────────────────────────────────────────────────────────────────
+  const tempBoxLines = doc.splitTextToSize(footer, tableW - 30);
+  const thankYouBoxH = 24 + tempBoxLines.length * 14;
+  const tableHeaderH = 22;
+  const totalsTailH  = (24 * 3) + 30 + thankYouBoxH;   // 3 totals rows + spacer + box
+  const usableH      = pageH - FOOTER_RESERVED;
+  const firstPageRowSpace = usableH - ty - tableHeaderH;   // budget after first-page chrome
+  const contPageRowSpace  = usableH - 50 - tableHeaderH;   // budget on continuation pages
+
+  function planPages(rowCount) {
+    // Everything fits on page 1 (rows + totals)
+    if (rowCount * rowH + totalsTailH <= firstPageRowSpace) {
+      return [{ start: 0, end: rowCount, hasTotals: true }];
     }
-    doc.text(label, cols[4].x - 8, ty + 16, { align: 'right' });
-    doc.setFont('helvetica', isGrand ? 'bold' : 'normal');
-    doc.text(val, cols[4].x + 5, ty + 16);
-    ty += 24;
-  });
+    const pages = [];
+    let cursor = 0, remaining = rowCount;
 
-  // Footer thank-you box
-  ty += 30;
-  doc.setDrawColor(180); doc.setFillColor(245, 241, 232);
-  const boxLines = doc.splitTextToSize(footer, tableW - 30);
-  const boxH = 24 + boxLines.length * 14;
-  doc.rect(M, ty, tableW, boxH, 'FD');
-  doc.setTextColor(40); doc.setFont('helvetica','normal'); doc.setFontSize(11);
-  doc.text(boxLines, M + 15, ty + 22);
+    // Page 1: rows only, totals don't fit here
+    const firstFit = Math.min(remaining, Math.floor(firstPageRowSpace / rowH));
+    pages.push({ start: cursor, end: cursor + firstFit, hasTotals: false });
+    cursor += firstFit; remaining -= firstFit;
 
-  // bottom address line
-  doc.setFontSize(9.5); doc.setTextColor(70);
-  doc.text('8 Aberdeen Street Caledonia, ON N3W 1C8. GST/HST: 74975 1954 RT0001',
-    pageW/2, doc.internal.pageSize.getHeight() - 40, { align: 'center' });
+    // Continuation pages
+    while (remaining > 0) {
+      if (remaining * rowH + totalsTailH <= contPageRowSpace) {
+        pages.push({ start: cursor, end: cursor + remaining, hasTotals: true });
+        cursor += remaining; remaining = 0;
+      } else {
+        const fit = Math.min(remaining, Math.floor(contPageRowSpace / rowH));
+        pages.push({ start: cursor, end: cursor + fit, hasTotals: false });
+        cursor += fit; remaining -= fit;
+      }
+    }
+    // Safety net: if a page boundary lined up so cleanly that no page got
+    // the totals (last page is row-full), add a tiny final page for them.
+    if (!pages[pages.length - 1].hasTotals) {
+      pages.push({ start: cursor, end: cursor, hasTotals: true });
+    }
+
+    // ── Rebalance last two pages so the tail isn't sparse ──
+    if (pages.length >= 2) {
+      const last = pages[pages.length - 1];
+      const prev = pages[pages.length - 2];
+      const lastRows = last.end - last.start;
+      const prevRows = prev.end - prev.start;
+      const combined = lastRows + prevRows;
+      // Aim for roughly half on each, at minimum 3 rows on the last page
+      const target = Math.max(3, Math.ceil(combined / 2));
+      if (lastRows < target && prevRows > target) {
+        // When pages.length >= 2 (which is the only branch we reach here),
+        // the last page is always a continuation page, so its row budget is
+        // contPageRowSpace (continuation pages don't carry the logo header).
+        const lastBudget = contPageRowSpace;
+        const maxLastRows = Math.floor((lastBudget - totalsTailH) / rowH);
+        const desired = Math.min(target, maxLastRows);
+        const toMove = desired - lastRows;
+        if (toMove > 0) { prev.end -= toMove; last.start -= toMove; }
+      }
+    }
+    return pages;
+  }
+
+  const pagePlan = planPages(data.lineItems.length);
+
+  // ───────────────────────────────────────────────────────────────────
+  // RENDER ROWS + TOTALS per the plan
+  // ───────────────────────────────────────────────────────────────────
+  for (let p = 0; p < pagePlan.length; p++) {
+    if (p > 0) { doc.addPage(); ty = 50; }
+    ty = drawTableHeader(ty);
+    const page = pagePlan[p];
+    for (let i = page.start; i < page.end; i++) {
+      const r = data.lineItems[i];
+      if (i % 2 === 1) { doc.setFillColor(...rowAlt); doc.rect(M, ty, tableW, rowH, 'F'); }
+      const cells = [
+        r.desc,
+        r.camp != null ? money(r.camp) : '',
+        r.pre  != null ? money(r.pre)  : '',
+        r.post != null ? money(r.post) : '',
+        r.total!= null ? money(r.total): '',
+      ];
+      doc.setFontSize(9); doc.setTextColor(40); doc.setFont('helvetica','normal');
+      cells.forEach((txt, ci) => {
+        const c = cols[ci];
+        if (ci === 0) {
+          const lines = doc.splitTextToSize(String(txt), c.w - 8);
+          doc.text(lines, c.x + 5, ty + (lines.length > 1 ? 11 : 17));
+        } else {
+          doc.text(String(txt), c.x + 5, ty + 17);
+        }
+      });
+      ty += rowH;
+    }
+    if (page.hasTotals) {
+      // Subtotal / HST / Grand total
+      const totalsRows = [
+        ['Subtotal', money(data.subtotal), false],
+        ['HST (13%)', money(data.hst), false],
+        ['Grand total', money(data.grand), true],
+      ];
+      doc.setFontSize(10);
+      totalsRows.forEach(([label, val, isGrand]) => {
+        if (isGrand) {
+          doc.setFillColor(...grandBg); doc.rect(M, ty, tableW, 24, 'F');
+          doc.setTextColor(255); doc.setFont('helvetica','bold');
+        } else {
+          doc.setFillColor(...rowAlt); doc.rect(M, ty, tableW, 24, 'F');
+          doc.setTextColor(40); doc.setFont('helvetica','bold');
+        }
+        doc.text(label, cols[4].x - 8, ty + 16, { align: 'right' });
+        doc.setFont('helvetica', isGrand ? 'bold' : 'normal');
+        doc.text(val, cols[4].x + 5, ty + 16);
+        ty += 24;
+      });
+      // Thank-you box
+      ty += 30;
+      doc.setDrawColor(180); doc.setFillColor(245, 241, 232);
+      doc.rect(M, ty, tableW, thankYouBoxH, 'FD');
+      doc.setTextColor(40); doc.setFont('helvetica','normal'); doc.setFontSize(11);
+      doc.text(tempBoxLines, M + 15, ty + 22);
+    }
+  }
+
+  // Draw the address line on EVERY page at a consistent bottom position so
+  // long multi-page invoices stay branded throughout.
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFontSize(9.5); doc.setTextColor(70); doc.setFont('helvetica','normal');
+    doc.text('8 Aberdeen Street Caledonia, ON N3W 1C8. GST/HST: 74975 1954 RT0001',
+      pageW/2, pageH - 30, { align: 'center' });
+    if (totalPages > 1) {
+      doc.text(`Page ${p} of ${totalPages}`, pageW/2, pageH - 15, { align: 'center' });
+    }
+  }
 
   return doc; // caller handles save + storage
 }
@@ -4053,6 +4155,7 @@ function renderAdmin() {
       ? `<div class="admin-invoice-cell">
            <button class="admin-pdf-link" onclick="viewInvoicePdf('${keyEsc}')" title="Open saved invoice PDF"><i class="ti ti-file-invoice"></i>${esc(invNum||'View PDF')}</button>
            <i class="ti ti-mail admin-pdf-icon" title="Email invoice to parent" onclick="emailInvoice('${keyEsc}')"></i>
+           <i class="ti ti-refresh admin-pdf-icon" title="Regenerate invoice PDF from current data" onclick="regenerateInvoiceForKey('${keyEsc}')"></i>
            <i class="ti ti-pencil admin-pdf-icon" title="Edit invoice number" onclick="editInvoiceNumber('${keyEsc}')"></i>
          </div>`
       : `<input class="admin-inp" type="text" value="${esc(invNum)}" placeholder="—"
@@ -4267,7 +4370,7 @@ async function autoGenerateInvoiceForKey(key) {
   if (!data || !data.lineItems.length || !data.grand) return false;
   const invNum = nextInvoiceNumber();
   const invDate = dStr(new Date());
-  const footer = invoiceFooterText(data.payMethod);
+  const footer = invoiceFooterText(data.payMethod, data.hasDaily);
   const safeName = (data.childName || 'camper').replace(/[^a-z0-9]+/gi, '_');
   const filename = `Invoice_${safeName}_${invNum}.pdf`;
   const pdfDoc = buildInvoicePDF(data, invNum, invDate, footer, filename);
@@ -4283,6 +4386,43 @@ async function autoGenerateInvoiceForKey(key) {
   const id = adminId(key);
   window.adminData.set(id, { ...(window.adminData.get(id) || {}), camperKey: key, hasInvoicePdf: true, ...patch });
   return true;
+}
+
+// Force-rebuild a camper's invoice PDF from their current registrations and overwrite
+// the saved copy in Admin. Used when registrations have been edited (e.g., duplicates
+// removed) and the existing PDF no longer matches reality.
+async function regenerateInvoiceForKey(key) {
+  const group = groupCampers(true).find(g => g.key === key);
+  if (!group) { showToast('Could not find that camper.', 'error'); return; }
+  const childName = `${group.first||''} ${group.last||''}`.trim() || 'this camper';
+  if (!confirm(`Regenerate the invoice for ${childName}? The saved PDF will be replaced with a new one based on the current weeks and days. The invoice number stays the same.`)) return;
+
+  showToast('Regenerating invoice…');
+  try {
+    const rec = window.adminData.get(adminId(key)) || {};
+    const data = buildInvoiceData(key);
+    if (!data || !data.lineItems.length || !data.grand) {
+      showToast('Cannot regenerate — no chargeable items found for this camper.', 'error');
+      return;
+    }
+    // Reuse the existing invoice number so the customer-facing reference doesn't change
+    const invNum = rec.invoiceNumber || nextInvoiceNumber();
+    const invDate = dStr(new Date());
+    const footer = invoiceFooterText(data.payMethod, data.hasDaily);
+    const safeName = (data.childName || 'camper').replace(/[^a-z0-9]+/gi, '_');
+    const filename = `Invoice_${safeName}_${invNum}.pdf`;
+    const pdfDoc = buildInvoicePDF(data, invNum, invDate, footer, filename);
+    const dataUri = pdfDoc.output('datauristring');
+    await saveInvoicePdf(key, invNum, filename, dataUri); // overwrites existing
+    await updateAdminFieldBulk(key, { invoiceNumber: invNum, totalAmount: data.grand });
+    // Mirror so the totals row + view-PDF link refresh immediately
+    const id = adminId(key);
+    window.adminData.set(id, { ...(window.adminData.get(id) || {}), camperKey: key, hasInvoicePdf: true, invoiceNumber: invNum, totalAmount: data.grand });
+    showToast(`Invoice regenerated — ${money(data.grand)} on ${data.lineItems.length} line${data.lineItems.length===1?'':'s'}.`);
+  } catch (e) {
+    console.error('Regenerate failed', e);
+    showToast('Could not regenerate invoice: ' + e.message, 'error');
+  }
 }
 
 function dataUriToBlob(dataUri) {
@@ -4707,6 +4847,7 @@ window.updateAdminField = updateAdminField;
 window.editInvoiceNumber = editInvoiceNumber;
 window.viewInvoicePdf = viewInvoicePdf;
 window.emailInvoice = emailInvoice;
+window.regenerateInvoiceForKey = regenerateInvoiceForKey;
 window.openRefundModal = openRefundModal;
 window.closeRefundModal = closeRefundModal;
 window.confirmRefund = confirmRefund;
