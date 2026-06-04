@@ -1259,10 +1259,9 @@
   .fin-card.net .fin-card-val { color: var(--text); }
   .fin-card.net.negative .fin-card-val { color: #B23B2E; }
   .fin-actions { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
-  .fin-filter {
-    margin-left: auto; padding: 7px 10px; font-size: 13px;
-    border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text);
-  }
+  .fin-filter-group { margin-left: auto; display: flex; gap: 6px; }
+  .fin-filter-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
+  .fin-filter-btn.active:hover { background: var(--green); opacity: .95; }
   .fin-table { min-width: 760px; }
   .fin-empty { text-align: center; color: var(--text-3); padding: 22px; font-size: 13px; }
   .fin-type { font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 20px; display: inline-block; }
@@ -1273,6 +1272,9 @@
   .txn-receipt-hint { font-size: 12px; color: var(--text-2); margin-top: 6px; }
   .fin-receipt-link { color: var(--green); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
   .fin-receipt-link:hover { text-decoration: underline; }
+  .fin-locked { color: var(--text-3); font-size: 13px; cursor: default; }
+  .fin-card.tax .fin-card-val { color: #8A6D2F; }
+  .admin-tax-row td { color: var(--text-2); font-weight: 600; font-size: 13px; }
   .form-row { display: flex; gap: 12px; }
   .txn-import-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px dashed var(--border); }
   .txn-import-hint { font-size: 12px; color: var(--green); }
@@ -1619,16 +1621,17 @@
             <div class="fin-card income"><div class="fin-card-label">Income</div><div class="fin-card-val" id="finIncome">$0.00</div></div>
             <div class="fin-card expense"><div class="fin-card-label">Expenses</div><div class="fin-card-val" id="finExpense">$0.00</div></div>
             <div class="fin-card net"><div class="fin-card-label">Net</div><div class="fin-card-val" id="finNet">$0.00</div></div>
+            <div class="fin-card tax"><div class="fin-card-label">Tax collected (HST)</div><div class="fin-card-val" id="finTax">$0.00</div></div>
           </div>
           <div class="fin-actions">
             <button class="btn btn-sm" onclick="openAddTxn('income')"><i class="ti ti-plus"></i> Add income</button>
             <button class="btn btn-sm" onclick="openAddTxn('expense')"><i class="ti ti-plus"></i> Add expense</button>
             <button class="btn btn-sm" onclick="openReceiptImport()"><i class="ti ti-file-import"></i> Import receipts</button>
-            <select id="finFilter" class="fin-filter" onchange="renderFinances()">
-              <option value="all">All entries</option>
-              <option value="income">Income only</option>
-              <option value="expense">Expenses only</option>
-            </select>
+            <div class="fin-filter-group" id="finFilterGroup">
+              <button class="btn fin-filter-btn active" data-filter="all" onclick="setFinFilter('all',this)">All entries</button>
+              <button class="btn fin-filter-btn" data-filter="income" onclick="setFinFilter('income',this)">Income</button>
+              <button class="btn fin-filter-btn" data-filter="expense" onclick="setFinFilter('expense',this)">Expenses</button>
+            </div>
           </div>
           <div class="admin-table-wrap">
             <table class="admin-table fin-table">
@@ -2242,6 +2245,12 @@ function startDataListeners() {
           document.getElementById('page-admin') &&
           document.getElementById('page-admin').classList.contains('active')) {
         window.renderAdmin();
+        // Invoice income shown in the Finances tab is derived from this same
+        // data — keep it live when that sub-tab is the one on screen.
+        const finTab = document.getElementById('atab-finances');
+        if (finTab && finTab.style.display !== 'none' && typeof window.renderFinances === 'function') {
+          window.renderFinances();
+        }
       }
     }, (err) => console.error('admin snapshot error', err)));
 
@@ -2659,6 +2668,7 @@ const FIN_CATEGORIES = {
   expense: ['Supplies', 'Staff wages', 'Food & snacks', 'Facility / rent', 'Equipment', 'Insurance', 'Marketing', 'Transportation', 'Other expense']
 };
 let _finances = [];
+let _finFilter = 'all'; // 'all' | 'income' | 'expense'
 let _txnType = 'expense';
 let _txnReceipt = null; // { dataUri, name } staged for the entry being added
 
@@ -2677,32 +2687,119 @@ function fmtFinDate(d) {
   return (months[mi] || '?') + ' ' + parseInt(parts[2], 10) + ', ' + parts[0];
 }
 
+// Tax (HST) portion of an HST-inclusive total: total = subtotal × 1.13, so
+// the embedded tax is exactly total × 13/113. Derived (never stored) so it
+// always matches the invoice totals.
+function invoiceTaxOf(total) {
+  const t = Number(total) || 0;
+  return Math.round(t * HST_RATE / (1 + HST_RATE) * 100) / 100;
+}
+
+// Build income rows derived from invoices (admin records) — NOT stored in the
+// finances collection, so there's no duplicate data and the two tabs stay in
+// sync automatically. One row per generated/uploaded invoice.
+function invoiceIncomeRows() {
+  const rows = [];
+  if (!window.adminData) return rows;
+  // Camper keys that have been refunded — their invoices don't count as income.
+  const refundedKeys = new Set(
+    (window.campers || []).filter(c => c.refunded === true).map(c => camperKey(c))
+  );
+  // Earliest registration date per camper (from JotForm submission date, else
+  // the date the record was first created).
+  const regDateByKey = new Map();
+  (window.campers || []).forEach(c => {
+    const k = camperKey(c);
+    const rd = c.regDate || tsToYmd(c.createdAt) || '';
+    if (rd && (!regDateByKey.has(k) || rd < regDateByKey.get(k))) regDateByKey.set(k, rd);
+  });
+  for (const rec of window.adminData.values()) {
+    const total = parseFloat(rec.totalAmount);
+    const invNum = (rec.invoiceNumber || '').toString().trim();
+    if (!(total > 0) || !invNum) continue;
+    if (rec.camperKey && refundedKeys.has(rec.camperKey)) continue;
+    // Income reflects money actually COLLECTED, not billed:
+    //   paid in full → the full total; otherwise → amount paid so far.
+    const collected = rec.paidInFull ? total : (parseFloat(rec.amountPaid) || 0);
+    if (!(collected > 0)) continue; // nothing collected yet → not income
+    // Invoice date = when the registration came in.
+    const date = (rec.camperKey && regDateByKey.get(rec.camperKey))
+                 || rec.invoiceDate || tsToYmd(rec.updatedAt) || '';
+    rows.push({
+      invoiceRow: true,
+      key: rec.camperKey || '',
+      date,
+      invoiceNumber: invNum,
+      hasPdf: !!rec.hasInvoicePdf,
+      amount: collected,
+      tax: invoiceTaxOf(collected)
+    });
+  }
+  return rows;
+}
+
+// Firestore Timestamp (or {seconds}) → 'YYYY-MM-DD', for legacy invoices that
+// predate the stored invoiceDate field.
+function tsToYmd(ts) {
+  try {
+    if (!ts) return '';
+    const d = (typeof ts.toDate === 'function') ? ts.toDate()
+            : (ts.seconds ? new Date(ts.seconds * 1000) : null);
+    return d ? dStr(d) : '';
+  } catch (e) { return ''; }
+}
+
 async function renderFinances() {
   const body = document.getElementById('finTableBody');
   if (!body) return;
   if (window._userRole !== 'admin') { body.innerHTML = ''; return; }
   body.innerHTML = '<tr><td colspan="7" class="fin-empty">Loading…</td></tr>';
   try {
-    const items = await window._fetchFinances();
-    items.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-    _finances = items;
+    const stored = await window._fetchFinances();
+    _finances = stored;
+    const invoiceRows = invoiceIncomeRows();
 
-    // Totals (always over ALL entries, regardless of filter)
-    let inc = 0, exp = 0;
-    items.forEach(t => { if (t.type === 'income') inc += Number(t.amount || 0); else exp += Number(t.amount || 0); });
+    // ── Totals (over everything, regardless of filter) ──
+    let inc = 0, exp = 0, tax = 0;
+    stored.forEach(t => { if (t.type === 'income') inc += Number(t.amount || 0); else exp += Number(t.amount || 0); });
+    invoiceRows.forEach(r => { inc += r.amount; tax += r.tax; });
     const net = inc - exp;
     document.getElementById('finIncome').textContent = finMoney(inc);
     document.getElementById('finExpense').textContent = finMoney(exp);
     document.getElementById('finNet').textContent = finMoney(net);
+    const taxEl = document.getElementById('finTax'); if (taxEl) taxEl.textContent = finMoney(tax);
     document.getElementById('finSummary').querySelector('.fin-card.net').classList.toggle('negative', net < 0);
 
-    const filter = (document.getElementById('finFilter') || {}).value || 'all';
-    const shown = items.filter(t => filter === 'all' || t.type === filter);
+    // ── Merge invoice-income rows with stored entries, newest first ──
+    const merged = [
+      ...invoiceRows.map(r => ({
+        invoiceRow: true, key: r.key, date: r.date, type: 'income',
+        category: 'Invoice', invoiceNumber: r.invoiceNumber, hasPdf: r.hasPdf, amount: r.amount
+      })),
+      ...stored.map(t => ({ ...t, invoiceRow: false }))
+    ].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+
+    const filter = _finFilter;
+    const shown = merged.filter(t => filter === 'all' || t.type === filter);
     if (!shown.length) {
-      body.innerHTML = '<tr><td colspan="7" class="fin-empty">No entries yet. Use “Add income” or “Add expense” above.</td></tr>';
+      body.innerHTML = '<tr><td colspan="7" class="fin-empty">No entries yet. Invoices appear here automatically as income; use “Add expense” for costs.</td></tr>';
       return;
     }
     body.innerHTML = shown.map(t => {
+      if (t.invoiceRow) {
+        const desc = t.hasPdf
+          ? `<span class="fin-receipt-link" onclick="viewInvoicePdf('${escapeHtml(t.key)}')"><i class="ti ti-file-invoice"></i> Invoice ${escapeHtml(t.invoiceNumber)}</span>`
+          : `Invoice ${escapeHtml(t.invoiceNumber)}`;
+        return `<tr>
+          <td>${escapeHtml(fmtFinDate(t.date))}</td>
+          <td><span class="fin-type income">Income</span></td>
+          <td>Invoice</td>
+          <td>${desc}</td>
+          <td class="fin-amt income">${finMoney(t.amount)}</td>
+          <td><span style="color:var(--text-3)">—</span></td>
+          <td style="text-align:right"><span class="fin-locked" title="From the Payments tab — edit it there">🔒</span></td>
+        </tr>`;
+      }
       const receipt = t.hasReceipt
         ? `<span class="fin-receipt-link" onclick="viewReceipt('${escapeHtml(t.id)}')"><i class="ti ti-paperclip"></i> View</span>`
         : '<span style="color:var(--text-3)">—</span>';
@@ -2720,6 +2817,13 @@ async function renderFinances() {
     console.error(e);
     body.innerHTML = '<tr><td colspan="7" class="fin-empty">Could not load finances: ' + escapeHtml(e.code || e.message || 'error') + '</td></tr>';
   }
+}
+
+function setFinFilter(value, btn) {
+  _finFilter = value;
+  document.querySelectorAll('#finFilterGroup .fin-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderFinances();
 }
 
 function openAddTxn(type) {
@@ -4390,6 +4494,7 @@ function buildImportRows(csvRows) {
           healthCard,
           payMethod,
           notes, type: 'weekly', weekStart: wk.start,
+          regDate: row.__regDate || '',
           campDays, preDays, postDays}
       });
     });
@@ -4413,7 +4518,8 @@ function buildImportRows(csvRows) {
         parent, email, phone, address,
         parent2, email2, phone2, address2,
         ec1Name, ec1Phone, ec1Rel, ec2Name, ec2Phone, ec2Rel,
-        pickup, allergies, medical: medFull, healthCard, payMethod, notes
+        pickup, allergies, medical: medFull, healthCard, payMethod, notes,
+        regDate: row.__regDate || ''
       };
 
       const matchedWeeks = Object.values(parsed.byWeek);
@@ -4661,7 +4767,18 @@ function jotformAnswerToRow(answers) {
   }
   return row;
 }
-function submissionsToRows(subs) { return subs.map(s => jotformAnswerToRow(s.answers || {})); }
+function jotformYmd(createdAt) {
+  if (!createdAt) return '';
+  const m = String(createdAt).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[1] + '-' + m[2] + '-' + m[3]) : '';
+}
+function submissionsToRows(subs) {
+  return subs.map(s => {
+    const r = jotformAnswerToRow(s.answers || {});
+    r.__regDate = jotformYmd(s.created_at); // submission date = when the registration came in
+    return r;
+  });
+}
 function maxCreated(subs, fallback) {
   return subs.reduce((m, s) => (s.created_at && s.created_at > m ? s.created_at : m), fallback || '');
 }
@@ -5012,7 +5129,9 @@ async function generateInvoiceFiles() {
       const dataUri = pdfDoc.output('datauristring');
       await saveInvoicePdf(invoiceCamperKey, invNum, pdfFilename, dataUri);
       const existing = window.adminData.get(adminId(invoiceCamperKey)) || {};
-      const patch = { invoiceNumber: invNum, totalAmount: data.grand };
+      const rawDate = document.getElementById('fInvoiceDate').value;
+      const patch = { invoiceNumber: invNum, totalAmount: data.grand,
+        invoiceDate: /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : dStr(new Date()) };
       if (!existing.paymentMethod && data.payMethod) {
         const pm = normalizePaymentMethod(data.payMethod);
         if (pm) patch.paymentMethod = pm;
@@ -5405,19 +5524,16 @@ function renderAdmin() {
   }).join('');
 
   // Totals (active campers only; refunded excluded). Paid-in-full counts as fully paid.
-  let totalInvoiced = 0, totalPaid = 0, totalOwed = 0;
+  let totalInvoiced = 0, totalPaid = 0, totalOwed = 0, totalTax = 0;
   groups.forEach(g => {
     if (g.registrations[0] && g.registrations[0].refunded) return;
     const r = window.adminData.get(adminId(g.key)) || {};
     const total = parseFloat(r.totalAmount) || 0;
     totalInvoiced += total;
-    if (r.paidInFull) {
-      totalPaid += total;
-    } else {
-      const paid = parseFloat(r.amountPaid) || 0;
-      totalPaid += paid;
-      totalOwed += Math.max(0, total - paid);
-    }
+    const collected = r.paidInFull ? total : (parseFloat(r.amountPaid) || 0);
+    totalPaid += collected;
+    totalOwed += Math.max(0, total - collected);
+    totalTax += (typeof invoiceTaxOf === 'function' ? invoiceTaxOf(collected) : 0);
   });
   const totalsRow = `<tr class="admin-totals-row">
       <td colspan="3" style="text-align:right">Totals</td>
@@ -5427,6 +5543,11 @@ function renderAdmin() {
       <td>${money(totalPaid)}</td>
       <td>${money(totalOwed)}</td>
       <td></td>
+    </tr>
+    <tr class="admin-totals-row admin-tax-row">
+      <td colspan="6" style="text-align:right">of which HST collected (13%, included in amount paid)</td>
+      <td>${money(totalTax)}</td>
+      <td colspan="2"></td>
     </tr>`;
 
   body.innerHTML = rowsHtml + totalsRow;
@@ -5580,7 +5701,7 @@ async function autoGenerateInvoiceForKey(key) {
   const pdfDoc = buildInvoicePDF(data, invNum, invDate, footer, filename);
   const dataUri = pdfDoc.output('datauristring');
   await saveInvoicePdf(key, invNum, filename, dataUri);
-  const patch = { invoiceNumber: invNum, totalAmount: data.grand };
+  const patch = { invoiceNumber: invNum, totalAmount: data.grand, invoiceDate: invDate };
   if (!existing.paymentMethod && data.payMethod) {
     const pm = normalizePaymentMethod(data.payMethod);
     if (pm) patch.paymentMethod = pm;
@@ -5618,10 +5739,11 @@ async function regenerateInvoiceForKey(key) {
     const pdfDoc = buildInvoicePDF(data, invNum, invDate, footer, filename);
     const dataUri = pdfDoc.output('datauristring');
     await saveInvoicePdf(key, invNum, filename, dataUri); // overwrites existing
-    await updateAdminFieldBulk(key, { invoiceNumber: invNum, totalAmount: data.grand });
+    const keepDate = rec.invoiceDate || invDate;
+    await updateAdminFieldBulk(key, { invoiceNumber: invNum, totalAmount: data.grand, invoiceDate: keepDate });
     // Mirror so the totals row + view-PDF link refresh immediately
     const id = adminId(key);
-    window.adminData.set(id, { ...(window.adminData.get(id) || {}), camperKey: key, hasInvoicePdf: true, invoiceNumber: invNum, totalAmount: data.grand });
+    window.adminData.set(id, { ...(window.adminData.get(id) || {}), camperKey: key, hasInvoicePdf: true, invoiceNumber: invNum, totalAmount: data.grand, invoiceDate: keepDate });
     showToast(`Invoice regenerated — ${money(data.grand)} on ${data.lineItems.length} line${data.lineItems.length===1?'':'s'}.`);
   } catch (e) {
     console.error('Regenerate failed', e);
@@ -5832,6 +5954,10 @@ function parseInvoiceText(text) {
   return {
     invoiceNumber: invMatch ? invMatch[1] : '',
     total: totalMatch ? parseFloat(totalMatch[1].replace(/,/g, '')) : null,
+    invoiceDate: (function(){
+      const m = joined.match(/Invoice\s*Date:?\s*([A-Za-z0-9,\/\-\s]{6,20})/i);
+      return (m && parseReceiptDate(m[1])) || parseReceiptDate(joined) || '';
+    })(),
     email: emailMatch ? emailMatch[0] : '',
     billTo,
     paymentMethod: normalizePaymentMethod(
@@ -6075,6 +6201,7 @@ async function saveAllImportedInvoices() {
       if (p.parsed.invoiceNumber) patch.invoiceNumber = p.parsed.invoiceNumber;
       if (p.parsed.total != null) patch.totalAmount = p.parsed.total;
       if (p.parsed.paymentMethod) patch.paymentMethod = p.parsed.paymentMethod;
+      patch.invoiceDate = p.parsed.invoiceDate || dStr(new Date());
       if (Object.keys(patch).length) await updateAdminFieldBulk(p.matchKey, patch);
       ok++;
     } catch (e) { console.error('invoice save failed', p.fileName, e); fail++; }
@@ -6148,6 +6275,7 @@ window.toggleEmpActive = toggleEmpActive;
 window.removeEmp = removeEmp;
 window.showAdminTab = showAdminTab;
 window.renderFinances = renderFinances;
+window.setFinFilter = setFinFilter;
 window.openAddTxn = openAddTxn;
 window.closeTxnModal = closeTxnModal;
 window.onReceiptPick = onReceiptPick;
