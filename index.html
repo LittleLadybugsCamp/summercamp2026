@@ -1183,6 +1183,97 @@
     padding: 10px 14px; border-radius: 10px; font-size: 13px; margin-bottom: 18px;
   }
   .admin-note i { font-size: 16px; }
+
+  /* ── Employees panel ── */
+  .emp-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 18px 14px; margin-bottom: 22px;
+  }
+  .emp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .emp-h2 { font-size: 16px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .emp-h2 i { color: var(--green); font-size: 19px; }
+  .emp-sub { font-size: 12.5px; color: var(--text-3); margin-top: 4px; margin-bottom: 14px; line-height: 1.45; }
+  .emp-list { display: flex; flex-direction: column; gap: 8px; }
+  .emp-empty { font-size: 13px; color: var(--text-3); padding: 10px 2px; }
+  .emp-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 13px; border: 1px solid var(--border);
+    border-radius: 10px; background: var(--bg);
+  }
+  .emp-row.inactive { opacity: .62; }
+  .emp-info { flex: 1; min-width: 0; }
+  .emp-name { font-weight: 600; font-size: 14px; color: var(--text); display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .emp-email { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .emp-badge { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 20px; }
+  .emp-badge.admin  { background: var(--green-light); color: var(--green-deep, #2d6035); }
+  .emp-badge.active { background: #E3F2E5; color: #2E7D43; }
+  .emp-badge.off    { background: #FCE8E6; color: #B23B2E; }
+  .emp-badge.you    { background: #EEF1F4; color: #5B6B7B; }
+  .emp-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .emp-actions .btn-icon { width: 32px; height: 32px; }
+  .emp-error {
+    background: #FDECEA; color: #9A2A1E; border: 1px solid #F3C9C3;
+    border-radius: 8px; padding: 9px 12px; font-size: 12.5px; margin-bottom: 12px; line-height: 1.4;
+  }
+  .emp-success { font-size: 14px; color: #2E7D43; display: flex; align-items: center; gap: 7px; }
+  .emp-success i { font-size: 18px; }
+  .emp-pw-box {
+    display: flex; align-items: center; gap: 8px; margin-top: 6px;
+    background: var(--bg); border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px;
+  }
+  .emp-pw-box code {
+    flex: 1; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 16px; font-weight: 600; letter-spacing: .5px; color: var(--text); word-break: break-all;
+  }
+  .emp-note { font-size: 12px; color: var(--text-3); margin-top: 10px; line-height: 1.5; }
+  @media (max-width: 560px) {
+    .emp-row { flex-wrap: wrap; }
+    .emp-actions { width: 100%; justify-content: flex-end; }
+  }
+
+  /* ── Admin tabs ── */
+  .admin-tabs {
+    display: flex; gap: 6px; margin-bottom: 18px;
+    border-bottom: 1px solid var(--border); overflow-x: auto;
+  }
+  .admin-tab {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 14px; font-size: 13.5px; font-weight: 600;
+    color: var(--text-3); background: none; border: none;
+    border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap;
+  }
+  .admin-tab i { font-size: 16px; }
+  .admin-tab:hover { color: var(--text-2); }
+  .admin-tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+  /* ── Finances ── */
+  .fin-summary { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .fin-card {
+    flex: 1; min-width: 120px; padding: 14px 16px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+  }
+  .fin-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--text-3); font-weight: 600; }
+  .fin-card-val { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  .fin-card.income .fin-card-val { color: #2E7D43; }
+  .fin-card.expense .fin-card-val { color: #B23B2E; }
+  .fin-card.net .fin-card-val { color: var(--text); }
+  .fin-card.net.negative .fin-card-val { color: #B23B2E; }
+  .fin-actions { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+  .fin-filter {
+    margin-left: auto; padding: 7px 10px; font-size: 13px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text);
+  }
+  .fin-table { min-width: 760px; }
+  .fin-empty { text-align: center; color: var(--text-3); padding: 22px; font-size: 13px; }
+  .fin-type { font-weight: 600; font-size: 12px; padding: 2px 8px; border-radius: 20px; display: inline-block; }
+  .fin-type.income { background: #E3F2E5; color: #2E7D43; }
+  .fin-type.expense { background: #FCE8E6; color: #B23B2E; }
+  .fin-amt.income { color: #2E7D43; font-weight: 600; }
+  .fin-amt.expense { color: #B23B2E; font-weight: 600; }
+  .txn-receipt-hint { font-size: 12px; color: var(--text-2); margin-top: 6px; }
+  .fin-receipt-link { color: var(--green); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+  .fin-receipt-link:hover { text-decoration: underline; }
+  .form-row { display: flex; gap: 12px; }
   .admin-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
   .admin-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
   .admin-table thead th {
@@ -1470,49 +1561,155 @@
         </button>
       </div>
       <div style="padding:20px var(--page-pad-x)">
-        <div class="admin-note"><i class="ti ti-eye-off"></i> Payment information shown here is private and never appears on the Campers or Weekly Roster pages.</div>
-        <div class="admin-table-wrap">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>Camper</th>
-                <th>Parent</th>
-                <th>Invoice #</th>
-                <th>Total amount</th>
-                <th>Payment method</th>
-                <th style="text-align:center">Paid in full</th>
-                <th>Amount paid</th>
-                <th>Owed</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody id="adminTableBody"></tbody>
-          </table>
+        <div class="admin-tabs">
+          <button class="admin-tab active" data-atab="payments" onclick="showAdminTab('payments',this)"><i class="ti ti-cash"></i> Payments</button>
+          <button class="admin-tab" data-atab="employees" onclick="showAdminTab('employees',this)"><i class="ti ti-id-badge-2"></i> Employees</button>
+          <button class="admin-tab" data-atab="finances" onclick="showAdminTab('finances',this)"><i class="ti ti-report-money"></i> Finances</button>
+        </div>
+
+        <!-- Payments tab -->
+        <div class="admin-tab-panel" id="atab-payments">
+          <div class="admin-note"><i class="ti ti-eye-off"></i> Payment information shown here is private and never appears on the Campers or Weekly Roster pages.</div>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Camper</th>
+                  <th>Parent</th>
+                  <th>Invoice #</th>
+                  <th>Total amount</th>
+                  <th>Payment method</th>
+                  <th style="text-align:center">Paid in full</th>
+                  <th>Amount paid</th>
+                  <th>Owed</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody id="adminTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Employees tab -->
+        <div class="admin-tab-panel" id="atab-employees" style="display:none">
+          <div class="emp-section">
+            <div class="emp-head">
+              <h2 class="emp-h2"><i class="ti ti-id-badge-2"></i> Employees</h2>
+              <button class="btn btn-primary btn-sm" onclick="openAddEmployee()"><i class="ti ti-plus"></i> Add employee</button>
+            </div>
+            <div class="emp-sub">People who can sign in to the site. Deactivating someone blocks their access immediately, even if they still know their password.</div>
+            <div id="empList" class="emp-list"><div class="emp-empty">Loading…</div></div>
+          </div>
+        </div>
+
+        <!-- Finances tab -->
+        <div class="admin-tab-panel" id="atab-finances" style="display:none">
+          <div class="fin-summary" id="finSummary">
+            <div class="fin-card income"><div class="fin-card-label">Income</div><div class="fin-card-val" id="finIncome">$0.00</div></div>
+            <div class="fin-card expense"><div class="fin-card-label">Expenses</div><div class="fin-card-val" id="finExpense">$0.00</div></div>
+            <div class="fin-card net"><div class="fin-card-label">Net</div><div class="fin-card-val" id="finNet">$0.00</div></div>
+          </div>
+          <div class="fin-actions">
+            <button class="btn btn-sm" onclick="openAddTxn('income')"><i class="ti ti-plus"></i> Add income</button>
+            <button class="btn btn-sm" onclick="openAddTxn('expense')"><i class="ti ti-plus"></i> Add expense</button>
+            <select id="finFilter" class="fin-filter" onchange="renderFinances()">
+              <option value="all">All entries</option>
+              <option value="income">Income only</option>
+              <option value="expense">Expenses only</option>
+            </select>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table fin-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Category</th>
+                  <th>Description</th>
+                  <th>Amount</th>
+                  <th>Receipt</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="finTableBody"><tr><td colspan="7" class="fin-empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
   </main>
 
-  <!-- Admin password gate -->
-  <div class="modal-overlay" id="adminGate" onclick="if(event.target===this)closeAdminGate()">
-    <div class="modal" style="max-width:380px">
+  <!-- Add / manage employee -->
+  <div class="modal-overlay" id="empModal" onclick="if(event.target===this)closeEmpModal()">
+    <div class="modal" style="max-width:420px">
       <div class="modal-header">
-        <span class="modal-title"><i class="ti ti-lock" style="margin-right:6px"></i>Admin access</span>
-        <button class="btn btn-ghost btn-icon" onclick="closeAdminGate()" aria-label="Close"><i class="ti ti-x"></i></button>
+        <span class="modal-title"><i class="ti ti-user-plus" style="margin-right:6px"></i>Add employee</span>
+        <button class="btn btn-ghost btn-icon" onclick="closeEmpModal()" aria-label="Close"><i class="ti ti-x"></i></button>
+      </div>
+      <div id="empFormStep">
+        <div class="form-group">
+          <label class="form-label" for="empName">Name</label>
+          <input type="text" id="empName" placeholder="e.g. Jane Smith">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="empEmail">Email</label>
+          <input type="email" id="empEmail" placeholder="name@example.com" autocomplete="off" autocapitalize="none">
+        </div>
+        <div class="emp-error" id="empError" style="display:none"></div>
+        <button class="btn btn-primary" id="empCreateBtn" style="width:100%;justify-content:center" onclick="submitNewEmployee()">
+          <i class="ti ti-user-plus"></i> Create login
+        </button>
+      </div>
+      <div id="empResultStep" style="display:none">
+        <div class="emp-success"><i class="ti ti-circle-check"></i> Login created for <strong id="empResultName"></strong>.</div>
+        <div class="form-label" style="margin-top:10px">Temporary password — give this to them:</div>
+        <div class="emp-pw-box">
+          <code id="empResultPw"></code>
+          <button class="btn btn-ghost btn-icon" onclick="copyEmpPw()" aria-label="Copy password"><i class="ti ti-copy"></i></button>
+        </div>
+        <div class="emp-note">They sign in with their email and this password. They can change it later, and you can send a reset link anytime from the list.</div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px" onclick="closeEmpModal()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add income / expense -->
+  <div class="modal-overlay" id="txnModal" onclick="if(event.target===this)closeTxnModal()">
+    <div class="modal" style="max-width:440px">
+      <div class="modal-header">
+        <span class="modal-title"><i class="ti ti-report-money" style="margin-right:6px"></i><span id="txnModalTitle">Add entry</span></span>
+        <button class="btn btn-ghost btn-icon" onclick="closeTxnModal()" aria-label="Close"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label class="form-label" for="txnDate">Date</label>
+          <input type="date" id="txnDate">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label class="form-label" for="txnAmount">Amount ($)</label>
+          <input type="number" id="txnAmount" placeholder="0.00" step="0.01" min="0" inputmode="decimal">
+        </div>
       </div>
       <div class="form-group">
-        <label class="form-label" for="adminPass">Enter password to view payment information</label>
-        <input type="password" id="adminPass" placeholder="Password" style="margin-bottom:4px"
-               onkeydown="if(event.key==='Enter')submitAdminPass()">
+        <label class="form-label" for="txnCategory">Category</label>
+        <select id="txnCategory"></select>
       </div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="submitAdminPass()">
-        <i class="ti ti-lock-open"></i> Unlock
+      <div class="form-group">
+        <label class="form-label" for="txnDesc">Description <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
+        <input type="text" id="txnDesc" placeholder="e.g. Craft supplies from Michaels">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Receipt <span style="color:var(--text-3);font-weight:400">(optional — photo or PDF)</span></label>
+        <input type="file" id="txnReceipt" accept="image/*,application/pdf" onchange="onReceiptPick()">
+        <div class="txn-receipt-hint" id="txnReceiptHint" style="display:none"></div>
+      </div>
+      <div class="emp-error" id="txnError" style="display:none"></div>
+      <button class="btn btn-primary" id="txnSaveBtn" style="width:100%;justify-content:center" onclick="submitTxn()">
+        <i class="ti ti-check"></i> Save entry
       </button>
     </div>
   </div>
 
-  <!-- Import past invoice PDF -->
-  <div class="modal-overlay" id="invImportOverlay" onclick="if(event.target===this)closeInvoiceImport()">
     <div class="modal" style="max-width:520px">
       <div class="modal-header">
         <span class="modal-title">Import invoice PDF</span>
@@ -1792,6 +1989,12 @@
       <div id="weekFixedLabel" style="font-weight:600;font-size:14px;color:var(--text)"></div>
     </div>
 
+    <!-- Single-week picker (adding one new week to an existing camper) -->
+    <div class="form-group" id="weekAddGroup" style="display:none">
+      <label class="form-label">Which week?</label>
+      <select id="fWeekAdd" style="width:100%"></select>
+    </div>
+
     <input type="hidden" id="fWeekStart">
 
     <div class="form-group" id="dayPickerGroup" style="display:none">
@@ -1866,13 +2069,15 @@
 
 <!-- Firebase -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getFirestore, collection, onSnapshot,
-  addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDoc
+  getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, onSnapshot,
+  addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDoc, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
+  createUserWithEmailAndPassword, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -1886,7 +2091,18 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Persistent on-disk cache: repeat visits render campers instantly from the
+// local cache while syncing fresh data in the background. Falls back to the
+// default in-memory client if the browser blocks IndexedDB (e.g. private mode).
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+} catch (e) {
+  console.warn('Persistent cache unavailable, using default client:', e);
+  db = getFirestore(app);
+}
 
 // Expose db operations to global scope
 window._db = db;
@@ -1905,6 +2121,59 @@ window._auth = auth;
 window._authSignIn  = (email, pw) => signInWithEmailAndPassword(auth, email, pw);
 window._authSignOut = () => signOut(auth);
 
+// ── Employee management (admin only) ────────────────────────────
+// Create an employee login. We spin up a throwaway *secondary* Firebase app
+// so creating the account doesn't replace the admin's own signed-in session
+// (createUserWithEmailAndPassword would otherwise log the admin out and in as
+// the new user). The user-role document is written via the PRIMARY db, where
+// the admin is authenticated, so the locked security rules permit it.
+window._createEmployee = async function(name, email, password) {
+  const secondary = initializeApp(firebaseConfig, 'secondary_' + Date.now());
+  try {
+    const secAuth = getAuth(secondary);
+    const cred = await createUserWithEmailAndPassword(secAuth, email, password);
+    const uid = cred.user.uid;
+    await setDoc(doc(db, 'users', uid), {
+      email: email,
+      name: name,
+      role: 'employee',
+      active: true,
+      createdAt: serverTimestamp()
+    });
+    try { await signOut(secAuth); } catch (e) {}
+    return { uid: uid };
+  } finally {
+    try { await deleteApp(secondary); } catch (e) {}
+  }
+};
+
+// Send an employee a password-reset email (they set their own new password;
+// the old one stops working once they complete it).
+window._sendReset = (email) => sendPasswordResetEmail(auth, email);
+
+// Set an employee's active flag (deactivate / reactivate access instantly).
+window._setEmployeeActive = (uid, active) =>
+  updateDoc(doc(db, 'users', uid), { active: active });
+
+// Permanently remove an employee's access record.
+window._removeEmployee = (uid) => deleteDoc(doc(db, 'users', uid));
+
+// Fetch all user/role records (admin-only read per the security rules).
+window._fetchUsers = async function() {
+  const snap = await getDocs(collection(db, 'users'));
+  const out = [];
+  snap.forEach(d => out.push({ id: d.id, ...d.data() }));
+  return out;
+};
+
+// Fetch all finance entries (admin-only read per the security rules).
+window._fetchFinances = async function() {
+  const snap = await getDocs(collection(db, 'finances'));
+  const out = [];
+  snap.forEach(d => out.push({ id: d.id, ...d.data() }));
+  return out;
+};
+
 const campersRef  = collection(db, "campers");
 const adminRef    = collection(db, "admin");
 const settingsRef = doc(db, "settings", "jotform");
@@ -1917,23 +2186,30 @@ let _unsubscribers = [];
 function startDataListeners() {
   if (_unsubscribers.length) return; // already running
 
-  // Admin / payment records (small docs, safe to stream)
-  _unsubscribers.push(onSnapshot(adminRef, (snap) => {
-    window.adminData = new Map();
-    snap.forEach(d => window.adminData.set(d.id, { id: d.id, ...d.data() }));
-    if (typeof window.renderAdmin === 'function' &&
-        document.getElementById('page-admin') &&
-        document.getElementById('page-admin').classList.contains('active')) {
-      window.renderAdmin();
-    }
-  }, (err) => console.error('admin snapshot error', err)));
+  const isAdmin = (window._userRole === 'admin');
 
-  // Persisted app settings (e.g. JotForm credentials)
-  _unsubscribers.push(onSnapshot(settingsRef, (snap) => {
-    window.jotformConfig = snap.exists() ? snap.data() : {};
-    window._jfConfigLoaded = true;
-    if (typeof window.onJotformConfigLoaded === 'function') window.onJotformConfigLoaded();
-  }, (err) => console.error('settings snapshot error', err)));
+  // Admin-only collections (payments + settings) — only subscribe for admins.
+  // The locked security rules forbid employees from reading these, so
+  // subscribing them would only produce permission-denied errors.
+  if (isAdmin) {
+    // Admin / payment records (small docs, safe to stream)
+    _unsubscribers.push(onSnapshot(adminRef, (snap) => {
+      window.adminData = new Map();
+      snap.forEach(d => window.adminData.set(d.id, { id: d.id, ...d.data() }));
+      if (typeof window.renderAdmin === 'function' &&
+          document.getElementById('page-admin') &&
+          document.getElementById('page-admin').classList.contains('active')) {
+        window.renderAdmin();
+      }
+    }, (err) => console.error('admin snapshot error', err)));
+
+    // Persisted app settings (e.g. JotForm credentials)
+    _unsubscribers.push(onSnapshot(settingsRef, (snap) => {
+      window.jotformConfig = snap.exists() ? snap.data() : {};
+      window._jfConfigLoaded = true;
+      if (typeof window.onJotformConfigLoaded === 'function') window.onJotformConfigLoaded();
+    }, (err) => console.error('settings snapshot error', err)));
+  }
 
   // Campers roster
   _unsubscribers.push(onSnapshot(campersRef, (snapshot) => {
@@ -1963,6 +2239,8 @@ function startDataListeners() {
 function stopDataListeners() {
   _unsubscribers.forEach(unsub => { try { unsub(); } catch (e) {} });
   _unsubscribers = [];
+  // Also halt the JotForm auto-poll so it can't keep running after sign-out.
+  if (typeof window.stopJotformAutoPoll === 'function') window.stopJotformAutoPoll();
 }
 
 // Decide what to show based on auth state. Runs on load and on every
@@ -2032,9 +2310,6 @@ let weeklySQ = '';   // search
 let weeklyTF = 'all';
 
 // ── Admin page ──
-// Password to view the Admin page. Change this value to set your own password.
-const ADMIN_PASSWORD = 'ladybugs2026';
-let adminUnlocked = false;
 let adminSQ = ''; // admin search
 
 // ── Navigation ──
@@ -2052,31 +2327,14 @@ function showPage(id, btn) {
   if (id === 'admin') renderAdmin();
 }
 
-// Admin page is restricted to admins, and password protected on top of that
+// Admin page is restricted to admins via their signed-in role. The login
+// itself is the gate, so no separate admin password is needed.
 function requestAdmin(btn) {
   if (window._userRole && window._userRole !== 'admin') {
     showToast('Admin access is restricted to administrators', 'error');
     return;
   }
-  if (adminUnlocked) { showPage('admin', btn); return; }
-  document.getElementById('adminGate').classList.add('open');
-  setTimeout(() => { const p = document.getElementById('adminPass'); if (p) p.focus(); }, 50);
-}
-function submitAdminPass() {
-  const input = document.getElementById('adminPass');
-  if (input.value === ADMIN_PASSWORD) {
-    adminUnlocked = true;
-    input.value = '';
-    document.getElementById('adminGate').classList.remove('open');
-    showPage('admin');
-  } else {
-    showToast('Incorrect password', 'error');
-    input.select();
-  }
-}
-function closeAdminGate() {
-  document.getElementById('adminGate').classList.remove('open');
-  document.getElementById('adminPass').value = '';
+  showPage('admin', btn);
 }
 
 // ── Login / authentication UI ──
@@ -2163,10 +2421,414 @@ async function doSignIn(event) {
 }
 
 async function doSignOut() {
-  // Reset admin gate so it re-locks next session
-  adminUnlocked = false;
   try { await window._authSignOut(); } catch (e) { console.error(e); }
   // onAuthStateChanged shows the login screen
+}
+
+// ── Employees management ──
+let _employees = [];
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+// Generate a friendly-but-random temporary password (avoids ambiguous
+// characters like O/0/I/l, always includes letters and at least 2 digits).
+function genPassword() {
+  const letters = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+  const digits = '23456789';
+  let pw = '';
+  for (let i = 0; i < 8; i++) pw += letters[Math.floor(Math.random() * letters.length)];
+  for (let i = 0; i < 3; i++) pw += digits[Math.floor(Math.random() * digits.length)];
+  // shuffle so digits aren't always trailing
+  return pw.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+async function renderEmployees() {
+  const list = document.getElementById('empList');
+  if (!list) return;
+  if (window._userRole !== 'admin') { list.innerHTML = ''; return; }
+  list.innerHTML = '<div class="emp-empty">Loading…</div>';
+  try {
+    const users = await window._fetchUsers();
+    // Sort: active first, then by name
+    users.sort((a, b) => {
+      const aa = a.active === false ? 1 : 0, bb = b.active === false ? 1 : 0;
+      if (aa !== bb) return aa - bb;
+      return (a.name || a.email || '').localeCompare(b.name || b.email || '');
+    });
+    _employees = users;
+    if (!users.length) { list.innerHTML = '<div class="emp-empty">No one yet. Add your first employee above.</div>'; return; }
+    const myUid = (window._auth && window._auth.currentUser) ? window._auth.currentUser.uid : null;
+    list.innerHTML = users.map(u => {
+      const isAdmin = (String(u.role || '').trim().toLowerCase() === 'admin');
+      const isMe = (u.id === myUid);
+      const inactive = u.active === false;
+      let badges = '';
+      if (isAdmin) badges += '<span class="emp-badge admin">Admin</span>';
+      if (isMe) badges += '<span class="emp-badge you">You</span>';
+      badges += inactive ? '<span class="emp-badge off">Deactivated</span>'
+                         : '<span class="emp-badge active">Active</span>';
+      // Actions: admins and yourself get no destructive controls from here
+      let actions = '';
+      if (!isAdmin && !isMe) {
+        actions += `<button class="btn btn-ghost btn-icon" title="Send password reset email" onclick="resetEmpPassword('${escapeHtml(u.id)}')"><i class="ti ti-mail"></i></button>`;
+        if (inactive) {
+          actions += `<button class="btn btn-ghost btn-icon" title="Reactivate access" onclick="toggleEmpActive('${escapeHtml(u.id)}',true)"><i class="ti ti-user-check"></i></button>`;
+          actions += `<button class="btn btn-ghost btn-icon" title="Remove permanently" onclick="removeEmp('${escapeHtml(u.id)}')"><i class="ti ti-trash"></i></button>`;
+        } else {
+          actions += `<button class="btn btn-ghost btn-icon" title="Deactivate access" onclick="toggleEmpActive('${escapeHtml(u.id)}',false)"><i class="ti ti-user-off"></i></button>`;
+        }
+      }
+      return `<div class="emp-row ${inactive ? 'inactive' : ''}">
+        <div class="emp-info">
+          <div class="emp-name">${escapeHtml(u.name || '(no name)')} ${badges}</div>
+          <div class="emp-email">${escapeHtml(u.email || '')}</div>
+        </div>
+        <div class="emp-actions">${actions}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    console.error(e);
+    list.innerHTML = '<div class="emp-empty">Could not load employees: ' + escapeHtml(e.code || e.message || 'error') + '</div>';
+  }
+}
+
+function openAddEmployee() {
+  document.getElementById('empFormStep').style.display = '';
+  document.getElementById('empResultStep').style.display = 'none';
+  document.getElementById('empName').value = '';
+  document.getElementById('empEmail').value = '';
+  const err = document.getElementById('empError'); err.style.display = 'none'; err.textContent = '';
+  const btn = document.getElementById('empCreateBtn'); btn.disabled = false; btn.innerHTML = '<i class="ti ti-user-plus"></i> Create login';
+  document.getElementById('empModal').classList.add('open');
+  setTimeout(() => document.getElementById('empName').focus(), 60);
+}
+
+function closeEmpModal() {
+  document.getElementById('empModal').classList.remove('open');
+}
+
+function empShowError(msg) {
+  const err = document.getElementById('empError');
+  err.textContent = msg; err.style.display = '';
+}
+
+async function submitNewEmployee() {
+  const name = document.getElementById('empName').value.trim();
+  const email = document.getElementById('empEmail').value.trim();
+  const btn = document.getElementById('empCreateBtn');
+  const err = document.getElementById('empError'); err.style.display = 'none';
+  if (!name) { empShowError('Please enter a name.'); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { empShowError('Please enter a valid email address.'); return; }
+  // Guard against an email that already has a login
+  if (_employees.some(u => (u.email || '').toLowerCase() === email.toLowerCase())) {
+    empShowError('Someone with that email already has a login.'); return;
+  }
+  const password = genPassword();
+  btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Creating…';
+  try {
+    await window._createEmployee(name, email, password);
+    // Show the generated password
+    document.getElementById('empResultName').textContent = name;
+    document.getElementById('empResultPw').textContent = password;
+    document.getElementById('empFormStep').style.display = 'none';
+    document.getElementById('empResultStep').style.display = '';
+    renderEmployees();
+  } catch (e) {
+    const code = e.code || '';
+    let msg = 'Could not create the login. Please try again.';
+    if (code === 'auth/email-already-in-use') msg = 'That email already has a login.';
+    else if (code === 'auth/invalid-email') msg = 'That email address looks invalid.';
+    else if (code === 'auth/weak-password') msg = 'Generated password was rejected — please try again.';
+    else if (code === 'permission-denied') msg = 'You don\'t have permission to add employees.';
+    else if (e.message) msg = e.message;
+    empShowError(msg);
+    btn.disabled = false; btn.innerHTML = '<i class="ti ti-user-plus"></i> Create login';
+  }
+}
+
+function copyEmpPw() {
+  const pw = document.getElementById('empResultPw').textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(pw).then(() => showToast('Password copied')).catch(() => showToast('Copy failed — select it manually', 'error'));
+  } else {
+    showToast('Select the password to copy it', 'error');
+  }
+}
+
+async function resetEmpPassword(uid) {
+  const u = _employees.find(x => x.id === uid);
+  if (!u) return;
+  if (!confirm(`Send a password reset email to ${u.name || u.email}?\n\nThey'll get a link at ${u.email} to set a new password. Their current password keeps working until they do.`)) return;
+  try {
+    await window._sendReset(u.email);
+    showToast('Reset email sent to ' + u.email);
+  } catch (e) {
+    showToast('Could not send reset: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+
+async function toggleEmpActive(uid, active) {
+  const u = _employees.find(x => x.id === uid);
+  if (!u) return;
+  const verb = active ? 'Reactivate' : 'Deactivate';
+  const note = active ? 'They will be able to sign in again.' : 'They will be signed out and blocked from signing in, even with their password.';
+  if (!confirm(`${verb} access for ${u.name || u.email}?\n\n${note}`)) return;
+  try {
+    await window._setEmployeeActive(uid, active);
+    showToast(active ? 'Access reactivated' : 'Access deactivated');
+    renderEmployees();
+  } catch (e) {
+    showToast('Could not update: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+
+async function removeEmp(uid) {
+  const u = _employees.find(x => x.id === uid);
+  if (!u) return;
+  if (!confirm(`Permanently remove ${u.name || u.email} from the employee list?\n\nThis blocks their access. (Their sign-in record stays in Firebase Authentication, but it can no longer be used to reach the site.)`)) return;
+  try {
+    await window._removeEmployee(uid);
+    showToast('Employee removed');
+    renderEmployees();
+  } catch (e) {
+    showToast('Could not remove: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+
+// ── Admin tabs ──
+function showAdminTab(name, btn) {
+  ['payments', 'employees', 'finances'].forEach(t => {
+    const panel = document.getElementById('atab-' + t);
+    if (panel) panel.style.display = (t === name) ? '' : 'none';
+  });
+  document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  else { const b = document.querySelector('.admin-tab[data-atab="' + name + '"]'); if (b) b.classList.add('active'); }
+  if (name === 'employees') renderEmployees();
+  if (name === 'finances') renderFinances();
+}
+
+// ── Finances ──
+const FIN_CATEGORIES = {
+  income: ['Registration fees', 'Deposits', 'Donations', 'Grants', 'Other income'],
+  expense: ['Supplies', 'Staff wages', 'Food & snacks', 'Facility / rent', 'Equipment', 'Insurance', 'Marketing', 'Transportation', 'Other expense']
+};
+let _finances = [];
+let _txnType = 'expense';
+let _txnReceipt = null; // { dataUri, name } staged for the entry being added
+
+function finMoney(n) {
+  const v = Number(n || 0);
+  return '$' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function fmtFinDate(d) {
+  // d is 'YYYY-MM-DD'; render as e.g. "Jul 15, 2026" without timezone drift
+  if (!d) return '';
+  const parts = String(d).split('-');
+  if (parts.length !== 3) return d;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const mi = parseInt(parts[1], 10) - 1;
+  return (months[mi] || '?') + ' ' + parseInt(parts[2], 10) + ', ' + parts[0];
+}
+
+async function renderFinances() {
+  const body = document.getElementById('finTableBody');
+  if (!body) return;
+  if (window._userRole !== 'admin') { body.innerHTML = ''; return; }
+  body.innerHTML = '<tr><td colspan="7" class="fin-empty">Loading…</td></tr>';
+  try {
+    const items = await window._fetchFinances();
+    items.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    _finances = items;
+
+    // Totals (always over ALL entries, regardless of filter)
+    let inc = 0, exp = 0;
+    items.forEach(t => { if (t.type === 'income') inc += Number(t.amount || 0); else exp += Number(t.amount || 0); });
+    const net = inc - exp;
+    document.getElementById('finIncome').textContent = finMoney(inc);
+    document.getElementById('finExpense').textContent = finMoney(exp);
+    document.getElementById('finNet').textContent = finMoney(net);
+    document.getElementById('finSummary').querySelector('.fin-card.net').classList.toggle('negative', net < 0);
+
+    const filter = (document.getElementById('finFilter') || {}).value || 'all';
+    const shown = items.filter(t => filter === 'all' || t.type === filter);
+    if (!shown.length) {
+      body.innerHTML = '<tr><td colspan="7" class="fin-empty">No entries yet. Use “Add income” or “Add expense” above.</td></tr>';
+      return;
+    }
+    body.innerHTML = shown.map(t => {
+      const receipt = t.hasReceipt
+        ? `<span class="fin-receipt-link" onclick="viewReceipt('${escapeHtml(t.id)}')"><i class="ti ti-paperclip"></i> View</span>`
+        : '<span style="color:var(--text-3)">—</span>';
+      return `<tr>
+        <td>${escapeHtml(fmtFinDate(t.date))}</td>
+        <td><span class="fin-type ${t.type}">${t.type === 'income' ? 'Income' : 'Expense'}</span></td>
+        <td>${escapeHtml(t.category || '')}</td>
+        <td>${escapeHtml(t.description || '')}</td>
+        <td class="fin-amt ${t.type}">${t.type === 'expense' ? '−' : ''}${finMoney(t.amount)}</td>
+        <td>${receipt}</td>
+        <td style="text-align:right"><button class="btn btn-ghost btn-icon" title="Delete entry" onclick="deleteTxn('${escapeHtml(t.id)}')"><i class="ti ti-trash"></i></button></td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    console.error(e);
+    body.innerHTML = '<tr><td colspan="7" class="fin-empty">Could not load finances: ' + escapeHtml(e.code || e.message || 'error') + '</td></tr>';
+  }
+}
+
+function openAddTxn(type) {
+  _txnType = (type === 'income') ? 'income' : 'expense';
+  _txnReceipt = null;
+  document.getElementById('txnModalTitle').textContent = (_txnType === 'income') ? 'Add income' : 'Add expense';
+  const sel = document.getElementById('txnCategory');
+  sel.innerHTML = FIN_CATEGORIES[_txnType].map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  // default date = today (local)
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  document.getElementById('txnDate').value = local;
+  document.getElementById('txnAmount').value = '';
+  document.getElementById('txnDesc').value = '';
+  const rc = document.getElementById('txnReceipt'); if (rc) rc.value = '';
+  const hint = document.getElementById('txnReceiptHint'); hint.style.display = 'none'; hint.textContent = '';
+  const err = document.getElementById('txnError'); err.style.display = 'none'; err.textContent = '';
+  const btn = document.getElementById('txnSaveBtn'); btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Save entry';
+  document.getElementById('txnModal').classList.add('open');
+  setTimeout(() => document.getElementById('txnAmount').focus(), 60);
+}
+
+function closeTxnModal() {
+  document.getElementById('txnModal').classList.remove('open');
+  _txnReceipt = null;
+}
+
+function onReceiptPick() {
+  const f = document.getElementById('txnReceipt').files[0];
+  const hint = document.getElementById('txnReceiptHint');
+  if (!f) { hint.style.display = 'none'; return; }
+  const kb = Math.round(f.size / 1024);
+  hint.textContent = f.name + ' (' + (kb > 1024 ? (kb/1024).toFixed(1) + ' MB' : kb + ' KB') + ')'
+    + (f.type.startsWith('image/') ? ' — will be compressed automatically' : '');
+  hint.style.display = '';
+}
+
+// Compress an image file to a JPEG data URI under ~850 KB.
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read the image.'));
+    reader.onload = ev => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Could not load the image.'));
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        const maxDim = 1500;
+        if (w > maxDim || h > maxDim) {
+          if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        let q = 0.7, uri = canvas.toDataURL('image/jpeg', q);
+        while (uri.length > 850000 && q > 0.3) { q -= 0.15; uri = canvas.toDataURL('image/jpeg', q); }
+        resolve(uri);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function fileToReceipt(file) {
+  const MAX = 950000; // ~950 KB of data-URI text (under Firestore's 1 MB doc cap)
+  if (file.type && file.type.indexOf('image/') === 0) {
+    const dataUri = await compressImage(file);
+    if (dataUri.length > MAX) throw new Error('That image is too large even after compression — try a smaller photo.');
+    return { dataUri, name: file.name };
+  }
+  const dataUri = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error('Could not read the file.'));
+    r.onload = e => resolve(e.target.result);
+    r.readAsDataURL(file);
+  });
+  if (dataUri.length > MAX) throw new Error('That PDF is too large (over ~700 KB). Use a smaller file, or snap a photo of the receipt instead.');
+  return { dataUri, name: file.name };
+}
+
+async function submitTxn() {
+  const dateV = document.getElementById('txnDate').value;
+  const amountV = parseFloat(document.getElementById('txnAmount').value);
+  const category = document.getElementById('txnCategory').value;
+  const desc = document.getElementById('txnDesc').value.trim();
+  const fileEl = document.getElementById('txnReceipt');
+  const err = document.getElementById('txnError'); err.style.display = 'none';
+  const btn = document.getElementById('txnSaveBtn');
+  function fail(m) { err.textContent = m; err.style.display = ''; }
+  if (!dateV) { fail('Please choose a date.'); return; }
+  if (!(amountV > 0)) { fail('Please enter an amount greater than zero.'); return; }
+  if (!category) { fail('Please choose a category.'); return; }
+
+  btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Saving…';
+  try {
+    let receipt = null;
+    if (fileEl && fileEl.files && fileEl.files[0]) {
+      receipt = await fileToReceipt(fileEl.files[0]);
+    }
+    const data = {
+      type: _txnType,
+      date: dateV,
+      amount: Math.round(amountV * 100) / 100,
+      category: category,
+      description: desc,
+      hasReceipt: !!receipt,
+      receiptName: receipt ? receipt.name : null,
+      createdAt: window._serverTimestamp(),
+      createdBy: window._userEmail || ''
+    };
+    const ref = await window._addDoc(window._collection(window._db, 'finances'), data);
+    if (receipt) {
+      await window._setDoc(window._doc(window._db, 'receipts', ref.id), { dataUri: receipt.dataUri, name: receipt.name });
+    }
+    showToast((_txnType === 'income' ? 'Income' : 'Expense') + ' added');
+    closeTxnModal();
+    renderFinances();
+  } catch (e) {
+    console.error(e);
+    fail(e.message || (e.code || 'Could not save — please try again.'));
+    btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Save entry';
+  }
+}
+
+async function viewReceipt(id) {
+  try {
+    const snap = await window._getDoc(window._doc(window._db, 'receipts', id));
+    if (!snap.exists()) { showToast('Receipt not found', 'error'); return; }
+    const blob = dataUriToBlob(snap.data().dataUri);
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    showToast('Could not open receipt: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+
+async function deleteTxn(id) {
+  const t = _finances.find(x => x.id === id);
+  if (!t) return;
+  if (!confirm(`Delete this ${t.type} entry of ${finMoney(t.amount)} (${t.category})?\n\nThis can't be undone.`)) return;
+  try {
+    await window._deleteDoc(window._doc(window._db, 'finances', id));
+    if (t.hasReceipt) { try { await window._deleteDoc(window._doc(window._db, 'receipts', id)); } catch (e) {} }
+    showToast('Entry deleted');
+    renderFinances();
+  } catch (e) {
+    showToast('Could not delete: ' + (e.code || e.message || 'error'), 'error');
+  }
 }
 
 // ── Toast ──
@@ -2233,7 +2895,18 @@ function weekLabel(weekStart) {
 function camperKey(c) {
   return (c.first||'').toLowerCase().trim() + '|' + (c.last||'').toLowerCase().trim();
 }
+// Memoized per campers-array reference. The campers snapshot replaces
+// window.campers with a fresh array on every change, so a reference check
+// auto-invalidates the cache exactly when the data changes — while letting
+// the several renders in one cycle (stats, roster, calendar, weekly) reuse
+// one grouping pass instead of regrouping the whole roster each time.
+let _grpCacheRef = null;
+let _grpCache = {};
 function groupCampers(includeRefunded = false) {
+  if (_grpCacheRef !== window.campers) { _grpCache = {}; _grpCacheRef = window.campers; }
+  const ck = includeRefunded ? 'T' : 'F';
+  if (_grpCache[ck]) return _grpCache[ck];
+
   const groups = new Map();
   window.campers.forEach(c => {
     if (!includeRefunded && c.refunded === true) return;
@@ -2244,7 +2917,9 @@ function groupCampers(includeRefunded = false) {
     }
     groups.get(k).registrations.push(c);
   });
-  return [...groups.values()].sort((a,b) => (a.last||'').localeCompare(b.last||''));
+  const result = [...groups.values()].sort((a,b) => (a.last||'').localeCompare(b.last||''));
+  _grpCache[ck] = result;
+  return result;
 }
 
 // ── Stats ──
@@ -2645,8 +3320,8 @@ function openDetail(key) {
     ${c.allergies?`<div class="allergy-alert"><i class="ti ti-alert-triangle"></i><strong>Allergy:</strong> ${esc(c.allergies)}</div>`:''}
     ${c.refunded?`<div class="refund-banner"><i class="ti ti-receipt-refund"></i> This camper has been marked as refunded and is hidden from the roster.</div>`:''}
     <div style="display:flex;gap:8px;margin-top:14px">
-      <button class="btn" style="flex:1;justify-content:center" onclick="closeDetail();openModal('${c.id}','edit')">
-        <i class="ti ti-edit"></i> Edit camper${regs.length>1?` (${regs.length} wks)`:''}
+      <button class="btn" style="flex:1;justify-content:center" onclick="closeDetail();openModal('${c.id}','personal')">
+        <i class="ti ti-edit"></i> Edit details
       </button>
       <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openInvoice('${c.id}')">
         <i class="ti ti-file-invoice"></i> Print invoice
@@ -2672,7 +3347,10 @@ function openDetail(key) {
     </div>
 
     <div class="detail-section">
-      <div class="detail-section-title">Weeks &amp; schedule</div>
+      <div class="detail-section-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <span>Weeks &amp; schedule</span>
+        <button class="btn btn-sm btn-ghost" onclick="closeDetail();openModal('${c.id}','addweek')"><i class="ti ti-plus"></i> Add a week</button>
+      </div>
       ${regs.map(r => {
         const campDayNames = (r.campDays||[]).map(d=>DN[d]).join(', ') || 'None';
         const preDayNames  = (r.preDays||[]).map(d=>DN[d]).join(', ') || 'None';
@@ -2793,11 +3471,11 @@ function openModal(id=null, mode='full') {
     personalTop.style.display = '';
     personalBottom.style.display = '';
     scheduleSection.style.display = 'none';
-  } else if (mode === 'schedule') {
+  } else if (mode === 'schedule' || mode === 'addweek') {
     personalTop.style.display = 'none';
     personalBottom.style.display = 'none';
     scheduleSection.style.display = '';
-  } else { // full (new) or edit (existing) — show everything
+  } else { // full (new camper) — show everything
     personalTop.style.display = '';
     personalBottom.style.display = '';
     scheduleSection.style.display = '';
@@ -2805,21 +3483,24 @@ function openModal(id=null, mode='full') {
 
   // Title + delete button
   let title = 'Add camper';
-  if (mode === 'personal') title = 'Edit personal info';
+  if (mode === 'personal') title = 'Edit camper details';
   else if (mode === 'schedule') title = c ? weekLabel(c.weekStart) : 'Edit week';
-  else if (mode === 'edit') title = 'Edit camper';
-  else if (c) title = 'Edit camper';
+  else if (mode === 'addweek') title = 'Add a week';
   document.getElementById('modalTitle').textContent = title;
-  // Delete button: shows for schedule (one week) and edit (whole camper)
-  document.getElementById('deleteBtn').style.display = (c && (mode === 'schedule' || mode === 'edit')) ? 'flex' : 'none';
+  // Delete button: shows for schedule (one week) and personal (whole camper)
+  document.getElementById('deleteBtn').style.display = (c && (mode === 'schedule' || mode === 'personal')) ? 'flex' : 'none';
 
-  // Sync note: when editing a camper across multiple weeks
+  // Sync note
   const syncNote = document.getElementById('syncNote');
-  if (c && (mode === 'personal' || mode === 'edit')) {
+  if (c && mode === 'personal') {
     const sibCount = window.campers.filter(x => camperKey(x) === camperKey(c)).length;
     document.getElementById('syncNoteText').textContent = sibCount > 1
-      ? `${c.first}'s personal info is shared across all ${sibCount} weeks. Toggle weeks below to add or remove registrations.`
-      : `Edit ${c.first}'s details and registered weeks below.`;
+      ? `${c.first}'s details are shared across all ${sibCount} registered weeks — changes here apply to every week. To change which weeks or days, use each week's own Edit button or “Add a week”.`
+      : `Edit ${c.first}'s details. To change the week or days, use the week's own Edit button.`;
+    syncNote.style.display = 'flex';
+  } else if (c && mode === 'addweek') {
+    document.getElementById('syncNoteText').textContent =
+      `Add another week for ${c.first}. Their contact and medical details carry over automatically.`;
     syncNote.style.display = 'flex';
   } else {
     syncNote.style.display = 'none';
@@ -2838,43 +3519,55 @@ function openModal(id=null, mode='full') {
   document.getElementById('fNotes').value = c?.notes||'';
   document.getElementById('fWeekStart').value = c?.weekStart || '';
   cType = c?.type||'weekly';
+  // When adding a brand-new week, always start fresh as a full Weekly week
+  // (the representative registration's days shouldn't carry over).
+  if (mode === 'addweek') cType = 'weekly';
   selType(cType);
 
-  // ── Week selection UI: multi-select buttons (new/edit) vs fixed week (schedule) ──
+  // ── Week selection UI: multi-select (new), fixed (one week), or single dropdown (add a week) ──
   const weekSelGroup = document.getElementById('weekSelectGroup');
   const weekFixedGroup = document.getElementById('weekFixedGroup');
+  const weekAddGroup = document.getElementById('weekAddGroup');
   modalSelectedWeeks = new Set();
   if (mode === 'schedule') {
     // Editing one existing week — show its label, hide the multi-select grid
     weekSelGroup.style.display = 'none';
     weekFixedGroup.style.display = '';
+    weekAddGroup.style.display = 'none';
     document.getElementById('weekFixedLabel').textContent = c ? weekLabel(c.weekStart) : '';
-  } else if (mode === 'edit') {
-    // Editing existing camper — show week buttons with their current weeks pre-selected
-    weekSelGroup.style.display = '';
+  } else if (mode === 'addweek') {
+    // Adding a new week — single-week dropdown of weeks not already registered
+    weekSelGroup.style.display = 'none';
     weekFixedGroup.style.display = 'none';
-    populateModalWeeks();
+    weekAddGroup.style.display = '';
     const key = camperKey(c);
-    window.campers.filter(x => camperKey(x) === key).forEach(x => modalSelectedWeeks.add(x.weekStart));
-    document.querySelectorAll('#modalWeekButtons .modal-week-btn').forEach(b => {
-      b.classList.toggle('active', modalSelectedWeeks.has(b.dataset.weekStart));
+    const taken = new Set(window.campers.filter(x => camperKey(x) === key).map(x => x.weekStart));
+    const sel = document.getElementById('fWeekAdd');
+    sel.innerHTML = '';
+    WEEKS.filter(wk => !taken.has(wk.start)).forEach(wk => {
+      const o = document.createElement('option');
+      o.value = wk.start; o.textContent = wk.label;
+      sel.appendChild(o);
     });
   } else if (mode === 'full') {
     // New camper — show the multi-select week buttons, nothing pre-selected
     weekSelGroup.style.display = '';
     weekFixedGroup.style.display = 'none';
+    weekAddGroup.style.display = 'none';
     populateModalWeeks();
   } else {
     // personal mode — schedule section hidden anyway
     weekSelGroup.style.display = 'none';
     weekFixedGroup.style.display = 'none';
+    weekAddGroup.style.display = 'none';
   }
 
   document.querySelectorAll('#dayGrid .day-sel').forEach(el => {
-    el.classList.toggle('sel', c ? c.campDays?.includes(+el.dataset.d) : +el.dataset.d===0);
+    if (mode === 'addweek') el.classList.add('sel'); // fresh full week as starting point
+    else el.classList.toggle('sel', c ? c.campDays?.includes(+el.dataset.d) : +el.dataset.d===0);
   });
-  document.querySelectorAll('.care-day.pre').forEach(el => el.classList.toggle('sel', c?.preDays?.includes(+el.dataset.d)||false));
-  document.querySelectorAll('.care-day.post').forEach(el => el.classList.toggle('sel', c?.postDays?.includes(+el.dataset.d)||false));
+  document.querySelectorAll('.care-day.pre').forEach(el => el.classList.toggle('sel', mode!=='addweek' && (c?.preDays?.includes(+el.dataset.d)||false)));
+  document.querySelectorAll('.care-day.post').forEach(el => el.classList.toggle('sel', mode!=='addweek' && (c?.postDays?.includes(+el.dataset.d)||false)));
   syncCare();
   // New fields
   document.getElementById('fParent2').value = c?.parent2||'';
@@ -2958,34 +3651,30 @@ async function saveCamper() {
         updatedAt: window._serverTimestamp()
       });
       showToast('Week schedule updated!');
-    } else if (modalMode === 'edit') {
-      // ── Edit existing camper: sync personal info + add/remove weeks + set schedule ──
-      if(!first||!last) { showToast("Please enter the camper's name.", 'error'); return; }
-      const weeks = [...modalSelectedWeeks];
-      if(!weeks.length) { showToast('Please select at least one week.', 'error'); return; }
+    } else if (modalMode === 'addweek') {
+      // ── Add one new week to an existing camper (personal info copied over) ──
       const editing = window.campers.find(x => x.id === editingId);
-      const key = editing ? camperKey(editing) : (first.toLowerCase()+'|'+last.toLowerCase());
-      const existing = window.campers.filter(x => camperKey(x) === key);
-      const byWeek = new Map(existing.map(x => [x.weekStart, x]));
-      const ops = [];
-      // Update existing weeks that are still selected; create newly selected weeks
-      for (const ws of weeks) {
-        const data = { ...sharedData, type: cType, weekStart: ws, campDays, preDays, postDays };
-        if (byWeek.has(ws)) {
-          ops.push(window._updateDoc(window._doc(window._db, 'campers', byWeek.get(ws).id), data));
-        } else {
-          ops.push(window._addDoc(window._collection(window._db, 'campers'),
-            { ...data, createdAt: window._serverTimestamp() }));
-        }
+      if (!editing) { showToast('Camper not found.', 'error'); return; }
+      const ws = document.getElementById('fWeekAdd').value;
+      if (!ws) { showToast('This camper is already registered for every week.', 'error'); return; }
+      // Guard against a race where the week already exists
+      const key = camperKey(editing);
+      if (window.campers.some(x => camperKey(x) === key && x.weekStart === ws)) {
+        showToast('Already registered for that week.', 'error'); return;
       }
-      // Delete weeks that were de-selected
-      for (const x of existing) {
-        if (!weeks.includes(x.weekStart)) {
-          ops.push(window._deleteDoc(window._doc(window._db, 'campers', x.id)));
-        }
-      }
-      await Promise.all(ops);
-      showToast(weeks.length > 1 ? `Saved — ${weeks.length} weeks updated` : 'Camper updated!');
+      // Copy personal fields from the existing camper, set this week's schedule
+      const personalFields = ['first','last','age','parent','phone','email','address','allergies','medical','healthCard','notes','parent2','phone2','email2','address2','ec1Name','ec1Phone','ec1Rel','ec2Name','ec2Phone','ec2Rel','pickup'];
+      const newReg = {};
+      personalFields.forEach(f => { if (editing[f] !== undefined && editing[f] !== null) newReg[f] = editing[f]; });
+      newReg.type = cType;
+      newReg.weekStart = ws;
+      newReg.campDays = campDays;
+      newReg.preDays = preDays;
+      newReg.postDays = postDays;
+      newReg.createdAt = window._serverTimestamp();
+      newReg.updatedAt = window._serverTimestamp();
+      await window._addDoc(window._collection(window._db, 'campers'), newReg);
+      showToast('Week added — ' + weekLabel(ws));
     } else {
       // ── New camper (full) — create one registration per selected week ──
       if(!first||!last) { showToast("Please enter the camper's name.", 'error'); return; }
@@ -3013,7 +3702,7 @@ async function deleteCamper() {
   const c = window.campers.find(x=>x.id===editingId);
   if(!c) return;
   try {
-    if (modalMode === 'edit') {
+    if (modalMode === 'personal') {
       // Delete ALL of this camper's week registrations
       const sibs = window.campers.filter(x => camperKey(x) === camperKey(c));
       if(!confirm('Remove ' + (c.first||'') + ' ' + (c.last||'') + ' from all ' + sibs.length + ' week(s)? This cannot be undone.')) return;
@@ -3860,15 +4549,21 @@ async function jotformPoll() {
 
 function startJotformAutoPoll() {
   // Clear ALL pending timers so re-entry can't schedule two parallel polls.
-  // (renderStats calls this at app load, and the Firestore settings snapshot
-  // calls it again — without clearing the kickoff timer, both 8-s setTimeouts
-  // would fire and import every new submission twice.)
+  // (the Firestore settings snapshot calls this when config loads — without
+  // clearing the kickoff timer, two 8-s setTimeouts would import twice.)
   if (jotformPollTimer)   { clearInterval(jotformPollTimer);  jotformPollTimer = null; }
   if (jotformKickoffTimer) { clearTimeout(jotformKickoffTimer); jotformKickoffTimer = null; }
+  // JotForm sync writes to admin-only collections, so only admins poll.
+  if (window._userRole !== 'admin') return;
   const s = getJotformSettings();
   if (!s.apiKey || !s.formId) return;
   jotformPollTimer = setInterval(jotformPoll, JF_POLL_MS);
   jotformKickoffTimer = setTimeout(jotformPoll, 8000); // quick first check after load
+}
+
+function stopJotformAutoPoll() {
+  if (jotformPollTimer)   { clearInterval(jotformPollTimer);  jotformPollTimer = null; }
+  if (jotformKickoffTimer) { clearTimeout(jotformKickoffTimer); jotformKickoffTimer = null; }
 }
 
 // ── Day Popup ──
@@ -3903,7 +4598,8 @@ function closeDayPopup() {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (document.getElementById('dayPopupOverlay').classList.contains('open')) closeDayPopup();
-  else if (document.getElementById('adminGate').classList.contains('open')) closeAdminGate();
+  else if (document.getElementById('empModal').classList.contains('open')) closeEmpModal();
+  else if (document.getElementById('txnModal').classList.contains('open')) closeTxnModal();
   else if (document.getElementById('refundOverlay').classList.contains('open')) closeRefundModal();
   else if (document.getElementById('invImportOverlay').classList.contains('open')) closeInvoiceImport();
   else if (document.getElementById('jotformOverlay').classList.contains('open')) closeJotformSync();
@@ -4411,7 +5107,7 @@ function adminId(key) {
 function renderAdmin() {
   const body = document.getElementById('adminTableBody');
   if (!body) return;
-  let groups = groupCampers(true); // include refunded so they remain visible here only
+  let groups = groupCampers(true).slice(); // include refunded; copy so we don't mutate the shared cache
   if (adminSQ) {
     groups = groups.filter(g => ((g.first||'')+' '+(g.last||'')).toLowerCase().includes(adminSQ));
   }
@@ -5090,13 +5786,15 @@ async function saveAllImportedInvoices() {
 
 // Initial render (while Firebase loads)
 renderStats();
-startJotformAutoPoll();
-// Re-evaluate polling once the persisted JotForm config arrives from Firestore
+// JotForm polling is started by onJotformConfigLoaded (admins only), once the
+// settings doc arrives — never unconditionally, so employees and signed-out
+// sessions never poll.
 window.onJotformConfigLoaded = function() { startJotformAutoPoll(); };
 
 // Expose functions needed by the Firebase module script and inline onclick handlers
 window.renderRoster = renderRoster;
 window.renderStats = renderStats;
+window.stopJotformAutoPoll = stopJotformAutoPoll;
 window.rCal = rCal;
 window.rWeekly = rWeekly;
 window.populateWeekButtons = populateWeekButtons;
@@ -5135,13 +5833,27 @@ window.closeInvoice = closeInvoice;
 window.generateInvoiceFiles = generateInvoiceFiles;
 // Admin page
 window.requestAdmin = requestAdmin;
-window.submitAdminPass = submitAdminPass;
-window.closeAdminGate = closeAdminGate;
 window.showLogin = showLogin;
 window.hideLogin = hideLogin;
 window.applyRoleUI = applyRoleUI;
 window.doSignIn = doSignIn;
 window.doSignOut = doSignOut;
+window.renderEmployees = renderEmployees;
+window.openAddEmployee = openAddEmployee;
+window.closeEmpModal = closeEmpModal;
+window.submitNewEmployee = submitNewEmployee;
+window.copyEmpPw = copyEmpPw;
+window.resetEmpPassword = resetEmpPassword;
+window.toggleEmpActive = toggleEmpActive;
+window.removeEmp = removeEmp;
+window.showAdminTab = showAdminTab;
+window.renderFinances = renderFinances;
+window.openAddTxn = openAddTxn;
+window.closeTxnModal = closeTxnModal;
+window.onReceiptPick = onReceiptPick;
+window.submitTxn = submitTxn;
+window.viewReceipt = viewReceipt;
+window.deleteTxn = deleteTxn;
 window.renderAdmin = renderAdmin;
 window.updateAdminField = updateAdminField;
 window.editInvoiceNumber = editInvoiceNumber;
