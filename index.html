@@ -1274,6 +1274,17 @@
   .fin-receipt-link { color: var(--green); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
   .fin-receipt-link:hover { text-decoration: underline; }
   .form-row { display: flex; gap: 12px; }
+  .txn-import-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px dashed var(--border); }
+  .txn-import-hint { font-size: 12px; color: var(--green); }
+  .rcpt-card { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: var(--surface); }
+  .rcpt-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .rcpt-file { font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rcpt-warn { font-size: 11.5px; color: #B23B2E; margin-top: 6px; }
+  .rcpt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+  .rcpt-grid label { font-size: 11px; font-weight: 600; color: var(--text-2); display: block; margin-bottom: 3px; }
+  .rcpt-grid input, .rcpt-grid select { width: 100%; box-sizing: border-box; padding: 7px 9px; font-size: 13px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+  .rcpt-grid .full { grid-column: 1 / -1; }
+  @media (max-width: 520px) { .rcpt-grid { grid-template-columns: 1fr; } }
   .admin-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
   .admin-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 1000px; }
   .admin-table thead th {
@@ -1612,6 +1623,7 @@
           <div class="fin-actions">
             <button class="btn btn-sm" onclick="openAddTxn('income')"><i class="ti ti-plus"></i> Add income</button>
             <button class="btn btn-sm" onclick="openAddTxn('expense')"><i class="ti ti-plus"></i> Add expense</button>
+            <button class="btn btn-sm" onclick="openReceiptImport()"><i class="ti ti-file-import"></i> Import receipts</button>
             <select id="finFilter" class="fin-filter" onchange="renderFinances()">
               <option value="all">All entries</option>
               <option value="income">Income only</option>
@@ -1680,6 +1692,11 @@
         <span class="modal-title"><i class="ti ti-report-money" style="margin-right:6px"></i><span id="txnModalTitle">Add entry</span></span>
         <button class="btn btn-ghost btn-icon" onclick="closeTxnModal()" aria-label="Close"><i class="ti ti-x"></i></button>
       </div>
+      <div id="txnImportRow" class="txn-import-row" style="display:none">
+        <button type="button" class="btn btn-sm" onclick="importExpensePdf()"><i class="ti ti-file-import"></i> Import from receipt PDF</button>
+        <input type="file" id="txnImportFile" accept="application/pdf" style="display:none" onchange="onExpensePdfPick(this.files)">
+        <span class="txn-import-hint" id="txnImportHint"></span>
+      </div>
       <div class="form-row">
         <div class="form-group" style="flex:1">
           <label class="form-label" for="txnDate">Date</label>
@@ -1710,6 +1727,8 @@
     </div>
   </div>
 
+  <!-- Import past invoice PDF -->
+  <div class="modal-overlay" id="invImportOverlay" onclick="if(event.target===this)closeInvoiceImport()">
     <div class="modal" style="max-width:520px">
       <div class="modal-header">
         <span class="modal-title">Import invoice PDF</span>
@@ -1727,6 +1746,29 @@
       <div id="invImportList"></div>
       <button class="btn btn-primary" id="invImportSaveBtn" style="width:100%;justify-content:center;margin-top:8px;display:none" onclick="saveAllImportedInvoices()">
         <i class="ti ti-device-floppy"></i> <span id="invImportSaveLabel">Save</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Import receipts → expenses (bulk) -->
+  <div class="modal-overlay" id="receiptImportOverlay" onclick="if(event.target===this)closeReceiptImport()">
+    <div class="modal" style="max-width:640px">
+      <div class="modal-header">
+        <span class="modal-title">Import receipts → expenses</span>
+        <button class="btn btn-ghost btn-icon" onclick="closeReceiptImport()" aria-label="Close"><i class="ti ti-x"></i></button>
+      </div>
+      <p style="font-size:13px;color:var(--text-2);margin-bottom:14px">
+        Upload one or more receipt PDFs. I'll read the date, amount, and vendor, guess a category, and stage an
+        expense for each — with the PDF attached. Review and edit everything below before saving.
+      </p>
+      <div class="form-group">
+        <label class="form-label" for="receiptPdfFiles">Receipt PDF(s)</label>
+        <input type="file" id="receiptPdfFiles" accept="application/pdf" multiple onchange="handleReceiptPdfFiles(this.files)">
+      </div>
+      <div id="receiptImportStatus" style="font-size:13px;color:var(--text-2);margin:10px 0"></div>
+      <div id="receiptImportList"></div>
+      <button class="btn btn-primary" id="receiptImportSaveBtn" style="width:100%;justify-content:center;margin-top:8px;display:none" onclick="saveAllImportedReceipts()">
+        <i class="ti ti-device-floppy"></i> <span id="receiptImportSaveLabel">Save expenses</span>
       </button>
     </div>
   </div>
@@ -2694,6 +2736,11 @@ function openAddTxn(type) {
   document.getElementById('txnDesc').value = '';
   const rc = document.getElementById('txnReceipt'); if (rc) rc.value = '';
   const hint = document.getElementById('txnReceiptHint'); hint.style.display = 'none'; hint.textContent = '';
+  // PDF-import row: only useful for expenses (receipts)
+  const importRow = document.getElementById('txnImportRow');
+  if (importRow) importRow.style.display = (_txnType === 'expense') ? 'flex' : 'none';
+  const importFile = document.getElementById('txnImportFile'); if (importFile) importFile.value = '';
+  const importHint = document.getElementById('txnImportHint'); if (importHint) importHint.textContent = '';
   const err = document.getElementById('txnError'); err.style.display = 'none'; err.textContent = '';
   const btn = document.getElementById('txnSaveBtn'); btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Save entry';
   document.getElementById('txnModal').classList.add('open');
@@ -2708,11 +2755,58 @@ function closeTxnModal() {
 function onReceiptPick() {
   const f = document.getElementById('txnReceipt').files[0];
   const hint = document.getElementById('txnReceiptHint');
+  // A manually chosen receipt supersedes anything staged from a PDF import.
+  if (f) {
+    _txnReceipt = null;
+    const importHint = document.getElementById('txnImportHint'); if (importHint) importHint.textContent = '';
+  }
   if (!f) { hint.style.display = 'none'; return; }
   const kb = Math.round(f.size / 1024);
   hint.textContent = f.name + ' (' + (kb > 1024 ? (kb/1024).toFixed(1) + ' MB' : kb + ' KB') + ')'
     + (f.type.startsWith('image/') ? ' — will be compressed automatically' : '');
   hint.style.display = '';
+}
+
+// ── Quick import: parse a single receipt PDF into the Add-expense form ──
+function importExpensePdf() {
+  document.getElementById('txnImportFile').click();
+}
+
+async function onExpensePdfPick(fileList) {
+  const file = (fileList || [])[0];
+  if (!file) return;
+  const importHint = document.getElementById('txnImportHint');
+  importHint.textContent = 'Reading…';
+  try {
+    const buf = await file.arrayBuffer();
+    const text = await extractPdfText(buf);
+    const parsed = parseReceiptText(text);
+    // Fill the form with whatever we found (leave fields the parser couldn't read)
+    if (parsed.date) document.getElementById('txnDate').value = parsed.date;
+    if (parsed.amount != null) document.getElementById('txnAmount').value = parsed.amount.toFixed(2);
+    if (parsed.vendor) document.getElementById('txnDesc').value = parsed.vendor;
+    if (parsed.category) document.getElementById('txnCategory').value = parsed.category;
+    // Stage the PDF itself as the receipt (size-checked against the Firestore cap)
+    const dataUri = await fileToDataUri(file);
+    if (dataUri.length <= 950000) {
+      _txnReceipt = { dataUri, name: file.name };
+      const rhint = document.getElementById('txnReceiptHint');
+      rhint.textContent = 'Attached from import: ' + file.name; rhint.style.display = '';
+      // clear the manual receipt input so it doesn't double up
+      const rc = document.getElementById('txnReceipt'); if (rc) rc.value = '';
+    } else {
+      _txnReceipt = null;
+    }
+    const got = [];
+    if (parsed.amount != null) got.push('amount'); if (parsed.date) got.push('date');
+    if (parsed.vendor) got.push('vendor'); 
+    importHint.textContent = got.length
+      ? ('Read ' + got.join(', ') + ' — please review.' + (dataUri.length > 950000 ? ' (PDF too large to attach)' : ''))
+      : 'Couldn’t read this PDF (it may be a scanned image). Fill the fields manually.';
+  } catch (e) {
+    console.error(e);
+    importHint.textContent = 'Could not read that PDF — please fill the fields manually.';
+  }
 }
 
 // Compress an image file to a JPEG data URI under ~850 KB.
@@ -2778,6 +2872,9 @@ async function submitTxn() {
     let receipt = null;
     if (fileEl && fileEl.files && fileEl.files[0]) {
       receipt = await fileToReceipt(fileEl.files[0]);
+    } else if (_txnReceipt) {
+      // Staged from a PDF import (already a {dataUri, name})
+      receipt = _txnReceipt;
     }
     const data = {
       type: _txnType,
@@ -2830,6 +2927,123 @@ async function deleteTxn(id) {
     showToast('Could not delete: ' + (e.code || e.message || 'error'), 'error');
   }
 }
+
+// ── Bulk receipt import → expenses ──
+let _importedReceipts = []; // [{ name, dataUri|null, tooLarge, date, vendor, category, amount }]
+
+function openReceiptImport() {
+  _importedReceipts = [];
+  document.getElementById('receiptPdfFiles').value = '';
+  document.getElementById('receiptImportStatus').textContent = '';
+  document.getElementById('receiptImportList').innerHTML = '';
+  document.getElementById('receiptImportSaveBtn').style.display = 'none';
+  document.getElementById('receiptImportOverlay').classList.add('open');
+}
+function closeReceiptImport() {
+  document.getElementById('receiptImportOverlay').classList.remove('open');
+  _importedReceipts = [];
+}
+
+async function handleReceiptPdfFiles(fileList) {
+  const files = Array.from(fileList || []).filter(f => /pdf$/i.test(f.name) || f.type === 'application/pdf');
+  if (!files.length) return;
+  const status = document.getElementById('receiptImportStatus');
+  _importedReceipts = [];
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    status.textContent = `Reading ${i + 1} of ${files.length}: ${f.name}…`;
+    let parsed = { amount: null, date: null, vendor: '', category: 'Other expense' };
+    try {
+      const buf = await f.arrayBuffer();
+      const text = await extractPdfText(buf);
+      parsed = parseReceiptText(text);
+    } catch (e) { console.error('parse failed for', f.name, e); }
+    let dataUri = null, tooLarge = false;
+    try {
+      dataUri = await fileToDataUri(f);
+      if (dataUri.length > 950000) { tooLarge = true; dataUri = null; }
+    } catch (e) { console.error('read failed for', f.name, e); }
+    _importedReceipts.push({
+      name: f.name, dataUri, tooLarge,
+      date: parsed.date || new Date(Date.now() - new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),
+      vendor: parsed.vendor || '',
+      category: parsed.category || 'Other expense',
+      amount: parsed.amount != null ? parsed.amount : ''
+    });
+  }
+  const readCount = _importedReceipts.filter(r => r.amount !== '' || r.vendor).length;
+  status.textContent = `${_importedReceipts.length} receipt(s) loaded` +
+    (readCount < _importedReceipts.length ? ` — ${_importedReceipts.length - readCount} couldn't be read automatically (scanned images?); fill those in.` : '. Review and edit below.');
+  renderReceiptCards();
+  document.getElementById('receiptImportSaveBtn').style.display = _importedReceipts.length ? 'flex' : 'none';
+}
+
+function renderReceiptCards() {
+  const cats = FIN_CATEGORIES.expense;
+  document.getElementById('receiptImportList').innerHTML = _importedReceipts.map((r, i) => {
+    const opts = cats.map(c => `<option value="${escapeHtml(c)}"${c === r.category ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    return `<div class="rcpt-card">
+      <div class="rcpt-card-top">
+        <span class="rcpt-file"><i class="ti ti-file-text"></i> ${escapeHtml(r.name)}</span>
+        <button class="btn btn-ghost btn-icon" title="Remove" onclick="removeImportedReceipt(${i})"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="rcpt-grid">
+        <div><label>Date</label><input type="date" value="${escapeHtml(r.date)}" onchange="editImportedReceipt(${i},'date',this.value)"></div>
+        <div><label>Amount ($)</label><input type="number" step="0.01" min="0" value="${r.amount}" placeholder="0.00" onchange="editImportedReceipt(${i},'amount',this.value)"></div>
+        <div><label>Category</label><select onchange="editImportedReceipt(${i},'category',this.value)">${opts}</select></div>
+        <div><label>Description</label><input type="text" value="${escapeHtml(r.vendor)}" placeholder="Vendor / note" onchange="editImportedReceipt(${i},'vendor',this.value)"></div>
+      </div>
+      ${r.tooLarge ? '<div class="rcpt-warn">⚠ PDF too large to attach (over ~700 KB) — the expense will be saved without the receipt file.</div>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function editImportedReceipt(i, field, value) {
+  if (!_importedReceipts[i]) return;
+  _importedReceipts[i][field] = value;
+}
+function removeImportedReceipt(i) {
+  _importedReceipts.splice(i, 1);
+  renderReceiptCards();
+  if (!_importedReceipts.length) document.getElementById('receiptImportSaveBtn').style.display = 'none';
+}
+
+async function saveAllImportedReceipts() {
+  const valid = _importedReceipts.filter(r => parseFloat(r.amount) > 0);
+  if (!valid.length) { showToast('Enter an amount on at least one receipt first.', 'error'); return; }
+  const btn = document.getElementById('receiptImportSaveBtn');
+  btn.disabled = true; btn.querySelector('#receiptImportSaveLabel').textContent = 'Saving…';
+  let saved = 0;
+  try {
+    for (const r of valid) {
+      const amount = Math.round(parseFloat(r.amount) * 100) / 100;
+      const hasReceipt = !!r.dataUri;
+      const ref = await window._addDoc(window._collection(window._db, 'finances'), {
+        type: 'expense',
+        date: r.date,
+        amount,
+        category: r.category || 'Other expense',
+        description: r.vendor || '',
+        hasReceipt,
+        receiptName: hasReceipt ? r.name : null,
+        createdAt: window._serverTimestamp(),
+        createdBy: window._userEmail || ''
+      });
+      if (hasReceipt) {
+        await window._setDoc(window._doc(window._db, 'receipts', ref.id), { dataUri: r.dataUri, name: r.name });
+      }
+      saved++;
+    }
+    showToast(`Imported ${saved} expense${saved === 1 ? '' : 's'}`);
+    closeReceiptImport();
+    renderFinances();
+  } catch (e) {
+    console.error(e);
+    showToast('Saved ' + saved + ' before an error: ' + (e.code || e.message || 'error'), 'error');
+    btn.disabled = false; btn.querySelector('#receiptImportSaveLabel').textContent = 'Save expenses';
+  }
+}
+
 
 // ── Toast ──
 function showToast(msg, type='success') {
@@ -4602,6 +4816,7 @@ document.addEventListener('keydown', (e) => {
   else if (document.getElementById('txnModal').classList.contains('open')) closeTxnModal();
   else if (document.getElementById('refundOverlay').classList.contains('open')) closeRefundModal();
   else if (document.getElementById('invImportOverlay').classList.contains('open')) closeInvoiceImport();
+  else if (document.getElementById('receiptImportOverlay').classList.contains('open')) closeReceiptImport();
   else if (document.getElementById('jotformOverlay').classList.contains('open')) closeJotformSync();
   else if (document.getElementById('importOverlay').classList.contains('open')) closeImport();
   else if (document.getElementById('detailOverlay').classList.contains('open')) closeDetail();
@@ -5625,8 +5840,93 @@ function parseInvoiceText(text) {
   };
 }
 
-// ── Fuzzy matching ──
-function normName(s) { return (s || '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim(); }
+// ── Receipt parsing (shared by the bulk import and the Add-expense quick import) ──
+// Auto-categorization keyword rules. First matching category wins, so order
+// matters. Category strings MUST match FIN_CATEGORIES.expense exactly.
+const EXPENSE_RULES = [
+  ['Food & snacks',   ['grocery','groceries','loblaws','no frills','nofrills','costco','metro ','sobeys','food basics','foodbasics','zehrs','freshco','farm boy','farmboy','superstore','restaurant','pizza','catering','snack','tim hortons','timhortons','subway','mcdonald','starbucks','coffee','bakery','dominos','wendy']],
+  ['Transportation',  ['petro-canada','petrocanada','esso','shell','ultramar','uber','lyft','taxi','transit','parking','mileage',' gas ','fuel station','gas station']],
+  ['Equipment',       ['home depot','homedepot','canadian tire','canadiantire','rona','lowes','equipment','rental','power tool']],
+  ['Marketing',       ['vistaprint','advertis','flyer','signage','facebook ad','google ad','banner','brochure']],
+  ['Insurance',       ['insurance','policy premium','underwrit']],
+  ['Facility / rent', ['rent ','lease','property mgmt','facility','venue','hydro one','utility','utilities','electric bill','water bill']],
+  ['Staff wages',     ['payroll','wages','salary','staff pay']],
+  ['Supplies',        ['michaels','staples','office depot','dollarama','dollar tree','amazon','craft','scholar','stationery','supplies','walmart','indigo','best buy','printer','paper']],
+];
+
+function categorizeExpense(vendor, lowerText) {
+  const hay = ((vendor || '') + ' ' + (lowerText || '')).toLowerCase();
+  for (const [cat, kws] of EXPENSE_RULES) {
+    if (kws.some(k => hay.includes(k))) return cat;
+  }
+  return 'Other expense';
+}
+
+function _isoDate(y, m, d) {
+  return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+}
+
+// Best-effort date extraction → 'YYYY-MM-DD' or null.
+function parseReceiptDate(text) {
+  const mon = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
+  let m = text.match(/\b(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})\b/);            // ISO 2026-07-15
+  if (m) { const mo=+m[2], d=+m[3]; if (mo>=1&&mo<=12&&d>=1&&d<=31) return _isoDate(+m[1], mo, d); }
+  m = text.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2}),?\s+(20\d{2})\b/i); // Jul 15, 2026
+  if (m) return _isoDate(+m[3], mon[m[1].slice(0,3).toLowerCase()], +m[2]);
+  m = text.match(/\b(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(20\d{2})\b/i); // 15 Jul 2026
+  if (m) return _isoDate(+m[3], mon[m[2].slice(0,3).toLowerCase()], +m[1]);
+  m = text.match(/\b(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})\b/);                  // 07/15/2026 or 15/07/26
+  if (m) {
+    let mo=+m[1], d=+m[2], y=+m[3]; if (y<100) y+=2000;
+    if (mo>12 && d<=12) { const t=mo; mo=d; d=t; }   // clearly DD/MM
+    if (mo>=1&&mo<=12&&d>=1&&d<=31) return _isoDate(y, mo, d);
+  }
+  return null;
+}
+
+// Guess the merchant/vendor from the first meaningful line(s).
+function guessVendor(lines) {
+  for (let i = 0; i < Math.min(lines.length, 8); i++) {
+    let l = (lines[i] || '').trim();
+    if (!l) continue;
+    if (/^\$?\s*[\d,.\s]+$/.test(l)) continue;                       // pure number/amount
+    if (parseReceiptDate(l)) continue;                               // a date line
+    if (/^(receipt|invoice|tax\s*invoice|order\s*confirmation|statement|customer\s*copy|merchant\s*copy)\b/i.test(l) && l.length < 22) continue;
+    if (!/[a-zA-Z]/.test(l)) continue;
+    l = l.replace(/[*#|]+/g, '').replace(/\s{2,}/g, ' ').trim();
+    if (l.length >= 2) return l.slice(0, 50);
+  }
+  return '';
+}
+
+// Parse a receipt's text into { amount, date, vendor, category }.
+function parseReceiptText(text) {
+  const lines = (text || '').replace(/\r/g, '').split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const joined = lines.join('\n');
+
+  // Amount: prefer the largest amount on a line labelled like a total
+  // (but never a "subtotal"); otherwise the largest amount anywhere.
+  const allAmounts = [], labeledTotals = [];
+  lines.forEach(line => {
+    const found = line.match(/\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2}/g);
+    if (!found) return;
+    const vals = found.map(x => parseFloat(x.replace(/,/g, '')));
+    vals.forEach(v => allAmounts.push(v));
+    const l = line.toLowerCase();
+    const isSub = /sub[\s-]*total/.test(l);
+    const isTotal = /(grand\s*total|total\s*due|amount\s*due|balance\s*due|amount\s*paid|total\b)/.test(l);
+    if (isTotal && !isSub) vals.forEach(v => labeledTotals.push(v));
+  });
+  let amount = null;
+  if (labeledTotals.length) amount = Math.max(...labeledTotals);
+  else if (allAmounts.length) amount = Math.max(...allAmounts);
+
+  const date = parseReceiptDate(joined);
+  const vendor = guessVendor(lines);
+  const category = categorizeExpense(vendor, joined.toLowerCase());
+  return { amount, date, vendor, category };
+}
+
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   if (!m) return n; if (!n) return m;
@@ -5854,6 +6154,14 @@ window.onReceiptPick = onReceiptPick;
 window.submitTxn = submitTxn;
 window.viewReceipt = viewReceipt;
 window.deleteTxn = deleteTxn;
+window.importExpensePdf = importExpensePdf;
+window.onExpensePdfPick = onExpensePdfPick;
+window.openReceiptImport = openReceiptImport;
+window.closeReceiptImport = closeReceiptImport;
+window.handleReceiptPdfFiles = handleReceiptPdfFiles;
+window.editImportedReceipt = editImportedReceipt;
+window.removeImportedReceipt = removeImportedReceipt;
+window.saveAllImportedReceipts = saveAllImportedReceipts;
 window.renderAdmin = renderAdmin;
 window.updateAdminField = updateAdminField;
 window.editInvoiceNumber = editInvoiceNumber;
