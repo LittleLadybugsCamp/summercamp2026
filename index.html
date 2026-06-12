@@ -2429,9 +2429,32 @@ function requestAdmin(btn) {
 // ── Login / authentication UI ──
 // These are called by the auth gate in the Firebase module (which runs after
 // this script has defined them).
+
+// iOS Safari proactively shows the Face ID "Fill Password" sheet whenever it
+// finds login fields on the page that match a saved credential — EVEN when the
+// login overlay is hidden. So the email/password form must not merely be
+// hidden while signed in: it has to be physically removed from the document,
+// and re-attached only at the moment the login screen is actually shown.
+let _loginFormNode = null;
+let _loginFormParent = null;
+function detachLoginForm() {
+  const f = document.getElementById('loginForm');
+  if (f && f.parentNode) {
+    _loginFormNode = f;
+    _loginFormParent = f.parentNode;
+    f.parentNode.removeChild(f);
+  }
+}
+function attachLoginForm() {
+  if (_loginFormNode && _loginFormParent && !document.getElementById('loginForm')) {
+    _loginFormParent.appendChild(_loginFormNode);
+  }
+}
+
 function showLogin(message) {
   const ls = document.getElementById('loadingScreen');
   if (ls) { ls.style.opacity = '0'; ls.style.display = 'none'; }
+  attachLoginForm(); // put the email/password fields back in the page
   const screen = document.getElementById('loginScreen');
   const err = document.getElementById('loginError');
   const btn = document.getElementById('loginBtn');
@@ -2452,6 +2475,10 @@ function showLogin(message) {
 function hideLogin() {
   const screen = document.getElementById('loginScreen');
   if (screen) screen.classList.remove('open');
+  // Drop focus first (a focused field can keep the iOS sheet alive), then
+  // remove the credential fields from the document entirely.
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+  detachLoginForm();
 }
 
 // Show/hide UI based on the signed-in user's role.
@@ -6287,6 +6314,12 @@ async function saveAllImportedInvoices() {
 
 // Initial render (while Firebase loads)
 renderStats();
+// Remove the login fields from the document right away. While Firebase is
+// still restoring a previous session, the page would otherwise contain a
+// hidden password field — which is enough for iPhone Safari to pop the
+// Face ID "Fill Password" sheet over a signed-in session. showLogin()
+// re-attaches the form if sign-in is actually needed.
+detachLoginForm();
 // JotForm polling is started by onJotformConfigLoaded (admins only), once the
 // settings doc arrives — never unconditionally, so employees and signed-out
 // sessions never poll.
