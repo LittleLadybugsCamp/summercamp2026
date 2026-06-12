@@ -4,11 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Summer Camp Manager</title>
+<!-- Preconnects: start TLS handshakes to data/CDN origins during HTML parse -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- jsPDF is only needed when generating an invoice — defer so it never blocks first paint -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
     /* Warm, design-forward palette with camp green accent */
@@ -2237,21 +2244,35 @@ function startDataListeners() {
   // The locked security rules forbid employees from reading these, so
   // subscribing them would only produce permission-denied errors.
   if (isAdmin) {
-    // Admin / payment records (small docs, safe to stream)
-    _unsubscribers.push(onSnapshot(adminRef, (snap) => {
-      window.adminData = new Map();
-      snap.forEach(d => window.adminData.set(d.id, { id: d.id, ...d.data() }));
+    // Admin / payment records (small docs, safe to stream). Re-renders are
+    // debounced (bursts during batch invoice generation), and deferred while
+    // the admin is typing in one of the table's inputs — a mid-edit re-render
+    // would throw away focus and any half-typed value.
+    let _adminTimer = null;
+    function _applyAdminRender() {
+      const ae = document.activeElement;
+      if (ae && ae.closest && ae.closest('#atab-payments') &&
+          (ae.tagName === 'INPUT' || ae.tagName === 'SELECT' || ae.tagName === 'TEXTAREA')) {
+        _adminTimer = setTimeout(_applyAdminRender, 800); // retry after they finish
+        return;
+      }
+      _adminTimer = null;
       if (typeof window.renderAdmin === 'function' &&
           document.getElementById('page-admin') &&
           document.getElementById('page-admin').classList.contains('active')) {
         window.renderAdmin();
-        // Invoice income shown in the Finances tab is derived from this same
-        // data — keep it live when that sub-tab is the one on screen.
+        // Invoice income in the Finances tab derives from this same data.
         const finTab = document.getElementById('atab-finances');
         if (finTab && finTab.style.display !== 'none' && typeof window.renderFinances === 'function') {
-          window.renderFinances();
+          window.renderFinances(false); // invoice data changed; stored entries didn't
         }
       }
+    }
+    _unsubscribers.push(onSnapshot(adminRef, (snap) => {
+      window.adminData = new Map();
+      snap.forEach(d => window.adminData.set(d.id, { id: d.id, ...d.data() }));
+      if (_adminTimer) clearTimeout(_adminTimer);
+      _adminTimer = setTimeout(_applyAdminRender, 80);
     }, (err) => console.error('admin snapshot error', err)));
 
     // Persisted app settings (e.g. JotForm credentials)
@@ -2262,7 +2283,22 @@ function startDataListeners() {
     }, (err) => console.error('settings snapshot error', err)));
   }
 
-  // Campers roster
+  // Campers roster. Rapid bursts of writes (multi-week saves, JotForm
+  // auto-imports) fire one snapshot per write; re-rendering every page for
+  // each would do the same work N times in a row. The FIRST snapshot renders
+  // immediately (fast first paint from the disk cache); bursts after that are
+  // coalesced into one render ~80 ms after the last write in the burst.
+  let _renderTimer = null;
+  let _firstSnapshot = true;
+  function _applyCamperRenders() {
+    if (typeof window.renderStats === 'function') window.renderStats();
+    if (typeof window.renderRoster === 'function') window.renderRoster();
+    const cal = document.getElementById('page-calendar');
+    if (typeof window.rCal === 'function' && cal && cal.classList.contains('active')) window.rCal();
+    if (typeof window.populateWeekButtons === 'function') window.populateWeekButtons();
+    const wk = document.getElementById('page-weekly');
+    if (typeof window.rWeekly === 'function' && wk && wk.classList.contains('active')) window.rWeekly();
+  }
   _unsubscribers.push(onSnapshot(campersRef, (snapshot) => {
     window.campers = [];
     snapshot.forEach(d => { window.campers.push({ id: d.id, ...d.data() }); });
@@ -2270,11 +2306,13 @@ function startDataListeners() {
     window._avatarIdx.clear();
     window.campers.forEach((c, i) => window._avatarIdx.set(c.id, i));
 
-    if (typeof window.renderStats === 'function') window.renderStats();
-    if (typeof window.renderRoster === 'function') window.renderRoster();
-    if (typeof window.rCal === 'function' && document.getElementById('page-calendar').classList.contains('active')) window.rCal();
-    if (typeof window.populateWeekButtons === 'function') window.populateWeekButtons();
-    if (typeof window.rWeekly === 'function' && document.getElementById('page-weekly').classList.contains('active')) window.rWeekly();
+    if (_firstSnapshot) {
+      _firstSnapshot = false;
+      _applyCamperRenders();
+    } else {
+      if (_renderTimer) clearTimeout(_renderTimer);
+      _renderTimer = setTimeout(() => { _renderTimer = null; _applyCamperRenders(); }, 80);
+    }
 
     const ls = document.getElementById('loadingScreen');
     if (ls) { ls.style.opacity = '0'; setTimeout(() => ls.style.display='none', 300); }
@@ -2749,14 +2787,23 @@ function tsToYmd(ts) {
   } catch (e) { return ''; }
 }
 
-async function renderFinances() {
+let _finLoaded = false; // becomes true once finance entries have been fetched
+
+// renderFinances(refetch):
+//   refetch=true  (default) → pull finance entries from Firestore, then render
+//   refetch=false → render from the cached entries (filter clicks, invoice-data
+//                   syncs). Saves a server round-trip when nothing stored changed.
+async function renderFinances(refetch = true) {
   const body = document.getElementById('finTableBody');
   if (!body) return;
   if (window._userRole !== 'admin') { body.innerHTML = ''; return; }
-  body.innerHTML = '<tr><td colspan="7" class="fin-empty">Loading…</td></tr>';
   try {
-    const stored = await window._fetchFinances();
-    _finances = stored;
+    if (refetch || !_finLoaded) {
+      body.innerHTML = '<tr><td colspan="7" class="fin-empty">Loading…</td></tr>';
+      _finances = await window._fetchFinances();
+      _finLoaded = true;
+    }
+    const stored = _finances;
     const invoiceRows = invoiceIncomeRows();
 
     // ── Totals (over everything, regardless of filter) ──
@@ -2788,7 +2835,7 @@ async function renderFinances() {
     body.innerHTML = shown.map(t => {
       if (t.invoiceRow) {
         const desc = t.hasPdf
-          ? `<span class="fin-receipt-link" onclick="viewInvoicePdf('${escapeHtml(t.key)}')"><i class="ti ti-file-invoice"></i> Invoice ${escapeHtml(t.invoiceNumber)}</span>`
+          ? `<span class="fin-receipt-link" onclick="viewInvoicePdf('${jsArg(t.key)}')"><i class="ti ti-file-invoice"></i> Invoice ${escapeHtml(t.invoiceNumber)}</span>`
           : `Invoice ${escapeHtml(t.invoiceNumber)}`;
         return `<tr>
           <td>${escapeHtml(fmtFinDate(t.date))}</td>
@@ -2823,7 +2870,7 @@ function setFinFilter(value, btn) {
   _finFilter = value;
   document.querySelectorAll('#finFilterGroup .fin-filter-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  renderFinances();
+  renderFinances(false); // filtering is client-side — no need to refetch
 }
 
 function openAddTxn(type) {
@@ -3006,14 +3053,18 @@ async function submitTxn() {
 }
 
 async function viewReceipt(id) {
+  // Open the tab synchronously, INSIDE the click gesture — Safari blocks
+  // window.open() that happens after an await as a popup.
+  const win = window.open('', '_blank');
   try {
     const snap = await window._getDoc(window._doc(window._db, 'receipts', id));
-    if (!snap.exists()) { showToast('Receipt not found', 'error'); return; }
+    if (!snap.exists()) { if (win) win.close(); showToast('Receipt not found', 'error'); return; }
     const blob = dataUriToBlob(snap.data().dataUri);
     const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    if (win) win.location = url; else window.open(url, '_blank');
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
+    if (win) { try { win.close(); } catch (e2) {} }
     showToast('Could not open receipt: ' + (e.code || e.message || 'error'), 'error');
   }
 }
@@ -3172,6 +3223,16 @@ function esc(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+// For values embedded inside inline handlers like onclick="f('VALUE')".
+// HTML-escaping alone is NOT enough there: the browser decodes &#39; back to
+// a raw quote BEFORE the JS runs, so a name like O'Brien would produce a
+// syntax error and silently break the button. Backslash-escape for the JS
+// string first, then HTML-escape for the attribute.
+function jsArg(s) {
+  if (s == null) return '';
+  return esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
 }
 
 // ── Initials for avatars (robust when a name part is missing) ──
@@ -3647,7 +3708,7 @@ function openDetail(key) {
     </div>
     <div style="text-align:right;margin-top:8px">
       ${c.refunded
-        ? `<button class="btn-link-subtle" onclick="restoreCamper('${esc(camperKey(c))}')"><i class="ti ti-rotate"></i> Restore camper to roster</button>`
+        ? `<button class="btn-link-subtle" onclick="restoreCamper('${jsArg(camperKey(c))}')"><i class="ti ti-rotate"></i> Restore camper to roster</button>`
         : `<button class="btn-link-subtle" onclick="openRefundModal('${c.id}')"><i class="ti ti-receipt-refund"></i> Mark as refunded</button>`}
     </div>
     <div class="detail-section" style="margin-top:16px">
@@ -5155,6 +5216,9 @@ async function generateInvoiceFiles() {
 
 // ---- PDF (jsPDF) ----
 function buildInvoicePDF(data, invNum, invDate, footer, filename) {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    throw new Error('The PDF library is still loading — please try again in a moment.');
+  }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const pageW = doc.internal.pageSize.getWidth();
@@ -5472,7 +5536,7 @@ function renderAdmin() {
     const paid = !!rec.paidInFull;
     const hasPdf = !!rec.hasInvoicePdf;
     const owed = Math.max(0, (parseFloat(total) || 0) - (parseFloat(paidAmt) || 0));
-    const keyEsc = esc(g.key);
+    const keyEsc = jsArg(g.key);
 
     const invoiceCell = hasPdf
       ? `<div class="admin-invoice-cell">
@@ -5555,7 +5619,10 @@ function renderAdmin() {
 
 // Write a single admin field (merges into the camper's admin record)
 async function updateAdminField(key, field, value) {
-  if (field === 'amountPaid' || field === 'totalAmount') value = (value === '' ? null : parseFloat(value));
+  if (field === 'amountPaid' || field === 'totalAmount') {
+    value = (value === '' ? null : parseFloat(value));
+    if (typeof value === 'number' && !isFinite(value)) value = null; // NaN would poison totals
+  }
   try {
     await window._setDoc(
       window._doc(window._db, 'admin', adminId(key)),
@@ -5763,15 +5830,19 @@ function dataUriToBlob(dataUri) {
 }
 
 async function viewInvoicePdf(key) {
+  // Open the tab synchronously, INSIDE the click gesture — Safari blocks
+  // window.open() that happens after an await as a popup.
+  const win = window.open('', '_blank');
   try {
     const snap = await window._getDoc(window._doc(window._db, 'invoices', adminId(key)));
-    if (!snap.exists()) { showToast('No saved invoice PDF for this camper.', 'error'); return; }
+    if (!snap.exists()) { if (win) win.close(); showToast('No saved invoice PDF for this camper.', 'error'); return; }
     const data = snap.data();
     const blob = dataUriToBlob(data.pdfDataUri);
     const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
+    if (win) win.location = url; else window.open(url, '_blank');
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
+    if (win) { try { win.close(); } catch (e2) {} }
     showToast('Error opening PDF: ' + e.message, 'error');
   }
 }
@@ -5899,18 +5970,21 @@ function closeInvoiceImport() {
 }
 
 // Lazily load pdf.js only when first needed
+let _pdfJsLoading = null; // single-flight: concurrent imports share one load
 function loadPdfJs() {
-  return new Promise((resolve, reject) => {
-    if (window.pdfjsLib) { resolve(); return; }
+  if (window.pdfjsLib) return Promise.resolve();
+  if (_pdfJsLoading) return _pdfJsLoading;
+  _pdfJsLoading = new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
     s.onload = () => {
       try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; } catch(e) {}
       resolve();
     };
-    s.onerror = () => reject(new Error('Could not load the PDF reader. Check your connection.'));
+    s.onerror = () => { _pdfJsLoading = null; reject(new Error('Could not load the PDF reader. Check your connection.')); };
     document.head.appendChild(s);
   });
+  return _pdfJsLoading;
 }
 
 async function extractPdfText(arrayBuffer) {
