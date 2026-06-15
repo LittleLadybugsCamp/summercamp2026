@@ -727,6 +727,13 @@
   .import-status { font-size: 11px; padding: 2px 7px; border-radius: 20px; font-weight: 500; }
   .import-status-new { background: var(--green-light); color: var(--green); border: 1px solid var(--green-border); }
   .import-status-exists { background: var(--amber-light); color: var(--amber); border: 1px solid var(--amber-border); }
+  .import-dismiss {
+    font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 500;
+    background: transparent; color: var(--text-3); border: 1px solid var(--border);
+    cursor: pointer; margin-left: 6px;
+  }
+  .import-dismiss:hover { color: var(--text); border-color: var(--text-3); }
+  .import-dismiss:active { transform: scale(.97); }
   .import-progress { margin-top: 12px; font-size: 13px; color: var(--text-2); text-align: center; }
   .progress-bar { height: 6px; background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; }
   .progress-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width .3s; }
@@ -4507,7 +4514,23 @@ function buildImportRows(csvRows) {
   importRows = [];
   // Each CSV row may register for multiple weeks → create one camper entry per week
   csvRows.forEach(row => {
-    const fullName = row["Child's full name"] || '';
+    // Skip submissions the admin has explicitly dismissed in a prior sync
+    // (per-submission ignore list — see jotformDismissed config). Identified
+    // by JotForm's stable submission ID, so genuinely new entries are unaffected.
+    const submissionId = row.__submissionId || '';
+    if (submissionId && isJotformSubmissionDismissed(submissionId)) return;
+
+    const rowsBefore = importRows.length; // remember so we can detect "produced nothing"
+    // Look for the child name under common label variants. JotForm form-builders
+    // sometimes tweak labels ("Child's full name" → "Child's name" → "Camper name"),
+    // and the old hard-coded label would silently produce a blank-name row.
+    let fullName = row["Child's full name"];
+    if (!fullName) {
+      for (const k of Object.keys(row)) {
+        if (/child.*name|camper.*name/i.test(k) && row[k]) { fullName = row[k]; break; }
+      }
+    }
+    fullName = (fullName || '').toString();
     const nameParts = fullName.trim().split(/\s+/);
     const first = nameParts[0] || '';
     const last = nameParts.slice(1).join(' ') || '';
@@ -4565,13 +4588,17 @@ function buildImportRows(csvRows) {
       const postDays = hasPost ? [0,1,2,3,4] : [];
 
       const fl = first.toLowerCase(), ll = last.toLowerCase();
-      const existingMatch = window.campers.some(c =>
+      // An incoming submission with no first name shouldn't accidentally match
+      // a previous phantom (also with no first name) — that would silently skip
+      // every subsequent registration with a missing-name field.
+      const existingMatch = !!fl && window.campers.some(c =>
         (c.first||'').toLowerCase() === fl && (c.last||'').toLowerCase() === ll && c.weekStart === wk.start
       );
 
       importRows.push({
         csvName: fullName, weekLabel: wk.label, weekStart: wk.start,
         exists: existingMatch,
+        submissionId,
         data: {
           first, last, age: null,
           parent, email, phone, address,
@@ -4616,7 +4643,7 @@ function buildImportRows(csvRows) {
         const preDays  = wantPre  ? campDays.slice() : [];
         const postDays = wantPost ? campDays.slice() : [];
         const fl = first.toLowerCase(), ll = last.toLowerCase();
-        const existingMatch = window.campers.some(c =>
+        const existingMatch = !!fl && window.campers.some(c =>
           (c.first||'').toLowerCase() === fl && (c.last||'').toLowerCase() === ll && c.weekStart === week.start);
         importRows.push({
           csvName: fullName,
@@ -4624,6 +4651,7 @@ function buildImportRows(csvRows) {
           weekStart: week.start,
           exists: existingMatch,
           isDaily: true,
+          submissionId,
           parsedDays: campDays,
           wantPre, wantPost,
           rawDaily: parsed.raw,
@@ -4632,21 +4660,75 @@ function buildImportRows(csvRows) {
         });
       });
 
-      // If nothing could be matched but there is free text, surface a non-importable warning row
-      if (!matchedWeeks.length && (dailyFreeText || parsed.unmatched.length)) {
-        importRows.push({
-          csvName: fullName,
-          weekLabel: 'Daily — needs review',
-          weekStart: '',
-          exists: false,
-          isDaily: true,
-          needsReview: true,
-          rawDaily: parsed.raw,
-          unmatched: parsed.unmatched,
-          wantPre, wantPost,
-          data: null
+      // If nothing could be matched, surface a non-importable warning row.
+      // Also surfaces the case where dailyCamp was checked but the parent left
+      // the days free-text blank — infer the intended week(s) from any
+      // non-zero "Week N total" columns so the admin sees what to follow up on.
+      if (!matchedWeeks.length) {
+        // Scan the Week N total columns and pull out non-zero ones
+        const inferredWeeks = [];
+        WEEKS.forEach((wk, i) => {
+          const totalCol = 'Week ' + (i + 1) + ' total';
+          const v = parseFloat(String(row[totalCol] || '').replace(/[^0-9.]/g, ''));
+          if (v > 0) inferredWeeks.push({ label: wk.label, amount: v });
         });
+        if (dailyFreeText || parsed.unmatched.length || inferredWeeks.length) {
+          importRows.push({
+            csvName: fullName,
+            weekLabel: 'Daily — needs review',
+            weekStart: '',
+            exists: false,
+            isDaily: true,
+            needsReview: true,
+            submissionId,
+            rawDaily: parsed.raw,
+            unmatched: parsed.unmatched,
+            inferredWeeks,
+            wantPre, wantPost,
+            data: null
+          });
+        }
       }
+    }
+
+    // ── Catch-all: this submission produced ZERO rows ──
+    // Could happen if the JotForm field labels changed (camp-week columns no
+    // longer match), or the parent filled the form in an unexpected way.
+    // Surface it as needs-review so it doesn't disappear silently.
+    if (importRows.length === rowsBefore) {
+      // Log the keys actually present in this row so a future bug report can
+      // tell us exactly which column label is mismatched. ALSO log the raw
+      // JotForm answer payload — when the matrix-question response shape
+      // doesn't match what the parser expects, this is the only way to see
+      // what JotForm actually sent.
+      console.warn('JotForm submission for', fullName || '(unnamed)', 'produced no import rows. Keys received:', Object.keys(row));
+      if (row.__rawAnswers) {
+        // Find the answer for the "Choose the weeks…" matrix question, if any,
+        // and pretty-print it so the shape JotForm uses is visible.
+        const weekAnswers = {};
+        for (const k in row.__rawAnswers) {
+          const a = row.__rawAnswers[k];
+          if (a && typeof a.text === 'string' && /choose the weeks/i.test(a.text)) {
+            weekAnswers[k] = a;
+          }
+        }
+        console.warn('Raw JotForm answers (full):', JSON.parse(JSON.stringify(row.__rawAnswers)));
+        if (Object.keys(weekAnswers).length) {
+          console.warn('Raw JotForm answer for the camp-week matrix:', JSON.parse(JSON.stringify(weekAnswers)));
+        }
+      }
+      importRows.push({
+        csvName: fullName || '(no name)',
+        weekLabel: 'Needs review — could not detect any selected weeks',
+        weekStart: '',
+        exists: false,
+        needsReview: true,
+        submissionId,
+        unmatched: [],
+        rawDaily: '',
+        data: null,
+        _rawKeys: Object.keys(row).filter(k => k !== '__regDate' && k !== '__submissionId' && k !== '__rawAnswers')
+      });
     }
   });
 
@@ -4661,16 +4743,49 @@ function buildImportRows(csvRows) {
   document.getElementById('importPreviewSub').textContent = subParts.join(' · ');
 
   document.getElementById('importPreviewList').innerHTML = importRows.map(r => {
+    // "Dismiss" lets the admin tell the app to permanently skip this exact
+    // submission (e.g. "Test Test", or a daily-review row already handled
+    // manually). Only shown when we have a JotForm submission ID to record.
+    const dismissBtn = r.submissionId
+      ? '<button class="import-dismiss" onclick="onDismissJotformRow(\'' + jsArg(r.submissionId) + '\')" title="Skip this submission permanently">Dismiss</button>'
+      : '';
     if (r.needsReview) {
+      // Catch-all (no rawDaily): the submission didn't match the daily branch
+      // OR the weekly branch — most likely cause is a JotForm field label that
+      // doesn't match what the app expects. Show the actual keys received so
+      // the mismatch is debuggable from the UI.
+      const isCatchAll = !r.rawDaily && !r.unmatched.length && r._rawKeys;
+      let detail;
+      if (isCatchAll) {
+        // Highlight likely week-selection keys for quick spotting
+        const weekKeys = (r._rawKeys || []).filter(k => /week|camp|daily|attend/i.test(k));
+        detail = '<div>The submission was received but the app could not detect any selected camp weeks.</div>'
+          + (weekKeys.length
+              ? '<div style="margin-top:4px">Form fields that look related: <ul style="margin:4px 0 0 16px;padding:0">'
+                + weekKeys.slice(0, 8).map(k => '<li><code style="font-size:11px">' + esc(k) + '</code></li>').join('')
+                + '</ul></div>'
+              : '<div style="margin-top:4px;color:#b45309">No week-selection fields found in this submission — was the JotForm form changed?</div>')
+          + '<div style="margin-top:4px;color:#b45309">Add this camper manually, then send Claude a screenshot of the JotForm submission so the parser can be fixed.</div>';
+      } else {
+        const inf = r.inferredWeeks || [];
+        const infLine = inf.length
+          ? '<div style="margin-top:4px"><strong>Inferred from "Week N total" columns:</strong> '
+            + esc(inf.map(w => w.label + ' ($' + w.amount + ')').join(', '))
+            + '</div>'
+            + '<div style="color:#b45309;margin-top:2px">The parent didn\'t specify which days — please confirm with them, then add this camper manually.</div>'
+          : '';
+        detail = '<div>Free text: "<em>' + esc(r.rawDaily || '(empty)') + '</em>"</div>'
+          + infLine
+          + (r.unmatched.length ? '<div style="color:#b45309;margin-top:2px">Could not match: ' + esc(r.unmatched.join(', ')) + '. Add this camper manually.</div>'
+                                : (inf.length ? '' : '<div style="color:#b45309;margin-top:2px">No camp days could be parsed. Add this camper manually.</div>'));
+      }
       return '<div class="import-row" style="flex-wrap:wrap;background:#fdf3e7">'
         + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
-        + '<div class="import-row-weeks">Daily registration</div>'
+        + '<div class="import-row-weeks">' + esc(r.weekLabel || 'Daily registration') + '</div>'
         + '<span class="import-status" style="background:#f59e0b;color:#fff">Review</span>'
-        + '<div style="flex-basis:100%;margin-top:6px;font-size:12px;color:var(--text-2)">'
-        +   '<div>Free text: "<em>' + esc(r.rawDaily || '(empty)') + '</em>"</div>'
-        +   (r.unmatched.length ? '<div style="color:#b45309;margin-top:2px">Could not match: ' + esc(r.unmatched.join(', ')) + '. Add this camper manually.</div>'
-                                : '<div style="color:#b45309;margin-top:2px">No camp days could be parsed. Add this camper manually.</div>')
-        + '</div></div>';
+        + dismissBtn
+        + '<div style="flex-basis:100%;margin-top:6px;font-size:12px;color:var(--text-2)">' + detail + '</div>'
+        + '</div>';
     }
     if (r.isDaily) {
       const dayNames = r.parsedDays.map(d => DAY_ABBR[d]).join(', ');
@@ -4682,6 +4797,7 @@ function buildImportRows(csvRows) {
         + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
         + '<div class="import-row-weeks">' + esc(r.weekLabel) + ' <span style="opacity:.6">· Daily</span></div>'
         + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
+        + (r.exists ? dismissBtn : '')
         + '<div style="flex-basis:100%;margin-top:5px;font-size:12px;color:var(--text-2)">'
         +   '<strong>' + esc(dayNames) + '</strong>' + esc(careStr)
         +   (r.unmatched && r.unmatched.length ? '<span style="color:#b45309"> · couldn\'t match: ' + esc(r.unmatched.join(', ')) + '</span>' : '')
@@ -4692,6 +4808,7 @@ function buildImportRows(csvRows) {
       + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
       + '<div class="import-row-weeks">' + r.weekLabel + '</div>'
       + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
+      + (r.exists ? dismissBtn : '')
       + '</div>';
   }).join('');
   document.getElementById('importPreview').style.display = 'block';
@@ -4752,12 +4869,47 @@ async function doImport() {
 }
 
 // ════════════════════ JOTFORM SYNC ════════════════════
-const JF = { key:'lbc_jf_key', form:'lbc_jf_form', last:'lbc_jf_last', auto:'lbc_jf_auto' };
+const JF = { key:'lbc_jf_key', form:'lbc_jf_form', last:'lbc_jf_last', auto:'lbc_jf_auto', dismissed:'lbc_jf_dismissed' };
 const JF_POLL_MS = 5 * 60 * 1000;
 let jotformSyncActive = false;   // true when the import preview was opened from a JotForm sync
 let jotformPollTimer = null;
 let jotformKickoffTimer = null;
 let jotformPollInProgress = false;
+
+// ── Dismissed-submissions ignore list ──
+// JotForm submission IDs that the admin has explicitly chosen to ignore on
+// future syncs (e.g. a "Test Test" entry, or a submission they've already
+// added manually). Stored in Firestore (durable, multi-device) with a local
+// cache so the filter applies even before the settings doc loads.
+function getDismissedIds() {
+  const fromFs = (window.jotformConfig && Array.isArray(window.jotformConfig.dismissed))
+    ? window.jotformConfig.dismissed : null;
+  if (fromFs) return new Set(fromFs.map(String));
+  try {
+    const raw = localStorage.getItem(JF.dismissed);
+    return new Set(raw ? JSON.parse(raw).map(String) : []);
+  } catch (e) { return new Set(); }
+}
+function isJotformSubmissionDismissed(id) {
+  if (!id) return false;
+  return getDismissedIds().has(String(id));
+}
+async function dismissJotformSubmission(id) {
+  if (!id) return;
+  const set = getDismissedIds(); set.add(String(id));
+  const arr = [...set];
+  // Local cache for instant effect
+  try { localStorage.setItem(JF.dismissed, JSON.stringify(arr)); } catch (e) {}
+  // Persist to Firestore for cross-device sync
+  await persistJotformConfig({ dismissed: arr });
+}
+async function undismissJotformSubmission(id) {
+  if (!id) return;
+  const set = getDismissedIds(); set.delete(String(id));
+  const arr = [...set];
+  try { localStorage.setItem(JF.dismissed, JSON.stringify(arr)); } catch (e) {}
+  await persistJotformConfig({ dismissed: arr });
+}
 
 function getJotformSettings() {
   const c = window.jotformConfig || {};
@@ -4834,20 +4986,63 @@ function jotformAnswerToRow(answers) {
     if (typeof value === 'string' || typeof value === 'number') {
       row[label] = String(value);
     } else if (Array.isArray(value)) {
-      row[label] = value.join(', ');
+      // Matrix questions (type === 'control_matrix') come back as a 2D array
+      // indexed by row, then column — e.g. answer[6][0] === 'Camp' means
+      // mrow[6] (Week 7) has the 0-th column (Camp) selected. Detected by the
+      // field type or by the inner element being an array. The previous code
+      // joined the outer array with ", " and lost all selections.
+      const isMatrix2D = a.type === 'control_matrix' ||
+        (value.length > 0 && Array.isArray(value[0]));
+      if (isMatrix2D) {
+        const mrows = (typeof a.mrows === 'string')
+          ? a.mrows.split('|') : (a.rows || []);
+        const mcols = (typeof a.mcolumns === 'string')
+          ? a.mcolumns.split('|') : (a.columns || []);
+        value.forEach((rowCells, ri) => {
+          if (!Array.isArray(rowCells)) return;
+          const rowName = mrows[ri] || ('Row ' + (ri + 1));
+          rowCells.forEach((cell, ci) => {
+            if (cell == null || cell === '' || cell === false || cell === '0') return;
+            const colName = mcols[ci] || ('Col ' + (ci + 1));
+            row[`${label} >> ${rowName} >> ${colName}`] = String(cell || colName);
+          });
+        });
+      } else {
+        row[label] = value.join(', ');
+      }
     } else if (typeof value === 'object') {
       if ('first' in value || 'last' in value) {
         row[label] = [value.prefix, value.first, value.middle, value.last, value.suffix].filter(Boolean).join(' ').trim();
       } else if ('addr_line1' in value || 'city' in value || 'postal' in value || 'state' in value) {
         row[label] = [value.addr_line1, value.addr_line2, value.city, value.state, value.postal, value.country].filter(Boolean).join(' ').trim();
       } else {
-        // Matrix question → one column per selected cell: "Question >> Row >> Column"
+        // Matrix question → one column per selected cell: "Question >> Row >> Column".
+        // JotForm's API can return each matrix row's value in any of these shapes:
+        //   {Camp: 'Camp'}          ← object whose keys are the chosen column(s)
+        //   ['Camp']                ← array of chosen columns
+        //   'Camp'                  ← single chosen column as a plain string
+        //   {Camp: '1', 'Pre-care': ''}  ← object with truthy values for chosen cells
+        // The original code only handled arrays + strings, so the object form
+        // (which JotForm uses for the camp-week matrix) was silently dropped,
+        // and a real Week 7 selection looked like "no weeks chosen at all."
         for (const rowKey in value) {
           const sel = value[rowKey];
+          if (sel == null || sel === '') continue;
           if (Array.isArray(sel)) {
             sel.forEach(col => { if (col) row[`${label} >> ${rowKey} >> ${col}`] = col; });
-          } else if (typeof sel === 'string' && sel) {
-            row[`${label} >> ${rowKey} >> ${sel}`] = sel;
+          } else if (typeof sel === 'string' || typeof sel === 'number') {
+            row[`${label} >> ${rowKey} >> ${sel}`] = String(sel);
+          } else if (typeof sel === 'object') {
+            // Object form: each key is a column name; presence (or a truthy value) marks it selected.
+            // Always store the COLUMN KEY as the cell value (e.g. 'Camp'), since
+            // downstream checks compare against the column name in lowercase
+            // (`=== 'camp'`). JotForm's actual cellVal can be '1', 'true', the
+            // column name, etc. — what matters is that it's truthy.
+            for (const colKey in sel) {
+              const cellVal = sel[colKey];
+              if (cellVal == null || cellVal === '' || cellVal === false || cellVal === '0') continue;
+              row[`${label} >> ${rowKey} >> ${colKey}`] = colKey;
+            }
           }
         }
       }
@@ -4864,6 +5059,8 @@ function submissionsToRows(subs) {
   return subs.map(s => {
     const r = jotformAnswerToRow(s.answers || {});
     r.__regDate = jotformYmd(s.created_at); // submission date = when the registration came in
+    r.__submissionId = String(s.id || ''); // stable ID for the dismiss list
+    r.__rawAnswers = s.answers || {};       // kept for diagnostics on unmatched submissions
     return r;
   });
 }
@@ -4896,13 +5093,21 @@ async function jotformSyncNow() {
     jotformSyncActive = true;
     buildImportRows(submissionsToRows(subs));
     const importable = importRows.filter(r => r.data && !r.exists).length;
+    const needsReview = importRows.filter(r => r.data === null).length;
     closeJotformSync();
-    if (!importable) {
+    if (!importable && !needsReview) {
       jotformSyncActive = false;
       persistJotformConfig({ lastSync: window._jfMaxCreated || '' });
       updateJotformBadge(0);
       showToast('JotForm is up to date — no new registrations.');
       return;
+    }
+    if (!importable && needsReview) {
+      // Nothing auto-importable, but there ARE registrations that came in and
+      // couldn't be parsed (e.g. unusual phrasing of daily days). Open the
+      // review preview so the admin can see and fix them — without this the
+      // sync would silently report "no new registrations".
+      showToast(needsReview + ' registration' + (needsReview === 1 ? '' : 's') + ' need' + (needsReview === 1 ? 's' : '') + ' review.', 'error');
     }
     openImportPreview('JotForm registrations to import');
   } catch (e) {
@@ -4951,10 +5156,18 @@ async function jotformPoll() {
         catch (e) { console.error('Auto-invoice error for', key, e); }
       }
       persistJotformConfig({ lastSync: newMax });
-      updateJotformBadge(0);
+      // Needs-review rows came in but couldn't be auto-imported (e.g. daily
+      // free-text the parser couldn't match to a week). Flag them so they
+      // aren't silently swallowed — leaving the badge lit nudges the admin
+      // to open the manual sync and fix them.
+      const needsReview = importRows.filter(r => r.data === null).length;
+      updateJotformBadge(needsReview);
       if (done) {
         const suffix = invoiceCount ? ` (${invoiceCount} invoice${invoiceCount===1?'':'s'} generated)` : '';
-        showToast(done + ' new registration' + (done === 1 ? '' : 's') + ' auto-imported from JotForm' + suffix + '.');
+        const reviewSuffix = needsReview ? ` — ${needsReview} need${needsReview===1?'s':''} review` : '';
+        showToast(done + ' new registration' + (done === 1 ? '' : 's') + ' auto-imported from JotForm' + suffix + reviewSuffix + '.');
+      } else if (needsReview) {
+        showToast(`${needsReview} JotForm registration${needsReview===1?'':'s'} need${needsReview===1?'s':''} review — tap Sync JotForm.`, 'error');
       }
     } else {
       updateJotformBadge(subs.length); // passive nudge
@@ -4965,6 +5178,42 @@ async function jotformPoll() {
     jotformPollInProgress = false;
   }
 }
+
+// Per-row Dismiss click: record the submission ID as ignored, remove its
+// row(s) from the live preview, and (if everything's now handled) close it.
+async function onDismissJotformRow(submissionId) {
+  if (!submissionId) return;
+  await dismissJotformSubmission(submissionId);
+  // Filter the staged rows in-place so other rows still on screen aren't lost
+  importRows = importRows.filter(r => String(r.submissionId || '') !== String(submissionId));
+  showToast('Submission dismissed — it won\u2019t appear again.');
+  // If there's nothing left in the preview, close it; otherwise re-render
+  const stillImportable = importRows.filter(r => r.data && !r.exists).length;
+  const stillReview     = importRows.filter(r => r.needsReview).length;
+  const stillExists     = importRows.filter(r => r.exists).length;
+  if (!importRows.length) { closeImport(); return; }
+  // Re-render the preview counts and list
+  document.getElementById('importPreviewTitle').textContent = importRows.length + ' registrations found';
+  const subParts = [stillImportable + ' new', stillExists + ' already exist (will skip)'];
+  if (stillReview) subParts.push(stillReview + ' need review');
+  document.getElementById('importPreviewSub').textContent = subParts.join(' · ');
+  // Re-trigger the existing renderer by calling buildImportRows? No — that
+  // would re-fetch state. The cheapest path is to remove the matching DOM
+  // nodes; or, simplest and safest, just trigger another sync to rebuild
+  // the preview from cached submissions. But the cached path isn't exposed,
+  // so we just remove the rows in the DOM and let counts update above.
+  const list = document.getElementById('importPreviewList');
+  if (list) {
+    // Find rows by walking children and removing those whose dismiss button
+    // matched this submission ID. Cheaper than a full re-render.
+    [...list.children].forEach(node => {
+      const btn = node.querySelector && node.querySelector('.import-dismiss[onclick*="' + submissionId + '"]');
+      if (btn) node.remove();
+    });
+  }
+  document.getElementById('importBtn').style.display = stillImportable > 0 ? 'flex' : 'none';
+}
+window.onDismissJotformRow = onDismissJotformRow;
 
 function startJotformAutoPoll() {
   // Clear ALL pending timers so re-entry can't schedule two parallel polls.
@@ -5223,6 +5472,11 @@ async function generateInvoiceFiles() {
       if (!existing.paymentMethod && data.payMethod) {
         const pm = normalizePaymentMethod(data.payMethod);
         if (pm) patch.paymentMethod = pm;
+      }
+      // Credit-card invoices are paid by Stripe up front — auto-check paidInFull.
+      const finalMethod = patch.paymentMethod || normalizePaymentMethod(existing.paymentMethod);
+      if (finalMethod === 'Credit' && existing.paidInFull !== true) {
+        patch.paidInFull = true;
       }
       await updateAdminFieldBulk(invoiceCamperKey, patch);
     } catch (saveErr) {
@@ -5650,10 +5904,19 @@ async function updateAdminField(key, field, value) {
     value = (value === '' ? null : parseFloat(value));
     if (typeof value === 'number' && !isFinite(value)) value = null; // NaN would poison totals
   }
+  // Manually flipping the payment method to Credit means it was paid by card
+  // (collected up front by Stripe), so auto-tick "paid in full" at the same
+  // time. Choosing any other method clears that auto-tick assumption.
+  let extra = null;
+  if (field === 'paymentMethod') {
+    const pm = (typeof normalizePaymentMethod === 'function') ? normalizePaymentMethod(value) : value;
+    const existing = (window.adminData && window.adminData.get(adminId(key))) || {};
+    if (pm === 'Credit' && existing.paidInFull !== true) extra = { paidInFull: true };
+  }
   try {
     await window._setDoc(
       window._doc(window._db, 'admin', adminId(key)),
-      { camperKey: key, [field]: value, updatedAt: window._serverTimestamp() },
+      { camperKey: key, [field]: value, ...(extra || {}), updatedAt: window._serverTimestamp() },
       { merge: true }
     );
   } catch (e) {
@@ -5799,6 +6062,13 @@ async function autoGenerateInvoiceForKey(key) {
   if (!existing.paymentMethod && data.payMethod) {
     const pm = normalizePaymentMethod(data.payMethod);
     if (pm) patch.paymentMethod = pm;
+  }
+  // Credit-card payments are collected by Stripe at submission time, so the
+  // invoice is already paid in full the moment it's generated. (E-transfers
+  // and cash are handled manually, so paidInFull stays unchecked for those.)
+  const finalMethod = patch.paymentMethod || normalizePaymentMethod(existing.paymentMethod);
+  if (finalMethod === 'Credit' && existing.paidInFull !== true) {
+    patch.paidInFull = true;
   }
   await updateAdminFieldBulk(key, patch);
   // Mirror in memory so the next auto-invoice in a batch picks the next number
