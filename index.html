@@ -1449,18 +1449,15 @@
     <img src="" alt="Little Ladybugs Camp" class="login-logo" id="loginLogo">
     <div class="login-title">Little Ladybugs Camp</div>
     <div class="login-sub">Please sign in to continue</div>
-    <form id="loginForm" onsubmit="doSignIn(event)">
-      <div class="login-field">
-        <label for="loginEmail">Email</label>
-        <input id="loginEmail" type="email" autocomplete="username" required>
-      </div>
-      <div class="login-field">
-        <label for="loginPassword">Password</label>
-        <input id="loginPassword" type="password" autocomplete="current-password" required>
-      </div>
-      <button class="login-btn" id="loginBtn" type="submit">Sign in</button>
-      <div class="login-error" id="loginError"></div>
-    </form>
+    <!--
+      The credential form (email + password fields) is NOT in the parsed HTML.
+      iOS Safari scans the document at load time to decide whether to pop its
+      "Fill Password" sheet, and a hidden / detached form still triggers it.
+      So the form is built from JS in buildLoginForm(), and only when showLogin()
+      is actually called. Once you're signed in, the document literally never
+      contains a password field, so the sheet has nothing to latch onto.
+    -->
+    <div id="loginFormMount"></div>
   </div>
 </div>
 
@@ -2462,27 +2459,41 @@ function requestAdmin(btn) {
 // finds login fields on the page that match a saved credential — EVEN when the
 // login overlay is hidden. So the email/password form must not merely be
 // hidden while signed in: it has to be physically removed from the document,
-// and re-attached only at the moment the login screen is actually shown.
-let _loginFormNode = null;
-let _loginFormParent = null;
-function detachLoginForm() {
-  const f = document.getElementById('loginForm');
-  if (f && f.parentNode) {
-    _loginFormNode = f;
-    _loginFormParent = f.parentNode;
-    f.parentNode.removeChild(f);
-  }
+// and only *built into existence* at the moment the login screen is actually
+// needed. A static <form> in the parsed HTML — hidden or detached later — is
+// still discovered by Safari at parse time, which is what was causing the
+// "Fill Password" sheet to pop over the signed-in homepage.
+function buildLoginForm() {
+  const mount = document.getElementById('loginFormMount');
+  if (!mount || document.getElementById('loginForm')) return; // already built
+  const form = document.createElement('form');
+  form.id = 'loginForm';
+  form.setAttribute('onsubmit', 'doSignIn(event)');
+  form.innerHTML =
+    '<div class="login-field">' +
+      '<label for="loginEmail">Email</label>' +
+      '<input id="loginEmail" type="email" autocomplete="username" required>' +
+    '</div>' +
+    '<div class="login-field">' +
+      '<label for="loginPassword">Password</label>' +
+      '<input id="loginPassword" type="password" autocomplete="current-password" required>' +
+    '</div>' +
+    '<button class="login-btn" id="loginBtn" type="submit">Sign in</button>' +
+    '<div class="login-error" id="loginError"></div>';
+  mount.appendChild(form);
 }
-function attachLoginForm() {
-  if (_loginFormNode && _loginFormParent && !document.getElementById('loginForm')) {
-    _loginFormParent.appendChild(_loginFormNode);
-  }
+function destroyLoginForm() {
+  // Drop focus first — a focused field can keep the iOS sheet alive — and
+  // wipe values before tear-down so nothing lingers in the DOM tree.
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+  const mount = document.getElementById('loginFormMount');
+  if (mount) mount.innerHTML = '';
 }
 
 function showLogin(message) {
   const ls = document.getElementById('loadingScreen');
   if (ls) { ls.style.opacity = '0'; ls.style.display = 'none'; }
-  attachLoginForm(); // put the email/password fields back in the page
+  buildLoginForm(); // create the credential fields right when needed
   const screen = document.getElementById('loginScreen');
   const err = document.getElementById('loginError');
   const btn = document.getElementById('loginBtn');
@@ -2503,10 +2514,7 @@ function showLogin(message) {
 function hideLogin() {
   const screen = document.getElementById('loginScreen');
   if (screen) screen.classList.remove('open');
-  // Drop focus first (a focused field can keep the iOS sheet alive), then
-  // remove the credential fields from the document entirely.
-  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
-  detachLoginForm();
+  destroyLoginForm();
 }
 
 // Show/hide UI based on the signed-in user's role.
@@ -6660,12 +6668,6 @@ async function saveAllImportedInvoices() {
 
 // Initial render (while Firebase loads)
 renderStats();
-// Remove the login fields from the document right away. While Firebase is
-// still restoring a previous session, the page would otherwise contain a
-// hidden password field — which is enough for iPhone Safari to pop the
-// Face ID "Fill Password" sheet over a signed-in session. showLogin()
-// re-attaches the form if sign-in is actually needed.
-detachLoginForm();
 // JotForm polling is started by onJotformConfigLoaded (admins only), once the
 // settings doc arrives — never unconditionally, so employees and signed-out
 // sessions never poll.
