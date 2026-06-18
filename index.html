@@ -1309,6 +1309,26 @@
     border-bottom: 1px solid var(--border); background: var(--sidebar-bg);
     position: sticky; top: 0;
   }
+  .admin-table thead th.sortable {
+    cursor: pointer; user-select: none; -webkit-user-select: none;
+    transition: color .15s;
+  }
+  .admin-table thead th.sortable:hover { color: var(--text-2); }
+  .sort-ind {
+    display: inline-flex; flex-direction: column; vertical-align: middle;
+    margin-left: 5px; gap: 1px; opacity: .35; transition: opacity .15s;
+  }
+  .admin-table thead th.sortable:hover .sort-ind { opacity: .7; }
+  .sort-ind::before, .sort-ind::after {
+    content: ''; display: block; width: 0; height: 0;
+    border-left: 4px solid transparent; border-right: 4px solid transparent;
+  }
+  .sort-ind::before { border-bottom: 4px solid currentColor; }
+  .sort-ind::after  { border-top:    4px solid currentColor; }
+  .sort-ind.asc, .sort-ind.desc { opacity: 1; color: var(--green); }
+  .sort-ind.asc::after  { visibility: hidden; }
+  .sort-ind.desc::before { visibility: hidden; }
+  .admin-table thead th.sortable.active { color: var(--green); }
   .admin-table tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   .admin-table tbody tr:last-child td { border-bottom: none; }
   .admin-table tbody tr:hover { background: var(--bg); }
@@ -1601,14 +1621,14 @@
             <table class="admin-table">
               <thead>
                 <tr>
-                  <th>Camper</th>
-                  <th>Parent</th>
-                  <th>Invoice #</th>
-                  <th>Total amount</th>
+                  <th class="sortable" data-sort="camper" onclick="toggleAdminSort('camper')">Camper <span class="sort-ind" id="sort-ind-camper"></span></th>
+                  <th class="sortable" data-sort="parent" onclick="toggleAdminSort('parent')">Parent <span class="sort-ind" id="sort-ind-parent"></span></th>
+                  <th class="sortable" data-sort="invoice" onclick="toggleAdminSort('invoice')">Invoice # <span class="sort-ind" id="sort-ind-invoice"></span></th>
+                  <th class="sortable" data-sort="total" onclick="toggleAdminSort('total')">Total amount <span class="sort-ind" id="sort-ind-total"></span></th>
                   <th>Payment method</th>
                   <th style="text-align:center">Paid in full</th>
-                  <th>Amount paid</th>
-                  <th>Owed</th>
+                  <th class="sortable" data-sort="paid" onclick="toggleAdminSort('paid')">Amount paid <span class="sort-ind" id="sort-ind-paid"></span></th>
+                  <th class="sortable" data-sort="owed" onclick="toggleAdminSort('owed')">Owed <span class="sort-ind" id="sort-ind-owed"></span></th>
                   <th>Notes</th>
                 </tr>
               </thead>
@@ -2407,6 +2427,7 @@ let weeklyTF = 'all';
 
 // ── Admin page ──
 let adminSQ = ''; // admin search
+let _adminSort = { key: 'camper', dir: 'asc' };
 
 // ── Navigation ──
 function showPage(id, btn) {
@@ -5790,11 +5811,37 @@ function renderAdmin() {
   if (adminSQ) {
     groups = groups.filter(g => ((g.first||'')+' '+(g.last||'')).toLowerCase().includes(adminSQ));
   }
-  // Refunded rows sink to the bottom
+  // Apply user-selected sort, but always sink refunded rows to the bottom so
+  // they don't interfere with the active roster's totals view.
+  const sortKey = _adminSort.key;
+  const dir = _adminSort.dir === 'desc' ? -1 : 1;
+  const ofGroup = (g) => {
+    const rec = window.adminData.get(adminId(g.key)) || {};
+    switch (sortKey) {
+      case 'camper':  return ((g.last||'') + ' ' + (g.first||'')).toLowerCase();
+      case 'parent':  return ((g.registrations[0]?.parent || '')).toLowerCase();
+      case 'invoice': return parseInt((rec.invoiceNumber || '').toString().replace(/\D/g,''), 10) || 0;
+      case 'total':   return parseFloat(rec.totalAmount) || 0;
+      case 'paid':    return rec.paidInFull ? (parseFloat(rec.totalAmount) || 0) : (parseFloat(rec.amountPaid) || 0);
+      case 'owed': {
+        const t = parseFloat(rec.totalAmount) || 0;
+        if (rec.paidInFull) return 0;
+        return Math.max(0, t - (parseFloat(rec.amountPaid) || 0));
+      }
+      default: return 0;
+    }
+  };
   groups.sort((a,b) => {
+    // 1) refunded always last
     const ar = a.registrations[0]?.refunded ? 1 : 0;
     const br = b.registrations[0]?.refunded ? 1 : 0;
-    return ar - br;
+    if (ar !== br) return ar - br;
+    // 2) user-selected column
+    const av = ofGroup(a), bv = ofGroup(b);
+    if (typeof av === 'string' || typeof bv === 'string') {
+      return String(av).localeCompare(String(bv)) * dir;
+    }
+    return (av - bv) * dir;
   });
   if (!groups.length) {
     body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-3);padding:30px">No campers found</td></tr>';
@@ -5896,7 +5943,36 @@ function renderAdmin() {
     </tr>`;
 
   body.innerHTML = rowsHtml + totalsRow;
+  // Reflect current sort in the column headers (chevron + accent color)
+  ['camper','parent','invoice','total','paid','owed'].forEach(k => {
+    const ind = document.getElementById('sort-ind-' + k);
+    const th  = document.querySelector('.admin-table th[data-sort="' + k + '"]');
+    if (!ind || !th) return;
+    if (k === _adminSort.key) {
+      ind.className = 'sort-ind ' + _adminSort.dir;
+      th.classList.add('active');
+    } else {
+      ind.className = 'sort-ind';
+      th.classList.remove('active');
+    }
+  });
 }
+
+// Click a sortable header to toggle that column's direction (or switch to it
+// in its default direction if it wasn't active). Camper/Parent default to
+// ascending (A→Z); numeric columns default to descending (highest first),
+// which is what's typically useful — e.g. "who owes the most?"
+function toggleAdminSort(key) {
+  const numeric = (key === 'invoice' || key === 'total' || key === 'paid' || key === 'owed');
+  const defaultDir = numeric ? 'desc' : 'asc';
+  if (_adminSort.key === key) {
+    _adminSort.dir = (_adminSort.dir === 'asc') ? 'desc' : 'asc';
+  } else {
+    _adminSort = { key, dir: defaultDir };
+  }
+  renderAdmin();
+}
+window.toggleAdminSort = toggleAdminSort;
 
 // Write a single admin field (merges into the camper's admin record)
 async function updateAdminField(key, field, value) {
