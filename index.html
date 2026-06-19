@@ -301,6 +301,85 @@
   .dash-chart-baseline { stroke: var(--border); stroke-width: 1.5; }
   .dash-legend { display: flex; gap: 16px; justify-content: center; padding: 4px 0 10px; font-size: 12px; color: var(--text-2); }
   .dash-legend-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+
+  /* ── Activities page ── */
+  .act-day-picker {
+    display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 14px;
+    margin-bottom: 18px; border-bottom: 1px solid var(--border);
+    scrollbar-width: thin;
+  }
+  .act-day-pill {
+    flex: 0 0 auto; padding: 9px 12px; border-radius: 10px; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-2);
+    font-size: 12px; font-weight: 500; text-align: center; line-height: 1.25;
+    min-width: 64px; transition: background .15s, border-color .15s, color .15s;
+  }
+  .act-day-pill:hover { background: var(--bg); color: var(--text); }
+  .act-day-pill .act-day-pill-d { font-size: 16px; font-weight: 700; color: var(--text); display:block; }
+  .act-day-pill .act-day-pill-w { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .4px; display:block; }
+  .act-day-pill.active { background: var(--green); border-color: var(--green); color: #fff; }
+  .act-day-pill.active .act-day-pill-d, .act-day-pill.active .act-day-pill-w { color: #fff; }
+  .act-day-pill.today:not(.active) { border-color: var(--green); }
+
+  .act-day-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  .act-day-title { font-family: var(--font-serif, Fraunces, serif); font-size: 26px; font-weight: 600; color: var(--text); margin: 0; }
+  .act-day-meta { font-size: 13px; color: var(--text-3); }
+  .act-day-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .act-section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .act-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .act-section-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--text); margin: 0; }
+  .act-section-title i { font-size: 18px; }
+  .act-section-title.indoor i  { color: #6B7CD6; }
+  .act-section-title.outdoor i { color: #6A9D5B; }
+  .act-section-count { font-size: 12px; color: var(--text-3); font-weight: 500; }
+
+  .act-list { display: flex; flex-direction: column; gap: 8px; }
+  .act-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg);
+  }
+  .act-item-body { flex: 1; min-width: 0; }
+  .act-item-title { font-weight: 600; color: var(--text); font-size: 14px; }
+  .act-item-desc  { color: var(--text-2); font-size: 13px; margin-top: 2px; white-space: pre-wrap; word-wrap: break-word; }
+  .act-item-meta  { display: flex; gap: 12px; align-items: center; margin-top: 5px; font-size: 12px; color: var(--text-3); flex-wrap: wrap; }
+  .act-item-meta a { color: var(--green); text-decoration: none; }
+  .act-item-meta a:hover { text-decoration: underline; }
+  .act-item-actions { display: flex; gap: 2px; flex-shrink: 0; }
+  .act-empty { font-size: 13px; color: var(--text-3); padding: 10px 4px; text-align: center; font-style: italic; }
+
+  .act-import-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .act-import-tab {
+    background: none; border: none; padding: 9px 14px; cursor: pointer;
+    color: var(--text-3); font-weight: 500; font-size: 13px;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .act-import-tab:hover { color: var(--text-2); }
+  .act-import-tab.active { color: var(--green); border-bottom-color: var(--green); }
+  .act-import-hint { font-size: 12px; color: var(--text-3); margin-top: 6px; }
+  .act-import-preview { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .act-import-preview-head { font-size: 13px; color: var(--text-2); margin-bottom: 10px; }
+  .act-import-row {
+    display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border);
+    align-items: center;
+  }
+  .act-import-row:last-child { border-bottom: none; }
+  .act-import-row-body { flex: 1; min-width: 0; }
+  .act-import-row-title { font-weight: 600; font-size: 14px; color: var(--text); }
+  .act-import-row-desc { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+  .act-import-row select { padding: 5px 8px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
+  .act-import-row .act-skip { font-size: 11px; padding: 3px 8px; border-radius: 6px; background: transparent; color: var(--text-3); border: 1px solid var(--border); cursor: pointer; }
+  .act-import-row .act-skip:hover { color: var(--text); }
+  .form-row { margin-bottom: 12px; }
+  .form-row-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-label { display: block; font-size: 12px; font-weight: 500; color: var(--text-2); margin-bottom: 5px; }
+  .form-input {
+    width: 100%; padding: 9px 11px; font-size: 14px; box-sizing: border-box;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text);
+    font-family: inherit;
+  }
+  .form-input:focus { outline: 2px solid var(--green); outline-offset: -1px; border-color: var(--green); }
   .stat-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -1156,6 +1235,13 @@
     .dash-table thead th, .dash-table tbody td { padding: 9px 11px; }
     .dash-chart-wrap { padding: 14px 4px 6px; }
 
+    /* Activities on mobile */
+    .act-day-pill { padding: 7px 10px; min-width: 56px; }
+    .act-day-pill .act-day-pill-d { font-size: 15px; }
+    .act-day-title { font-size: 22px; }
+    .act-section { padding: 12px; }
+    .form-row-grid { grid-template-columns: 1fr; gap: 8px; }
+
     /* ── Toolbar ── */
     .toolbar { gap: 6px; margin-bottom: 12px; }
     .search-wrap { min-width: 0; }
@@ -1514,6 +1600,9 @@
       <button class="nav-item active" data-page="roster" onclick="showPage('roster',this)">
         <i class="ti ti-users"></i> Campers
       </button>
+      <button class="nav-item" data-page="activities" onclick="showPage('activities',this)">
+        <i class="ti ti-tent"></i> Activities
+      </button>
       <button class="nav-item" data-page="weekly" onclick="showPage('weekly',this)">
         <i class="ti ti-calendar-event"></i> Weekly Roster
       </button>
@@ -1585,6 +1674,17 @@
             </table>
           </div>
         </section>
+      </div>
+    </div>
+
+    <!-- Activities page -->
+    <div id="page-activities" class="page">
+      <div class="top-bar">
+        <h1 class="page-heading">Activities</h1>
+      </div>
+      <div style="padding:20px var(--page-pad-x) 28px">
+        <div class="act-day-picker" id="actDayPicker"></div>
+        <div class="act-day-content" id="actDayContent"></div>
       </div>
     </div>
 
@@ -1939,6 +2039,10 @@
         <i class="ti ti-users"></i>
         Campers
       </button>
+      <button class="mobile-nav-btn nav-item" data-page="activities" onclick="showPage('activities',this)">
+        <i class="ti ti-tent"></i>
+        Activities
+      </button>
       <button class="mobile-nav-btn nav-item" data-page="weekly" onclick="showPage('weekly',this)">
         <i class="ti ti-calendar-event"></i>
         Weekly
@@ -1953,6 +2057,97 @@
       </button>
     </div>
   </nav>
+</div>
+
+
+<!-- Activity Add/Edit Modal -->
+<div class="modal-overlay" id="activityModal" onclick="if(event.target===this)closeActivityModal()">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="activityModalTitle">Add activity</div>
+      <button class="btn btn-icon" onclick="closeActivityModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label" for="actTitle">Title</label>
+        <input id="actTitle" type="text" class="form-input" placeholder="e.g. Nature walk in the park">
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="actDesc">Description</label>
+        <textarea id="actDesc" class="form-input" rows="3" placeholder="Optional details, what to bring, etc."></textarea>
+      </div>
+      <div class="form-row form-row-grid">
+        <div>
+          <label class="form-label" for="actTime">Time</label>
+          <input id="actTime" type="text" class="form-input" placeholder="e.g. 10:00 AM or 10–11">
+        </div>
+        <div>
+          <label class="form-label" for="actLocation">Location</label>
+          <select id="actLocation" class="form-input">
+            <option value="indoor">Indoor</option>
+            <option value="outdoor">Outdoor</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label" for="actSource">Source URL (optional)</label>
+        <input id="actSource" type="url" class="form-input" placeholder="https://…">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="saveActivity()">
+        <i class="ti ti-check"></i> <span id="actSaveLabel">Add activity</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Activity Import Modal -->
+<div class="modal-overlay" id="activityImportOverlay" onclick="if(event.target===this)closeActivityImport()">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title">Import activities</div>
+      <button class="btn btn-icon" onclick="closeActivityImport()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="act-import-tabs">
+        <button class="act-import-tab active" data-tab="url"  onclick="setActImportTab('url')">Web page</button>
+        <button class="act-import-tab"        data-tab="text" onclick="setActImportTab('text')">Paste text</button>
+        <button class="act-import-tab"        data-tab="pdf"  onclick="setActImportTab('pdf')">PDF</button>
+      </div>
+
+      <div class="act-import-panel" id="actImportPanel-url">
+        <label class="form-label" for="actUrlInput">URL of an activities page</label>
+        <input id="actUrlInput" type="url" class="form-input" placeholder="https://example.com/summer-activities">
+        <div class="act-import-hint">The browser may block direct fetching for some sites. If a URL fails, switch to Paste text instead.</div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:10px" onclick="actImportFromUrl()">
+          <i class="ti ti-world-download"></i> Fetch &amp; parse
+        </button>
+      </div>
+
+      <div class="act-import-panel" id="actImportPanel-text" style="display:none">
+        <label class="form-label" for="actTextInput">Paste page text, email, or any list of activities</label>
+        <textarea id="actTextInput" class="form-input" rows="8" placeholder="Paste anything — bullet lists, paragraphs, emails…"></textarea>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:10px" onclick="actImportFromText()">
+          <i class="ti ti-text-scan-2"></i> Parse text
+        </button>
+      </div>
+
+      <div class="act-import-panel" id="actImportPanel-pdf" style="display:none">
+        <label class="form-label">Upload a PDF</label>
+        <input id="actPdfInput" type="file" accept="application/pdf" onchange="actImportFromPdf(this.files[0])">
+        <div class="act-import-hint">Text-based PDFs work best. Scanned images won't parse.</div>
+      </div>
+
+      <div class="act-import-preview" id="actImportPreview" style="display:none">
+        <div class="act-import-preview-head">
+          <div><strong id="actImportFoundCount">0</strong> activities detected — review before saving</div>
+        </div>
+        <div id="actImportList"></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:10px" id="actImportSaveBtn" onclick="saveAllImportedActivities()">
+          <i class="ti ti-check"></i> Save all to this day
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
 
@@ -2350,9 +2545,10 @@ window._fetchFinances = async function() {
   return out;
 };
 
-const campersRef  = collection(db, "campers");
-const adminRef    = collection(db, "admin");
-const settingsRef = doc(db, "settings", "jotform");
+const campersRef    = collection(db, "campers");
+const adminRef      = collection(db, "admin");
+const activitiesRef = collection(db, "activities");
+const settingsRef   = doc(db, "settings", "jotform");
 
 // Real-time listeners are only started AFTER a verified sign-in, so that once
 // the database rules are locked down they never fire while signed-out (which
@@ -2449,6 +2645,25 @@ function startDataListeners() {
     const ls = document.getElementById('loadingScreen');
     if (ls) { ls.style.opacity = '0'; setTimeout(() => ls.style.display='none', 300); }
   }));
+
+  // Activities (visible to all signed-in users). Re-renders the Activities
+  // page if it's currently open. Debounced like the other listeners.
+  let _actTimer = null;
+  _unsubscribers.push(onSnapshot(activitiesRef, (snap) => {
+    window._activities = [];
+    snap.forEach(d => window._activities.push({ id: d.id, ...d.data() }));
+    // The activities module reads from its own module-scope variable, so push
+    // the data in there too via the window proxy that the module reads.
+    if (typeof window._setActivities === 'function') window._setActivities(window._activities);
+    if (_actTimer) clearTimeout(_actTimer);
+    _actTimer = setTimeout(() => {
+      _actTimer = null;
+      const ap = document.getElementById('page-activities');
+      if (typeof window.renderActivities === 'function' && ap && ap.classList.contains('active')) {
+        window.renderActivities();
+      }
+    }, 80);
+  }, (err) => console.error('activities snapshot error', err)));
 }
 
 function stopDataListeners() {
@@ -2539,6 +2754,7 @@ function showPage(id, btn) {
     if (x.dataset.page === id || onclickAttr.includes("showPage('" + id + "'")) x.classList.add('active');
   });
   if (id === 'dashboard') renderDashboard();
+  if (id === 'activities') renderActivities();
   if (id === 'calendar') rCal();
   if (id === 'weekly') { populateWeekButtons(); rWeekly(); }
   if (id === 'admin') renderAdmin();
@@ -3628,6 +3844,510 @@ function buildEnrollmentChart(data) {
     `</div>`
   );
 }
+
+// ════════════════════ ACTIVITIES ════════════════════
+// One sub-page per camp weekday (Mon-Fri across all 7 weeks, skipping the Civic
+// Holiday in Week 4). Activities are stored in Firestore at /activities/{id}
+// with fields: { date: 'YYYY-MM-DD', location: 'indoor'|'outdoor', title,
+// description, time, sourceUrl, createdBy, createdAt, updatedAt }. Visible to
+// everyone signed in; admins + employees can add/edit; only admins can delete.
+
+let _activities = []; // local cache, refreshed on demand
+let _actActiveDate = null; // currently selected YYYY-MM-DD
+let _actImportTab = 'url';
+let _actImportPending = []; // staged activities awaiting save
+let _actEditingId = null; // when set, saveActivity updates instead of inserting
+
+// Generate the list of camp weekdays (Mon-Fri, minus holidays) from WEEKS.
+// `holidayDays` is indexed from Monday (0=Mon, 1=Tue, ... 4=Fri), with `start`
+// being the first ACTUAL camp day. For Week 4 the week starts on a Tuesday
+// because Monday is the Civic Holiday — we iterate from `mondayDate` (the
+// week's real Monday) when present, else from `start`, then skip holidays.
+function actCampDays() {
+  const days = [];
+  WEEKS.forEach(wk => {
+    const baseStr = wk.mondayDate || wk.start;
+    const base = new Date(baseStr + 'T00:00:00');
+    const holidays = wk.holidayDays || [];
+    for (let i = 0; i < 5; i++) {
+      if (holidays.includes(i)) continue;
+      const d = new Date(base);
+      d.setDate(d.getDate() + i);
+      days.push({
+        ymd: d.getFullYear() + '-' +
+             String(d.getMonth() + 1).padStart(2, '0') + '-' +
+             String(d.getDate()).padStart(2, '0'),
+        date: d,
+        weekLabel: wk.label
+      });
+    }
+  });
+  return days;
+}
+
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function actFmtFull(d) {
+  return DAY_NAMES[d.getDay()] + ', ' + MONTH_NAMES[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+
+// ── Indoor/outdoor classifier ── lightweight keyword match. Defaults to indoor
+// when the text doesn't hint either way (most camp activities default outdoor
+// in summer, BUT defaulting to indoor is safer because the admin will likely
+// notice and re-tag the few outdoor ones — the reverse leaves indoor crafts
+// mis-tagged as outdoor). The auto-tag is always editable in the review step.
+const OUTDOOR_KEYWORDS = /\b(park|playground|outdoor|outside|nature|hike|trail|garden|field|lawn|backyard|pool|swim|swimming|beach|lake|river|picnic|bike|biking|cycling|sport|sports|soccer|baseball|basketball|tennis|frisbee|kite|scavenger|forest|woods|tree|sunshine|sunny|grass|patio|terrace|gazebo|tag|relay|water\s+balloon|sprinkler|squirt|water\s+gun|outdoor\s+games)\b/i;
+const INDOOR_KEYWORDS  = /\b(indoor|inside|craft|crafts|art|drawing|painting|paint|clay|cooking|baking|story|reading|book|library|music|sing|sang|movie|film|video|board\s+game|puzzle|lego|origami|knitting|sewing|science\s+experiment|chemistry|gym|studio|classroom|kitchen|theater|theatre|stage|dance\s+class)\b/i;
+function actClassifyLocation(text) {
+  if (!text) return 'indoor';
+  if (OUTDOOR_KEYWORDS.test(text) && !INDOOR_KEYWORDS.test(text)) return 'outdoor';
+  if (INDOOR_KEYWORDS.test(text) && !OUTDOOR_KEYWORDS.test(text)) return 'indoor';
+  // Both or neither → default indoor (safer to nudge admin to re-tag than to
+  // accidentally pretend a craft is outdoor)
+  return 'indoor';
+}
+
+// ── Permissions ──
+function actCanEdit()   { return window._userRole === 'admin' || window._userRole === 'employee'; }
+function actCanDelete() { return window._userRole === 'admin'; }
+
+// ── Day picker ──
+function renderActivities() {
+  const page = document.getElementById('page-activities');
+  if (!page) return;
+  const days = actCampDays();
+  if (!days.length) return;
+
+  // Pick today if it's a camp day, else default to the first camp day
+  if (!_actActiveDate) {
+    const today = new Date();
+    const ymd = today.getFullYear() + '-' +
+                String(today.getMonth() + 1).padStart(2, '0') + '-' +
+                String(today.getDate()).padStart(2, '0');
+    _actActiveDate = days.some(d => d.ymd === ymd) ? ymd : days[0].ymd;
+  }
+  // If the previously-active date is no longer in the list (shouldn't normally
+  // happen, but defensive), fall back to the first day.
+  if (!days.some(d => d.ymd === _actActiveDate)) _actActiveDate = days[0].ymd;
+
+  // Build the horizontal pill scroller
+  const picker = document.getElementById('actDayPicker');
+  const todayYmd = (function() {
+    const t = new Date();
+    return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+  })();
+  picker.innerHTML = days.map(d => {
+    const classes = ['act-day-pill'];
+    if (d.ymd === _actActiveDate) classes.push('active');
+    if (d.ymd === todayYmd) classes.push('today');
+    return `<button class="${classes.join(' ')}" onclick="setActivityDay('${d.ymd}')">
+      <span class="act-day-pill-w">${DAY_NAMES[d.date.getDay()]}</span>
+      <span class="act-day-pill-d">${d.date.getDate()}</span>
+      <span class="act-day-pill-w">${MONTH_NAMES[d.date.getMonth()]}</span>
+    </button>`;
+  }).join('');
+
+  // Scroll the active pill into view (handy when navigating to "today" mid-summer)
+  setTimeout(() => {
+    const active = picker.querySelector('.act-day-pill.active');
+    if (active && active.scrollIntoView) {
+      try { active.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' }); } catch(e) {}
+    }
+  }, 0);
+
+  renderActivityDay();
+}
+
+function setActivityDay(ymd) {
+  _actActiveDate = ymd;
+  renderActivities();
+}
+window.setActivityDay = setActivityDay;
+
+// Render the content for the currently-selected day
+function renderActivityDay() {
+  const wrap = document.getElementById('actDayContent');
+  if (!wrap) return;
+  const ymd = _actActiveDate;
+  const d = new Date(ymd + 'T00:00:00');
+  const dayActs = _activities.filter(a => a.date === ymd);
+  const indoor  = dayActs.filter(a => a.location === 'indoor');
+  const outdoor = dayActs.filter(a => a.location === 'outdoor');
+  const canEdit = actCanEdit();
+
+  const headerActions = canEdit ? `
+    <div class="act-day-actions">
+      <button class="btn btn-sm" onclick="openActivityModal('indoor')"><i class="ti ti-plus"></i> Add activity</button>
+      <button class="btn btn-sm" onclick="openActivityImport()"><i class="ti ti-file-import"></i> Import</button>
+    </div>` : '';
+
+  const indoorRows = indoor.length
+    ? indoor.map(a => activityItemHtml(a)).join('')
+    : '<div class="act-empty">No indoor activities for this day yet.</div>';
+  const outdoorRows = outdoor.length
+    ? outdoor.map(a => activityItemHtml(a)).join('')
+    : '<div class="act-empty">No outdoor activities for this day yet.</div>';
+
+  wrap.innerHTML = `
+    <div class="act-day-header">
+      <div>
+        <h2 class="act-day-title">${esc(actFmtFull(d))}</h2>
+        <div class="act-day-meta">${esc((days_for(ymd)||{}).weekLabel || '')}</div>
+      </div>
+      ${headerActions}
+    </div>
+    <div class="act-section">
+      <div class="act-section-head">
+        <h3 class="act-section-title indoor"><i class="ti ti-home"></i> Indoor</h3>
+        <span class="act-section-count">${indoor.length} activit${indoor.length === 1 ? 'y' : 'ies'}</span>
+      </div>
+      <div class="act-list">${indoorRows}</div>
+    </div>
+    <div class="act-section">
+      <div class="act-section-head">
+        <h3 class="act-section-title outdoor"><i class="ti ti-tree"></i> Outdoor</h3>
+        <span class="act-section-count">${outdoor.length} activit${outdoor.length === 1 ? 'y' : 'ies'}</span>
+      </div>
+      <div class="act-list">${outdoorRows}</div>
+    </div>`;
+}
+
+// Helper: look up the camp-day record for a given ymd (to get the week label)
+function days_for(ymd) {
+  return actCampDays().find(d => d.ymd === ymd);
+}
+
+function activityItemHtml(a) {
+  const canEdit = actCanEdit();
+  const canDel  = actCanDelete();
+  const idEsc = jsArg(a.id);
+  const actions = (canEdit || canDel) ? `
+    <div class="act-item-actions">
+      ${canEdit ? `<button class="btn btn-ghost btn-icon" title="Edit" onclick="editActivity('${idEsc}')"><i class="ti ti-pencil"></i></button>` : ''}
+      ${canDel  ? `<button class="btn btn-ghost btn-icon" title="Delete" onclick="deleteActivity('${idEsc}')"><i class="ti ti-trash"></i></button>` : ''}
+    </div>` : '';
+  const meta = [];
+  if (a.time)      meta.push(`<span><i class="ti ti-clock"></i> ${esc(a.time)}</span>`);
+  if (a.sourceUrl) meta.push(`<a href="${esc(a.sourceUrl)}" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link"></i> Source</a>`);
+  return `<div class="act-item">
+    <div class="act-item-body">
+      <div class="act-item-title">${esc(a.title || '(untitled)')}</div>
+      ${a.description ? `<div class="act-item-desc">${esc(a.description)}</div>` : ''}
+      ${meta.length ? `<div class="act-item-meta">${meta.join('')}</div>` : ''}
+    </div>
+    ${actions}
+  </div>`;
+}
+
+// ── Add / Edit modal ──
+function openActivityModal(defaultLoc) {
+  if (!actCanEdit()) { showToast('Sign in as admin or employee to add activities', 'error'); return; }
+  _actEditingId = null;
+  document.getElementById('activityModalTitle').textContent = 'Add activity';
+  document.getElementById('actSaveLabel').textContent = 'Add activity';
+  document.getElementById('actTitle').value = '';
+  document.getElementById('actDesc').value = '';
+  document.getElementById('actTime').value = '';
+  document.getElementById('actSource').value = '';
+  document.getElementById('actLocation').value = defaultLoc || 'indoor';
+  document.getElementById('activityModal').classList.add('open');
+  setTimeout(() => document.getElementById('actTitle').focus(), 60);
+}
+window.openActivityModal = openActivityModal;
+function closeActivityModal() {
+  document.getElementById('activityModal').classList.remove('open');
+  _actEditingId = null;
+}
+window.closeActivityModal = closeActivityModal;
+
+function editActivity(id) {
+  if (!actCanEdit()) return;
+  const a = _activities.find(x => x.id === id);
+  if (!a) return;
+  _actEditingId = id;
+  document.getElementById('activityModalTitle').textContent = 'Edit activity';
+  document.getElementById('actSaveLabel').textContent = 'Save changes';
+  document.getElementById('actTitle').value = a.title || '';
+  document.getElementById('actDesc').value = a.description || '';
+  document.getElementById('actTime').value = a.time || '';
+  document.getElementById('actSource').value = a.sourceUrl || '';
+  document.getElementById('actLocation').value = a.location || 'indoor';
+  document.getElementById('activityModal').classList.add('open');
+  setTimeout(() => document.getElementById('actTitle').focus(), 60);
+}
+window.editActivity = editActivity;
+
+async function saveActivity() {
+  if (!actCanEdit()) { showToast('Permission denied', 'error'); return; }
+  const title = document.getElementById('actTitle').value.trim();
+  if (!title) { showToast('Please enter a title', 'error'); document.getElementById('actTitle').focus(); return; }
+  const data = {
+    date: _actActiveDate,
+    location: document.getElementById('actLocation').value,
+    title,
+    description: document.getElementById('actDesc').value.trim(),
+    time: document.getElementById('actTime').value.trim(),
+    sourceUrl: document.getElementById('actSource').value.trim(),
+    updatedAt: window._serverTimestamp()
+  };
+  try {
+    if (_actEditingId) {
+      await window._updateDoc(window._doc(window._db, 'activities', _actEditingId), data);
+      showToast('Activity updated');
+    } else {
+      data.createdAt = window._serverTimestamp();
+      data.createdBy = (window._userEmail || '').toLowerCase();
+      await window._addDoc(window._collection(window._db, 'activities'), data);
+      showToast('Activity added');
+    }
+    closeActivityModal();
+  } catch (e) {
+    showToast('Could not save: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+window.saveActivity = saveActivity;
+
+async function deleteActivity(id) {
+  if (!actCanDelete()) { showToast('Only admins can delete activities', 'error'); return; }
+  const a = _activities.find(x => x.id === id);
+  if (!a) return;
+  if (!confirm('Delete this activity?')) return;
+  try {
+    await window._deleteDoc(window._doc(window._db, 'activities', id));
+    showToast('Activity deleted');
+  } catch (e) {
+    showToast('Could not delete: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+window.deleteActivity = deleteActivity;
+
+// ── Import modal ──
+function openActivityImport() {
+  if (!actCanEdit()) { showToast('Sign in as admin or employee to add activities', 'error'); return; }
+  _actImportPending = [];
+  document.getElementById('actImportPreview').style.display = 'none';
+  document.getElementById('actImportList').innerHTML = '';
+  document.getElementById('actUrlInput').value = '';
+  document.getElementById('actTextInput').value = '';
+  const pdfIn = document.getElementById('actPdfInput'); if (pdfIn) pdfIn.value = '';
+  setActImportTab('url');
+  document.getElementById('activityImportOverlay').classList.add('open');
+}
+window.openActivityImport = openActivityImport;
+function closeActivityImport() {
+  document.getElementById('activityImportOverlay').classList.remove('open');
+}
+window.closeActivityImport = closeActivityImport;
+
+function setActImportTab(tab) {
+  _actImportTab = tab;
+  document.querySelectorAll('.act-import-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  ['url','text','pdf'].forEach(t => {
+    const p = document.getElementById('actImportPanel-' + t);
+    if (p) p.style.display = t === tab ? '' : 'none';
+  });
+}
+window.setActImportTab = setActImportTab;
+
+// ── Core text-to-activities parser ──
+// Generic, format-flexible: handles bullet lists, numbered lists, blank-line
+// separated paragraphs, and lines that look like "10:00 AM — Activity name".
+// Each returned object: { title, description, time, location } (the user
+// confirms/edits location in the preview).
+function parseActivitiesFromText(text) {
+  if (!text) return [];
+  // Normalize whitespace
+  const clean = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\u2022|·|●|◦|▪|■|–|—/g, m => (m === '–' || m === '—') ? '—' : '•')
+    .replace(/[\t ]+/g, ' ');
+
+  // Split into candidate item-strings. Try in order:
+  //   1) Lines beginning with a bullet (•, *, -)
+  //   2) Lines beginning with a number+dot ("1.", "2)")
+  //   3) Non-blank lines (whole-line items)
+  //   4) Blank-line-separated paragraphs (each paragraph = one activity)
+  let items = [];
+  const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
+  const bulletLines = lines.filter(l => /^[•*\-]\s/.test(l));
+  const numLines    = lines.filter(l => /^\d+[.)]\s/.test(l));
+  if (bulletLines.length >= 2) {
+    items = bulletLines.map(l => l.replace(/^[•*\-]\s+/, '').trim());
+  } else if (numLines.length >= 2) {
+    items = numLines.map(l => l.replace(/^\d+[.)]\s+/, '').trim());
+  } else {
+    // Fall back to non-blank lines, but only if there are several short ones;
+    // otherwise treat blank-line-separated paragraphs as activities.
+    const shortLines = lines.filter(l => l.length < 200);
+    if (shortLines.length >= 2 && shortLines.length <= 60) {
+      items = shortLines;
+    } else {
+      items = clean.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    }
+  }
+
+  // Convert each raw item into a structured activity.
+  return items.map(raw => {
+    // Skip obvious non-activity headings ("Monday", "Week 1", page numbers, etc.)
+    if (/^(monday|tuesday|wednesday|thursday|friday|week\s*\d+|page\s*\d+|day\s*\d+)\s*[:\-—]?\s*$/i.test(raw)) return null;
+    if (raw.length < 3) return null;
+
+    // Pull a time hint if present anywhere in the item: "10am", "10:30",
+    // "10:00 AM", "9-10am", "9:30–10:30"
+    let time = '';
+    const timeMatch = raw.match(/\b(\d{1,2}(:\d{2})?\s*(am|pm)?(\s*[-–—]\s*\d{1,2}(:\d{2})?\s*(am|pm)?)?)\b/i);
+    if (timeMatch && /(\d{1,2}:\d{2}|am|pm)/i.test(timeMatch[1])) time = timeMatch[1].trim();
+
+    // Strip the time + any leading separators to get the activity portion
+    let body = raw;
+    if (time) body = body.replace(time, '').trim();
+    body = body.replace(/^[\s\-–—:|.,]+|[\s\-–—:|.,]+$/g, '').trim();
+
+    // Split off a description if the body has a "title: desc" or "title — desc" form
+    let title = body, description = '';
+    const splitMatch = body.match(/^(.{3,80}?)\s*[—–:\-]\s+(.+)$/);
+    if (splitMatch && splitMatch[1].split(' ').length <= 12) {
+      title = splitMatch[1].trim();
+      description = splitMatch[2].trim();
+    } else if (body.length > 90) {
+      // Long single line: keep the whole thing as title, no description
+      // (rather than truncating, since the admin will see and can edit)
+      title = body;
+    }
+
+    return {
+      title: title.slice(0, 200),
+      description: description.slice(0, 1000),
+      time,
+      location: actClassifyLocation(raw)
+    };
+  }).filter(Boolean);
+}
+
+async function actImportFromText() {
+  const text = document.getElementById('actTextInput').value;
+  if (!text.trim()) { showToast('Paste some text first', 'error'); return; }
+  const parsed = parseActivitiesFromText(text);
+  showActImportPreview(parsed, '');
+}
+window.actImportFromText = actImportFromText;
+
+async function actImportFromUrl() {
+  const url = document.getElementById('actUrlInput').value.trim();
+  if (!url) { showToast('Enter a URL', 'error'); return; }
+  if (!/^https?:\/\//i.test(url)) { showToast('URL must start with http:// or https://', 'error'); return; }
+  showToast('Fetching page…');
+  try {
+    // CORS proxy — corsproxy.io is a public free service. If it stops working,
+    // swap in another (allorigins.win, cors-anywhere clone, etc.).
+    const proxied = 'https://corsproxy.io/?' + encodeURIComponent(url);
+    const res = await fetch(proxied, { method: 'GET' });
+    if (!res.ok) throw new Error('Server returned ' + res.status);
+    const html = await res.text();
+    // Strip script/style blocks and tags to get visible text
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|h\d|tr)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    const parsed = parseActivitiesFromText(text);
+    if (!parsed.length) {
+      showToast('Page fetched but no activities found. Try Paste text instead.', 'error');
+      return;
+    }
+    showActImportPreview(parsed, url);
+  } catch (e) {
+    showToast('Could not fetch URL: ' + (e.message || 'error') + '. Try Paste text instead.', 'error');
+  }
+}
+window.actImportFromUrl = actImportFromUrl;
+
+async function actImportFromPdf(file) {
+  if (!file) return;
+  try {
+    await loadPdfJs();
+    const buf = await file.arrayBuffer();
+    const doc = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    let text = '';
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p);
+      const content = await page.getTextContent();
+      text += content.items.map(it => it.str).join(' ') + '\n';
+    }
+    const parsed = parseActivitiesFromText(text);
+    if (!parsed.length) {
+      showToast('PDF read but no activities found. The PDF may be a scanned image.', 'error');
+      return;
+    }
+    showActImportPreview(parsed, '');
+  } catch (e) {
+    showToast('Could not read PDF: ' + (e.message || 'error'), 'error');
+  }
+}
+window.actImportFromPdf = actImportFromPdf;
+
+function showActImportPreview(parsed, sourceUrl) {
+  _actImportPending = parsed.map(p => ({ ...p, sourceUrl: sourceUrl || '', _skip: false }));
+  document.getElementById('actImportFoundCount').textContent = _actImportPending.length;
+  document.getElementById('actImportList').innerHTML = _actImportPending.map((a, i) =>
+    `<div class="act-import-row" id="actImpRow-${i}">
+       <div class="act-import-row-body">
+         <div class="act-import-row-title">${esc(a.title)}</div>
+         ${a.description ? `<div class="act-import-row-desc">${esc(a.description)}</div>` : ''}
+         ${a.time ? `<div class="act-import-row-desc"><i class="ti ti-clock"></i> ${esc(a.time)}</div>` : ''}
+       </div>
+       <select onchange="_actImportPending[${i}].location=this.value">
+         <option value="indoor"${a.location === 'indoor' ? ' selected' : ''}>Indoor</option>
+         <option value="outdoor"${a.location === 'outdoor' ? ' selected' : ''}>Outdoor</option>
+       </select>
+       <button class="act-skip" onclick="actImportSkipRow(${i})">Skip</button>
+     </div>`
+  ).join('');
+  document.getElementById('actImportPreview').style.display = '';
+}
+
+function actImportSkipRow(i) {
+  if (!_actImportPending[i]) return;
+  _actImportPending[i]._skip = true;
+  const row = document.getElementById('actImpRow-' + i);
+  if (row) row.style.display = 'none';
+  const remaining = _actImportPending.filter(p => !p._skip).length;
+  document.getElementById('actImportFoundCount').textContent = remaining;
+}
+window.actImportSkipRow = actImportSkipRow;
+
+async function saveAllImportedActivities() {
+  const items = _actImportPending.filter(p => !p._skip);
+  if (!items.length) { showToast('Nothing to save', 'error'); return; }
+  if (!actCanEdit()) { showToast('Permission denied', 'error'); return; }
+  let saved = 0, failed = 0;
+  for (const a of items) {
+    try {
+      await window._addDoc(window._collection(window._db, 'activities'), {
+        date: _actActiveDate,
+        location: a.location || 'indoor',
+        title: a.title,
+        description: a.description || '',
+        time: a.time || '',
+        sourceUrl: a.sourceUrl || '',
+        createdBy: (window._userEmail || '').toLowerCase(),
+        createdAt: window._serverTimestamp(),
+        updatedAt: window._serverTimestamp()
+      });
+      saved++;
+    } catch (e) { failed++; console.error('Import error', e); }
+  }
+  closeActivityImport();
+  showToast(saved + ' activit' + (saved === 1 ? 'y' : 'ies') + ' added' + (failed ? ` (${failed} failed)` : ''));
+}
+window.saveAllImportedActivities = saveAllImportedActivities;
+
+window.renderActivities = renderActivities;
+// Allows the Firestore snapshot to push fresh data into our module-local cache.
+window._setActivities = function(arr) { _activities = arr || []; };
 
 // ── Roster ──
 function renderRoster() {
