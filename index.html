@@ -303,23 +303,29 @@
   .dash-legend-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
 
   /* ── Activities page ── */
-  .act-day-picker {
-    display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 14px;
-    margin-bottom: 18px; border-bottom: 1px solid var(--border);
-    scrollbar-width: thin;
+  .act-day-row {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 8px; margin: 16px 0 18px;
   }
-  .act-day-pill {
-    flex: 0 0 auto; padding: 9px 12px; border-radius: 10px; cursor: pointer;
+  .act-day-btn {
+    padding: 11px 8px; border-radius: 10px; cursor: pointer;
     background: var(--surface); border: 1px solid var(--border); color: var(--text-2);
-    font-size: 12px; font-weight: 500; text-align: center; line-height: 1.25;
-    min-width: 64px; transition: background .15s, border-color .15s, color .15s;
+    font-family: inherit; text-align: center; line-height: 1.25;
+    transition: background .15s, border-color .15s, color .15s;
   }
-  .act-day-pill:hover { background: var(--bg); color: var(--text); }
-  .act-day-pill .act-day-pill-d { font-size: 16px; font-weight: 700; color: var(--text); display:block; }
-  .act-day-pill .act-day-pill-w { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .4px; display:block; }
-  .act-day-pill.active { background: var(--green); border-color: var(--green); color: #fff; }
-  .act-day-pill.active .act-day-pill-d, .act-day-pill.active .act-day-pill-w { color: #fff; }
-  .act-day-pill.today:not(.active) { border-color: var(--green); }
+  .act-day-btn:hover { background: var(--bg); color: var(--text); }
+  .act-day-btn .act-day-btn-name { font-size: 11px; font-weight: 500; color: var(--text-3); text-transform: uppercase; letter-spacing: .5px; display:block; }
+  .act-day-btn .act-day-btn-date { font-size: 18px; font-weight: 700; color: var(--text); display:block; margin-top: 2px; }
+  .act-day-btn .act-day-btn-mon  { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .4px; display:block; }
+  .act-day-btn.active { background: var(--green); border-color: var(--green); }
+  .act-day-btn.active .act-day-btn-name,
+  .act-day-btn.active .act-day-btn-date,
+  .act-day-btn.active .act-day-btn-mon { color: #fff; }
+  .act-day-btn.today:not(.active) { border-color: var(--green); }
+  .act-day-btn.disabled {
+    background: var(--bg); border-style: dashed; cursor: not-allowed; opacity: .5;
+  }
+  .act-day-btn.disabled:hover { background: var(--bg); color: var(--text-2); }
 
   .act-day-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
   .act-day-title { font-family: var(--font-serif, Fraunces, serif); font-size: 26px; font-weight: 600; color: var(--text); margin: 0; }
@@ -1236,8 +1242,10 @@
     .dash-chart-wrap { padding: 14px 4px 6px; }
 
     /* Activities on mobile */
-    .act-day-pill { padding: 7px 10px; min-width: 56px; }
-    .act-day-pill .act-day-pill-d { font-size: 15px; }
+    .act-day-row { gap: 5px; margin: 12px 0 14px; }
+    .act-day-btn { padding: 8px 4px; }
+    .act-day-btn .act-day-btn-date { font-size: 16px; }
+    .act-day-btn .act-day-btn-name { font-size: 10px; }
     .act-day-title { font-size: 22px; }
     .act-section { padding: 12px; }
     .form-row-grid { grid-template-columns: 1fr; gap: 8px; }
@@ -1683,7 +1691,8 @@
         <h1 class="page-heading">Activities</h1>
       </div>
       <div style="padding:20px var(--page-pad-x) 28px">
-        <div class="act-day-picker" id="actDayPicker"></div>
+        <div class="week-buttons" id="actWeekButtons"></div>
+        <div class="act-day-row" id="actDayRow"></div>
         <div class="act-day-content" id="actDayContent"></div>
       </div>
     </div>
@@ -3853,7 +3862,8 @@ function buildEnrollmentChart(data) {
 // everyone signed in; admins + employees can add/edit; only admins can delete.
 
 let _activities = []; // local cache, refreshed on demand
-let _actActiveDate = null; // currently selected YYYY-MM-DD
+let _actActiveWeek = null; // selected WEEKS[i].start
+let _actActiveDate = null; // selected YYYY-MM-DD
 let _actImportTab = 'url';
 let _actImportPending = []; // staged activities awaiting save
 let _actEditingId = null; // when set, saveActivity updates instead of inserting
@@ -3911,14 +3921,14 @@ function actClassifyLocation(text) {
 function actCanEdit()   { return window._userRole === 'admin' || window._userRole === 'employee'; }
 function actCanDelete() { return window._userRole === 'admin'; }
 
-// ── Day picker ──
+// ── Week + Day picker ──
 function renderActivities() {
   const page = document.getElementById('page-activities');
   if (!page) return;
   const days = actCampDays();
   if (!days.length) return;
 
-  // Pick today if it's a camp day, else default to the first camp day
+  // Pick today if it's a camp day, else the first camp day overall (first load only)
   if (!_actActiveDate) {
     const today = new Date();
     const ymd = today.getFullYear() + '-' +
@@ -3926,37 +3936,86 @@ function renderActivities() {
                 String(today.getDate()).padStart(2, '0');
     _actActiveDate = days.some(d => d.ymd === ymd) ? ymd : days[0].ymd;
   }
-  // If the previously-active date is no longer in the list (shouldn't normally
-  // happen, but defensive), fall back to the first day.
-  if (!days.some(d => d.ymd === _actActiveDate)) _actActiveDate = days[0].ymd;
+  // Derive active week from the active day, so the two pickers always agree.
+  _actActiveWeek = (function() {
+    const activeDay = days.find(d => d.ymd === _actActiveDate);
+    if (!activeDay) return WEEKS[0].start;
+    const wk = WEEKS.find(w => w.label === activeDay.weekLabel);
+    return wk ? wk.start : WEEKS[0].start;
+  })();
 
-  // Build the horizontal pill scroller
-  const picker = document.getElementById('actDayPicker');
+  // ── Week buttons row (same .week-btn style as the Weekly Roster page) ──
+  const weekContainer = document.getElementById('actWeekButtons');
+  if (weekContainer.children.length === 0) {
+    WEEKS.forEach(wk => {
+      const parts = wk.label.split(' (');
+      const name = parts[0];
+      const dates = parts[1] ? parts[1].replace(')', '') : '';
+      const btn = document.createElement('button');
+      btn.className = 'week-btn';
+      btn.dataset.weekStart = wk.start;
+      btn.onclick = () => selectActivityWeek(wk.start);
+      btn.innerHTML = '<div class="week-btn-label">' + esc(name) + '</div>' +
+                      (dates ? '<div class="week-btn-dates">' + esc(dates) + '</div>' : '');
+      weekContainer.appendChild(btn);
+    });
+  }
+  weekContainer.querySelectorAll('.week-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.weekStart === _actActiveWeek);
+  });
+
+  // ── Day row for the selected week (5 cells; holiday days are dimmed) ──
+  renderActivityDayRow();
+  renderActivityDay();
+}
+
+// Build the row of Mon-Fri buttons for the currently-selected week
+function renderActivityDayRow() {
+  const row = document.getElementById('actDayRow');
+  if (!row) return;
+  const wk = WEEKS.find(w => w.start === _actActiveWeek);
+  if (!wk) { row.innerHTML = ''; return; }
+  const baseStr = wk.mondayDate || wk.start;
+  const base = new Date(baseStr + 'T00:00:00');
+  const holidays = wk.holidayDays || [];
+
   const todayYmd = (function() {
     const t = new Date();
     return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
   })();
-  picker.innerHTML = days.map(d => {
-    const classes = ['act-day-pill'];
-    if (d.ymd === _actActiveDate) classes.push('active');
-    if (d.ymd === todayYmd) classes.push('today');
-    return `<button class="${classes.join(' ')}" onclick="setActivityDay('${d.ymd}')">
-      <span class="act-day-pill-w">${DAY_NAMES[d.date.getDay()]}</span>
-      <span class="act-day-pill-d">${d.date.getDate()}</span>
-      <span class="act-day-pill-w">${MONTH_NAMES[d.date.getMonth()]}</span>
-    </button>`;
-  }).join('');
 
-  // Scroll the active pill into view (handy when navigating to "today" mid-summer)
-  setTimeout(() => {
-    const active = picker.querySelector('.act-day-pill.active');
-    if (active && active.scrollIntoView) {
-      try { active.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' }); } catch(e) {}
-    }
-  }, 0);
-
-  renderActivityDay();
+  const cells = [];
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(base);
+    d.setDate(d.getDate() + i);
+    const ymd = d.getFullYear() + '-' +
+                String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                String(d.getDate()).padStart(2, '0');
+    const isHoliday = holidays.includes(i);
+    const classes = ['act-day-btn'];
+    if (isHoliday) classes.push('disabled');
+    else if (ymd === _actActiveDate) classes.push('active');
+    if (!isHoliday && ymd === todayYmd) classes.push('today');
+    const onClick = isHoliday ? '' : `onclick="setActivityDay('${ymd}')"`;
+    cells.push(
+      `<button class="${classes.join(' ')}" ${onClick} ${isHoliday ? 'aria-disabled="true" title="Holiday — no camp"' : ''}>
+         <span class="act-day-btn-name">${DAY_NAMES[d.getDay()]}</span>
+         <span class="act-day-btn-date">${d.getDate()}</span>
+         <span class="act-day-btn-mon">${MONTH_NAMES[d.getMonth()]}</span>
+       </button>`
+    );
+  }
+  row.innerHTML = cells.join('');
 }
+
+function selectActivityWeek(weekStart) {
+  // When the user picks a new week, jump to its first non-holiday day
+  _actActiveWeek = weekStart;
+  const wk = WEEKS.find(w => w.start === weekStart);
+  if (wk) _actActiveDate = wk.start; // wk.start is already the first camp day
+  renderActivities();
+}
+window.selectActivityWeek = selectActivityWeek;
 
 function setActivityDay(ymd) {
   _actActiveDate = ymd;
