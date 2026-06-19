@@ -367,15 +367,26 @@
   .act-import-preview { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
   .act-import-preview-head { font-size: 13px; color: var(--text-2); margin-bottom: 10px; }
   .act-import-row {
-    display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border);
-    align-items: center;
+    display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border);
+    align-items: stretch;
   }
   .act-import-row:last-child { border-bottom: none; }
-  .act-import-row-body { flex: 1; min-width: 0; }
-  .act-import-row-title { font-weight: 600; font-size: 14px; color: var(--text); }
-  .act-import-row-desc { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-  .act-import-row select { padding: 5px 8px; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
-  .act-import-row .act-skip { font-size: 11px; padding: 3px 8px; border-radius: 6px; background: transparent; color: var(--text-3); border: 1px solid var(--border); cursor: pointer; }
+  .act-import-row-body { min-width: 0; }
+  .act-import-row-title {
+    font-weight: 600; font-size: 14px; color: var(--text); line-height: 1.4;
+    word-break: break-word; overflow-wrap: anywhere; hyphens: auto;
+  }
+  .act-import-row-desc {
+    font-size: 12px; color: var(--text-3); margin-top: 2px; line-height: 1.45;
+    word-break: break-word; overflow-wrap: anywhere;
+  }
+  .act-import-row-controls { display: flex; gap: 8px; align-items: center; }
+  .act-import-row select {
+    flex: 1; min-width: 0; max-width: 200px;
+    padding: 5px 8px; font-size: 12px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--surface); color: var(--text);
+  }
+  .act-import-row .act-skip { flex: 0 0 auto; font-size: 11px; padding: 4px 10px; border-radius: 6px; background: transparent; color: var(--text-3); border: 1px solid var(--border); cursor: pointer; }
   .act-import-row .act-skip:hover { color: var(--text); }
   .form-row { margin-bottom: 12px; }
   .form-row-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -4221,57 +4232,110 @@ function parseActivitiesFromText(text) {
     .replace(/\u2022|·|●|◦|▪|■|–|—/g, m => (m === '–' || m === '—') ? '—' : '•')
     .replace(/[\t ]+/g, ' ');
 
-  // Split into candidate item-strings. Try in order:
-  //   1) Lines beginning with a bullet (•, *, -)
-  //   2) Lines beginning with a number+dot ("1.", "2)")
-  //   3) Non-blank lines (whole-line items)
-  //   4) Blank-line-separated paragraphs (each paragraph = one activity)
-  let items = [];
   const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
-  const bulletLines = lines.filter(l => /^[•*\-]\s/.test(l));
-  const numLines    = lines.filter(l => /^\d+[.)]\s/.test(l));
-  if (bulletLines.length >= 2) {
-    items = bulletLines.map(l => l.replace(/^[•*\-]\s+/, '').trim());
-  } else if (numLines.length >= 2) {
-    items = numLines.map(l => l.replace(/^\d+[.)]\s+/, '').trim());
-  } else {
-    // Fall back to non-blank lines, but only if there are several short ones;
-    // otherwise treat blank-line-separated paragraphs as activities.
-    const shortLines = lines.filter(l => l.length < 200);
-    if (shortLines.length >= 2 && shortLines.length <= 60) {
-      items = shortLines;
-    } else {
-      items = clean.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+  const bulletRe = /^[•*\-]\s+(.+)$/;
+  const numRe    = /^(\d+)[.)]\s+(.+)$/;
+
+  // Decide the document's structure by counting how many lines look like
+  // section headings (bullets or numbered items). If at least two headings
+  // exist, treat each heading as an activity title and everything between it
+  // and the next heading as that activity's description.
+  const bulletCount = lines.filter(l => bulletRe.test(l)).length;
+  const numCount    = lines.filter(l => numRe.test(l)).length;
+  const useSections = bulletCount >= 2 || numCount >= 2;
+  // Prefer whichever style is more common (mixed lists exist but are rare)
+  const useNumbered = useSections && numCount >= bulletCount;
+
+  let items = [];
+
+  if (useSections) {
+    // Walk every line in order. A heading starts a new item; non-heading lines
+    // get appended to the current item's description until the next heading.
+    let current = null;
+    const flush = () => { if (current && current.title) items.push(current); current = null; };
+    for (const line of lines) {
+      const m = useNumbered ? line.match(numRe) : line.match(bulletRe);
+      if (m) {
+        // New activity heading detected
+        flush();
+        // numRe matches put the body in group 2; bulletRe in group 1
+        const headingBody = useNumbered ? m[2] : m[1];
+        current = { title: headingBody.trim(), descLines: [] };
+      } else if (current) {
+        // Continuation line — belongs to the current activity's description.
+        // Skip lines that are obviously not content (page numbers, "Staff
+        // Notes:" headers, etc.) by checking later.
+        current.descLines.push(line);
+      }
+      // (Lines BEFORE the first heading — like a document title — are ignored.)
     }
+    flush();
+    // Materialize { title, description } before going through the per-item
+    // refinement step below.
+    items = items.map(it => ({
+      raw: it.title + (it.descLines.length ? '\n' + it.descLines.join('\n') : ''),
+      preTitle: it.title,
+      preDesc:  it.descLines.join('\n').trim()
+    }));
+  } else {
+    // No heading-style structure: fall back to short-line-per-item or
+    // blank-line-separated paragraphs (whichever fits better).
+    const shortLines = lines.filter(l => l.length < 200);
+    let raws;
+    if (shortLines.length >= 2 && shortLines.length <= 60) {
+      raws = shortLines;
+    } else {
+      raws = clean.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    }
+    items = raws.map(r => ({ raw: r, preTitle: r, preDesc: '' }));
   }
 
-  // Convert each raw item into a structured activity.
-  return items.map(raw => {
-    // Skip obvious non-activity headings ("Monday", "Week 1", page numbers, etc.)
-    if (/^(monday|tuesday|wednesday|thursday|friday|week\s*\d+|page\s*\d+|day\s*\d+)\s*[:\-—]?\s*$/i.test(raw)) return null;
-    if (raw.length < 3) return null;
+  // Refine each item: skip obvious non-activities, extract time, separate
+  // a "title — desc" form inside the heading itself, and clean up edges.
+  return items.map(it => {
+    const raw = it.raw;
+    const titleRaw = (it.preTitle || '').trim();
 
-    // Pull a time hint if present anywhere in the item: "10am", "10:30",
-    // "10:00 AM", "9-10am", "9:30–10:30"
+    // Skip obvious non-activity headings ("Monday", "Week 1", "Day 3", page nums)
+    if (/^(monday|tuesday|wednesday|thursday|friday|week\s*\d+|page\s*\d+|day\s*\d+)\s*[:\-—]?\s*$/i.test(titleRaw)) return null;
+    if (titleRaw.length < 3) return null;
+
+    // Pull a time hint from the heading line (parens etc): "(1 min)", "10am", "9–10"
+    // Looks ONLY at the heading text, not the description, so we don't grab a
+    // stray "3 min" from a tip inside the description.
     let time = '';
-    const timeMatch = raw.match(/\b(\d{1,2}(:\d{2})?\s*(am|pm)?(\s*[-–—]\s*\d{1,2}(:\d{2})?\s*(am|pm)?)?)\b/i);
-    if (timeMatch && /(\d{1,2}:\d{2}|am|pm)/i.test(timeMatch[1])) time = timeMatch[1].trim();
+    const timeMatch = titleRaw.match(/\b(\d{1,2}(:\d{2})?\s*(am|pm)?(\s*[-–—]\s*\d{1,2}(:\d{2})?\s*(am|pm)?)?)\b/i);
+    if (timeMatch && /(\d{1,2}:\d{2}|am|pm)/i.test(timeMatch[1])) {
+      time = timeMatch[1].trim();
+    } else {
+      // Also catch "(N min)" / "(N–M min)" / "(N minute)" durations
+      const durMatch = titleRaw.match(/\(\s*(\d+(?:\s*[-–—]\s*\d+)?\s*(?:min(?:ute)?s?|hr|hour|h))\s*\)/i);
+      if (durMatch) time = durMatch[1].trim();
+    }
 
-    // Strip the time + any leading separators to get the activity portion
-    let body = raw;
-    if (time) body = body.replace(time, '').trim();
-    body = body.replace(/^[\s\-–—:|.,]+|[\s\-–—:|.,]+$/g, '').trim();
+    // Compute a clean title: strip a trailing parenthesised time/duration,
+    // then strip a leading time (e.g. "9:00 AM - Morning circle" → title is
+    // "Morning circle", not "9:00 AM"). Without this, a heading like
+    // "9:00 AM - Park walk" would split on the dash and put "9:00 AM" in the
+    // title slot. The time itself goes into the `time` field via timeMatch.
+    let title = titleRaw.replace(/\s*\(\s*\d+(?:\s*[-–—]\s*\d+)?\s*(?:min(?:ute)?s?|hr|hour|h)\s*\)\s*$/i, '').trim();
+    if (time && title.startsWith(time)) {
+      title = title.slice(time.length).trim();
+    } else if (time && timeMatch && title.indexOf(timeMatch[1]) === 0) {
+      title = title.slice(timeMatch[1].length).trim();
+    }
+    title = title.replace(/^[\s\-–—:|.,]+|[\s\-–—:|.,]+$/g, '').trim();
 
-    // Split off a description if the body has a "title: desc" or "title — desc" form
-    let title = body, description = '';
-    const splitMatch = body.match(/^(.{3,80}?)\s*[—–:\-]\s+(.+)$/);
-    if (splitMatch && splitMatch[1].split(' ').length <= 12) {
-      title = splitMatch[1].trim();
-      description = splitMatch[2].trim();
-    } else if (body.length > 90) {
-      // Long single line: keep the whole thing as title, no description
-      // (rather than truncating, since the admin will see and can edit)
-      title = body;
+    // Build the description. If the heading line had a "title: desc" or
+    // "title — desc" form, use that. Otherwise, the description is whatever
+    // followed the heading.
+    let description = it.preDesc || '';
+    if (!description) {
+      const splitMatch = title.match(/^(.{3,80}?)\s*[—–:\-]\s+(.+)$/);
+      if (splitMatch && splitMatch[1].split(' ').length <= 12) {
+        title = splitMatch[1].trim();
+        description = splitMatch[2].trim();
+      }
     }
 
     return {
@@ -4358,11 +4422,13 @@ function showActImportPreview(parsed, sourceUrl) {
          ${a.description ? `<div class="act-import-row-desc">${esc(a.description)}</div>` : ''}
          ${a.time ? `<div class="act-import-row-desc"><i class="ti ti-clock"></i> ${esc(a.time)}</div>` : ''}
        </div>
-       <select onchange="_actImportPending[${i}].location=this.value">
-         <option value="indoor"${a.location === 'indoor' ? ' selected' : ''}>Indoor</option>
-         <option value="outdoor"${a.location === 'outdoor' ? ' selected' : ''}>Outdoor</option>
-       </select>
-       <button class="act-skip" onclick="actImportSkipRow(${i})">Skip</button>
+       <div class="act-import-row-controls">
+         <select onchange="_actImportPending[${i}].location=this.value">
+           <option value="indoor"${a.location === 'indoor' ? ' selected' : ''}>Indoor</option>
+           <option value="outdoor"${a.location === 'outdoor' ? ' selected' : ''}>Outdoor</option>
+         </select>
+         <button class="act-skip" onclick="actImportSkipRow(${i})">Skip</button>
+       </div>
      </div>`
   ).join('');
   document.getElementById('actImportPreview').style.display = '';
