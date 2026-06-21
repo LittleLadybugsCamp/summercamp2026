@@ -397,6 +397,20 @@
   .md-tb-btn i { font-size: 16px; vertical-align: middle; }
   .md-tb-sep { width: 1px; background: var(--border); margin: 4px 2px; align-self: stretch; }
   .md-toolbar + textarea { border-top-left-radius: 0; border-top-right-radius: 0; border-top: none; }
+
+  /* ── Activity description row: override generic .form-row grid leaks ── */
+  /* Other modals in the app turn `.form-row` into a 2-column grid; the
+     activity description needs to be a vertical stack at full width, so we
+     force display:block on the row itself and make every child full width. */
+  .act-desc-row { display: block !important; width: 100%; }
+  .act-desc-row > * { width: 100%; box-sizing: border-box; }
+  .act-desc-row .md-toolbar { display: flex; }   /* keep toolbar children inline */
+  .act-desc-row .md-hint    { display: flex; justify-content: flex-end; }
+  .act-desc-textarea {
+    width: 100%; min-height: 320px; resize: vertical;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px; line-height: 1.5;
+  }
   .md-hint {
     display: flex; justify-content: space-between; align-items: center;
     font-size: 11px; color: var(--text-3); margin-top: 4px;
@@ -2157,7 +2171,7 @@
 
 <!-- Activity Add/Edit Modal -->
 <div class="modal-overlay" id="activityModal" onclick="if(event.target===this)closeActivityModal()">
-  <div class="modal" style="max-width:520px">
+  <div class="modal" style="max-width:680px">
     <div class="modal-header">
       <div class="modal-title" id="activityModalTitle">Add activity</div>
       <button class="btn btn-icon" onclick="closeActivityModal()"><i class="ti ti-x"></i></button>
@@ -2167,7 +2181,7 @@
         <label class="form-label" for="actTitle">Title</label>
         <input id="actTitle" type="text" class="form-input" placeholder="e.g. Nature walk in the park">
       </div>
-      <div class="form-row">
+      <div class="form-row act-desc-row">
         <label class="form-label" for="actDesc">Description</label>
         <div class="md-toolbar" role="toolbar" aria-label="Description formatting">
           <button type="button" class="md-tb-btn" title="Heading (⌘⌥1)"   onclick="actMdInsert('heading')"><i class="ti ti-heading"></i></button>
@@ -2182,9 +2196,8 @@
           <button type="button" class="md-tb-btn" title="Inline code"      onclick="actMdInsert('code')"><i class="ti ti-code"></i></button>
           <button type="button" class="md-tb-btn" title="Code block"       onclick="actMdInsert('codeblock')"><i class="ti ti-code-dots"></i></button>
         </div>
-        <textarea id="actDesc" class="form-input" rows="6" placeholder="Optional details, what to bring, etc. Markdown supported."></textarea>
+        <textarea id="actDesc" class="form-input act-desc-textarea" rows="12" placeholder="Optional details, what to bring, etc."></textarea>
         <div class="md-hint">
-          <span>Markdown supported: **bold**, *italic*, ## heading, - list, [link](url)</span>
           <button type="button" class="md-preview-toggle" onclick="actMdTogglePreview()" id="actMdPreviewBtn">Preview</button>
         </div>
         <div id="actMdPreview" class="md-preview-box" style="display:none;margin-top:6px"></div>
