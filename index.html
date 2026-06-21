@@ -348,7 +348,82 @@
   }
   .act-item-body { flex: 1; min-width: 0; }
   .act-item-title { font-weight: 600; color: var(--text); font-size: 14px; }
-  .act-item-desc  { color: var(--text-2); font-size: 13px; margin-top: 2px; white-space: pre-wrap; word-wrap: break-word; }
+  .act-item-desc  { color: var(--text-2); font-size: 13px; margin-top: 2px; white-space: normal; word-wrap: break-word; }
+
+  /* ── Markdown rendering inside activity descriptions ── */
+  .act-item-desc .md-p { margin: 0 0 8px; line-height: 1.5; }
+  .act-item-desc .md-p:last-child { margin-bottom: 0; }
+  .act-item-desc .md-h { color: var(--text); line-height: 1.3; font-weight: 600; }
+  .act-item-desc .md-h3 { font-size: 15px; margin: 12px 0 6px; }   /* was # */
+  .act-item-desc .md-h4 { font-size: 14px; margin: 10px 0 5px; }   /* was ## */
+  .act-item-desc .md-h5 { font-size: 13px; margin: 8px 0 4px;  }   /* was ### */
+  .act-item-desc .md-h6 { font-size: 13px; margin: 8px 0 4px; color: var(--text-2); }
+  .act-item-desc .md-list { margin: 0 0 8px; padding-left: 22px; }
+  .act-item-desc .md-list li { margin: 2px 0; line-height: 1.45; }
+  .act-item-desc .md-quote {
+    border-left: 3px solid var(--border); padding: 4px 10px; margin: 0 0 8px;
+    color: var(--text-3); font-style: italic;
+  }
+  .act-item-desc .md-pre {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; margin: 0 0 8px; overflow-x: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px; line-height: 1.45;
+  }
+  .act-item-desc .md-pre code { background: none; padding: 0; font-size: 12px; }
+  .act-item-desc .md-code {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 5px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+  }
+  .act-item-desc .md-link { color: var(--green); text-decoration: none; word-break: break-word; }
+  .act-item-desc .md-link:hover { text-decoration: underline; }
+  .act-item-desc .md-hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .act-item-desc strong { color: var(--text); font-weight: 600; }
+  .act-item-desc em { color: var(--text); }
+
+  /* ── Markdown toolbar (in the Add Activity form) ── */
+  .md-toolbar {
+    display: flex; gap: 2px; flex-wrap: wrap; padding: 4px;
+    background: var(--bg); border: 1px solid var(--border); border-bottom: none;
+    border-radius: 8px 8px 0 0;
+  }
+  .md-tb-btn {
+    background: transparent; border: none; padding: 5px 8px; border-radius: 5px;
+    color: var(--text-2); cursor: pointer; font-family: inherit; font-size: 13px;
+    line-height: 1; min-width: 26px;
+  }
+  .md-tb-btn:hover { background: var(--surface); color: var(--text); }
+  .md-tb-btn i { font-size: 16px; vertical-align: middle; }
+  .md-tb-sep { width: 1px; background: var(--border); margin: 4px 2px; align-self: stretch; }
+  .md-toolbar + textarea { border-top-left-radius: 0; border-top-right-radius: 0; border-top: none; }
+  .md-hint {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: var(--text-3); margin-top: 4px;
+  }
+  .md-preview-toggle {
+    background: none; border: none; color: var(--green); font-size: 11px;
+    cursor: pointer; padding: 0; font-family: inherit;
+  }
+  .md-preview-toggle:hover { text-decoration: underline; }
+  .md-preview-box {
+    border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+    background: var(--bg); min-height: 80px; font-size: 13px; color: var(--text-2);
+    line-height: 1.5;
+  }
+  /* Markdown rendered inside the preview box uses the same styles as in cards */
+  .md-preview-box .md-p { margin: 0 0 8px; }
+  .md-preview-box .md-p:last-child { margin-bottom: 0; }
+  .md-preview-box .md-h { color: var(--text); line-height: 1.3; font-weight: 600; }
+  .md-preview-box .md-h3 { font-size: 15px; margin: 12px 0 6px; }
+  .md-preview-box .md-h4 { font-size: 14px; margin: 10px 0 5px; }
+  .md-preview-box .md-h5 { font-size: 13px; margin: 8px 0 4px; }
+  .md-preview-box .md-list { margin: 0 0 8px; padding-left: 22px; }
+  .md-preview-box .md-quote { border-left: 3px solid var(--border); padding: 4px 10px; margin: 0 0 8px; color: var(--text-3); font-style: italic; }
+  .md-preview-box .md-pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin: 0 0 8px; overflow-x: auto; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+  .md-preview-box .md-code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+  .md-preview-box .md-link { color: var(--green); }
+  .md-preview-box .md-hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
   .act-item-meta  { display: flex; gap: 12px; align-items: center; margin-top: 5px; font-size: 12px; color: var(--text-3); flex-wrap: wrap; }
   .act-item-meta a { color: var(--green); text-decoration: none; }
   .act-item-meta a:hover { text-decoration: underline; }
@@ -2094,7 +2169,25 @@
       </div>
       <div class="form-row">
         <label class="form-label" for="actDesc">Description</label>
-        <textarea id="actDesc" class="form-input" rows="3" placeholder="Optional details, what to bring, etc."></textarea>
+        <div class="md-toolbar" role="toolbar" aria-label="Description formatting">
+          <button type="button" class="md-tb-btn" title="Heading (⌘⌥1)"   onclick="actMdInsert('heading')"><i class="ti ti-heading"></i></button>
+          <button type="button" class="md-tb-btn" title="Bold (⌘B)"        onclick="actMdInsert('bold')"><i class="ti ti-bold"></i></button>
+          <button type="button" class="md-tb-btn" title="Italic (⌘I)"      onclick="actMdInsert('italic')"><i class="ti ti-italic"></i></button>
+          <div class="md-tb-sep"></div>
+          <button type="button" class="md-tb-btn" title="Bullet list"      onclick="actMdInsert('ul')"><i class="ti ti-list"></i></button>
+          <button type="button" class="md-tb-btn" title="Numbered list"    onclick="actMdInsert('ol')"><i class="ti ti-list-numbers"></i></button>
+          <button type="button" class="md-tb-btn" title="Quote"            onclick="actMdInsert('quote')"><i class="ti ti-quote"></i></button>
+          <div class="md-tb-sep"></div>
+          <button type="button" class="md-tb-btn" title="Link (⌘K)"        onclick="actMdInsert('link')"><i class="ti ti-link"></i></button>
+          <button type="button" class="md-tb-btn" title="Inline code"      onclick="actMdInsert('code')"><i class="ti ti-code"></i></button>
+          <button type="button" class="md-tb-btn" title="Code block"       onclick="actMdInsert('codeblock')"><i class="ti ti-code-dots"></i></button>
+        </div>
+        <textarea id="actDesc" class="form-input" rows="6" placeholder="Optional details, what to bring, etc. Markdown supported."></textarea>
+        <div class="md-hint">
+          <span>Markdown supported: **bold**, *italic*, ## heading, - list, [link](url)</span>
+          <button type="button" class="md-preview-toggle" onclick="actMdTogglePreview()" id="actMdPreviewBtn">Preview</button>
+        </div>
+        <div id="actMdPreview" class="md-preview-box" style="display:none;margin-top:6px"></div>
       </div>
       <div class="form-row form-row-grid">
         <div>
@@ -4087,6 +4180,313 @@ function days_for(ymd) {
   return actCampDays().find(d => d.ymd === ymd);
 }
 
+// ── Tiny markdown renderer (block + inline) ──
+// Used by activity descriptions, which often contain headings, lists, bold,
+// links, etc. — especially the imported lesson scripts. Doesn't pull in a
+// library (the app is a single static file by design).
+//
+// Inputs are HTML-escaped first, so user content with raw '<' or '>' is safe.
+// The renderer then walks line-by-line for block constructs (headings, lists,
+// blockquotes, code fences, horizontal rules), and finally applies inline
+// transforms (links, bold, italic, code, autolinks) to non-code lines.
+function mdToHtml(src) {
+  if (!src) return '';
+  // 1) Escape HTML so user input can never inject tags
+  let text = String(src)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  // 2) Walk lines and build blocks. We accumulate into `out` as HTML strings.
+  const lines = text.split('\n');
+  const out = [];
+  let inCode = false;          // inside ``` fenced code block
+  let codeBuf = [];
+  let listType = null;         // 'ul' | 'ol' | null
+  let listBuf = [];
+  let quoteBuf = [];
+
+  const flushList = () => {
+    if (!listType) return;
+    out.push('<' + listType + ' class="md-list">' + listBuf.map(li => '<li>' + applyInline(li) + '</li>').join('') + '</' + listType + '>');
+    listType = null; listBuf = [];
+  };
+  const flushQuote = () => {
+    if (!quoteBuf.length) return;
+    out.push('<blockquote class="md-quote">' + quoteBuf.map(l => applyInline(l)).join('<br>') + '</blockquote>');
+    quoteBuf = [];
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // ── Fenced code block ── (```language?)
+    if (/^\s*```/.test(line)) {
+      if (inCode) {
+        // closing fence
+        out.push('<pre class="md-pre"><code>' + codeBuf.join('\n') + '</code></pre>');
+        inCode = false; codeBuf = [];
+      } else {
+        flushList(); flushQuote();
+        inCode = true;
+      }
+      continue;
+    }
+    if (inCode) { codeBuf.push(line); continue; }
+
+    // ── Horizontal rule ──
+    if (/^\s*(?:-\s*){3,}$|^\s*(?:\*\s*){3,}$|^\s*(?:_\s*){3,}$/.test(line)) {
+      flushList(); flushQuote();
+      out.push('<hr class="md-hr">');
+      continue;
+    }
+
+    // ── Headings (# / ## / ### / ####) ──
+    const hMatch = line.match(/^\s*(#{1,4})\s+(.+?)\s*#*\s*$/);
+    if (hMatch) {
+      flushList(); flushQuote();
+      const lvl = hMatch[1].length;
+      out.push(`<h${lvl + 2} class="md-h md-h${lvl}">${applyInline(hMatch[2])}</h${lvl + 2}>`);
+      // h1→h3 in output: we don't want activity descriptions to clash with the
+      // page h1/h2 styling, so shift everything down by 2 levels.
+      continue;
+    }
+
+    // ── Bullet list (-, *, +, • prefix) ──
+    const ulMatch = line.match(/^\s*[-*+•]\s+(.+)$/);
+    if (ulMatch) {
+      flushQuote();
+      if (listType && listType !== 'ul') flushList();
+      listType = 'ul'; listBuf.push(ulMatch[1]);
+      continue;
+    }
+    // ── Numbered list (1. / 2) / etc.) ──
+    const olMatch = line.match(/^\s*\d+[.)]\s+(.+)$/);
+    if (olMatch) {
+      flushQuote();
+      if (listType && listType !== 'ol') flushList();
+      listType = 'ol'; listBuf.push(olMatch[1]);
+      continue;
+    }
+
+    // ── Blockquote (> prefix) ──
+    const qMatch = line.match(/^\s*&gt;\s?(.*)$/); // we already HTML-escaped >
+    if (qMatch) {
+      flushList();
+      quoteBuf.push(qMatch[1]);
+      continue;
+    }
+
+    // ── Blank line ──
+    if (/^\s*$/.test(line)) {
+      flushList(); flushQuote();
+      out.push(''); // becomes paragraph separator below
+      continue;
+    }
+
+    // ── Regular line ── (paragraph text — group consecutive non-empty into one <p>)
+    flushList(); flushQuote();
+    // Look ahead: collect this and any consecutive plain lines into one <p>
+    const para = [line];
+    while (i + 1 < lines.length) {
+      const next = lines[i + 1];
+      if (/^\s*$/.test(next)) break;
+      // Stop if next is a block construct
+      if (/^\s*```/.test(next)) break;
+      if (/^\s*(#{1,4})\s+/.test(next)) break;
+      if (/^\s*[-*+•]\s+/.test(next)) break;
+      if (/^\s*\d+[.)]\s+/.test(next)) break;
+      if (/^\s*&gt;\s?/.test(next)) break;
+      if (/^\s*(?:-\s*){3,}$|^\s*(?:\*\s*){3,}$/.test(next)) break;
+      para.push(next);
+      i++;
+    }
+    out.push('<p class="md-p">' + applyInline(para.join('<br>')) + '</p>');
+  }
+  // Final flush in case the text ends mid-list/quote/code
+  if (inCode) { out.push('<pre class="md-pre"><code>' + codeBuf.join('\n') + '</code></pre>'); }
+  flushList(); flushQuote();
+  return out.filter(Boolean).join('\n');
+
+  // ── Inline transforms ── (applied to already-HTML-escaped text)
+  function applyInline(s) {
+    if (!s) return '';
+    let t = s;
+    // Inline code first — content inside backticks is left alone for other transforms
+    // Use a placeholder so subsequent regexes don't touch what's inside the code spans.
+    const codeStash = [];
+    t = t.replace(/`([^`\n]+?)`/g, (_, code) => {
+      codeStash.push(code);
+      return '\u0000CODE' + (codeStash.length - 1) + '\u0000';
+    });
+    // Markdown links: [label](url)
+    t = t.replace(/\[([^\]]+?)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>');
+    // Autolink bare URLs (only if not already inside an <a>)
+    t = t.replace(/(^|[\s(])(https?:\/\/[^\s<>()]+)(?![^<]*<\/a>)/g, (m, lead, url) => {
+      // Trim trailing punctuation that isn't part of the URL
+      let trailing = '';
+      const trimMatch = url.match(/[.,;:!?)\]]+$/);
+      if (trimMatch) { trailing = trimMatch[0]; url = url.slice(0, -trailing.length); }
+      return lead + '<a href="' + url + '" target="_blank" rel="noopener noreferrer" class="md-link">' + url + '</a>' + trailing;
+    });
+    // Bold: **text** or __text__
+    t = t.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/__([^_\n]+?)__/g, '<strong>$1</strong>');
+    // Italic: *text* or _text_ — but NOT inside already-bolded segments (handled by ordering: bold first)
+    // Avoid matching the * that started a list (already consumed at block level) and avoid mid-word _.
+    t = t.replace(/(^|[^\w*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
+    t = t.replace(/(^|[^\w_])_([^_\n]+?)_(?!_)/g, '$1<em>$2</em>');
+    // Restore inline code stashes
+    t = t.replace(/\u0000CODE(\d+)\u0000/g, (_, n) => '<code class="md-code">' + codeStash[+n] + '</code>');
+    return t;
+  }
+}
+
+// ── Description editor: toolbar inserts, preview toggle, keyboard shortcuts ──
+// Wraps or inserts markdown syntax around the textarea's current selection.
+// Each `kind` corresponds to a button in the toolbar. The cursor lands at a
+// sensible spot after insertion so the user can keep typing.
+function actMdInsert(kind) {
+  const ta = document.getElementById('actDesc');
+  if (!ta) return;
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  const before = ta.value.slice(0, start);
+  const sel    = ta.value.slice(start, end);
+  const after  = ta.value.slice(end);
+
+  // Helpers — each returns { inserted, selStart, selEnd } relative to inserted text
+  const wrap = (left, right, placeholder) => {
+    const inner = sel || placeholder;
+    return { inserted: left + inner + right, selStart: left.length, selEnd: left.length + inner.length };
+  };
+  // For block constructs, ensure a leading newline if we're not at the start of a line
+  const blockPrefix = () => (before.length && !before.endsWith('\n') ? '\n' : '');
+
+  let inserted, selStart, selEnd;
+  switch (kind) {
+    case 'bold':     ({ inserted, selStart, selEnd } = wrap('**', '**', 'bold text')); break;
+    case 'italic':   ({ inserted, selStart, selEnd } = wrap('*', '*', 'italic text')); break;
+    case 'code':     ({ inserted, selStart, selEnd } = wrap('`', '`', 'code')); break;
+    case 'link': {
+      const url = (sel && /^https?:\/\//.test(sel)) ? sel : 'https://';
+      const label = (sel && !/^https?:\/\//.test(sel)) ? sel : 'link text';
+      inserted = '[' + label + '](' + url + ')';
+      selStart = 1; selEnd = 1 + label.length;
+      break;
+    }
+    case 'heading': {
+      // Toggle ## prefix on the current line
+      const lineStart = before.lastIndexOf('\n') + 1;
+      const lineEnd = after.indexOf('\n');
+      const currentLine = ta.value.slice(lineStart, end + (lineEnd === -1 ? 0 : lineEnd));
+      const headingMatch = currentLine.match(/^(#{1,4})\s*/);
+      // Cycle: none → ## → ### → none
+      let newLine;
+      if (!headingMatch) newLine = '## ' + currentLine;
+      else if (headingMatch[1].length === 2) newLine = '### ' + currentLine.slice(headingMatch[0].length);
+      else newLine = currentLine.slice(headingMatch[0].length);
+      const newValue = ta.value.slice(0, lineStart) + newLine + ta.value.slice(end + (lineEnd === -1 ? 0 : lineEnd));
+      const newCursor = lineStart + newLine.length;
+      ta.value = newValue;
+      ta.setSelectionRange(newCursor, newCursor);
+      ta.focus();
+      actMdSyncPreview();
+      return;
+    }
+    case 'ul':
+    case 'ol': {
+      // If multi-line selection, prefix each line; else add a single new list item
+      const marker = (n) => kind === 'ol' ? (n + '. ') : '- ';
+      if (sel && sel.includes('\n')) {
+        const lines = sel.split('\n');
+        const out = lines.map((l, i) => l.trim() ? marker(i + 1) + l : l).join('\n');
+        inserted = blockPrefix() + out;
+        selStart = blockPrefix().length; selEnd = blockPrefix().length + out.length;
+      } else {
+        const prefix = blockPrefix();
+        const item = (sel || (kind === 'ol' ? 'List item' : 'List item'));
+        inserted = prefix + marker(1) + item;
+        selStart = prefix.length + marker(1).length;
+        selEnd   = selStart + item.length;
+      }
+      break;
+    }
+    case 'quote': {
+      const prefix = blockPrefix();
+      if (sel && sel.includes('\n')) {
+        const out = sel.split('\n').map(l => l.trim() ? '> ' + l : l).join('\n');
+        inserted = prefix + out;
+        selStart = prefix.length; selEnd = prefix.length + out.length;
+      } else {
+        const text = sel || 'quote';
+        inserted = prefix + '> ' + text;
+        selStart = prefix.length + 2;
+        selEnd = selStart + text.length;
+      }
+      break;
+    }
+    case 'codeblock': {
+      const prefix = blockPrefix();
+      const inner = sel || 'code';
+      inserted = prefix + '```\n' + inner + '\n```';
+      selStart = prefix.length + 4;
+      selEnd = selStart + inner.length;
+      break;
+    }
+    default: return;
+  }
+
+  ta.value = before + inserted + after;
+  const cur = before.length + selStart;
+  ta.setSelectionRange(cur, before.length + selEnd);
+  ta.focus();
+  actMdSyncPreview();
+}
+window.actMdInsert = actMdInsert;
+
+// ── Live preview ──
+let _actMdPreviewOpen = false;
+function actMdTogglePreview() {
+  _actMdPreviewOpen = !_actMdPreviewOpen;
+  const box = document.getElementById('actMdPreview');
+  const btn = document.getElementById('actMdPreviewBtn');
+  if (!box || !btn) return;
+  box.style.display = _actMdPreviewOpen ? '' : 'none';
+  btn.textContent = _actMdPreviewOpen ? 'Hide preview' : 'Preview';
+  if (_actMdPreviewOpen) actMdSyncPreview();
+}
+window.actMdTogglePreview = actMdTogglePreview;
+
+function actMdSyncPreview() {
+  if (!_actMdPreviewOpen) return;
+  const ta = document.getElementById('actDesc');
+  const box = document.getElementById('actMdPreview');
+  if (!ta || !box) return;
+  const txt = ta.value;
+  box.innerHTML = txt ? mdToHtml(txt) : '<span style="color:var(--text-3);font-style:italic">Preview will appear here as you type.</span>';
+}
+
+// ── Keyboard shortcuts on the description textarea ──
+// Attached once the modal is in the DOM (the element exists; this runs at
+// script load). Cmd/Ctrl + B/I/K trigger the corresponding toolbar action.
+(function attachActDescShortcuts() {
+  const ta = document.getElementById('actDesc');
+  if (!ta) return;
+  ta.addEventListener('input', actMdSyncPreview);
+  ta.addEventListener('keydown', (e) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (!mod) return;
+    const k = e.key.toLowerCase();
+    if (k === 'b') { e.preventDefault(); actMdInsert('bold'); }
+    else if (k === 'i') { e.preventDefault(); actMdInsert('italic'); }
+    else if (k === 'k') { e.preventDefault(); actMdInsert('link'); }
+    else if (e.altKey && k === '1') { e.preventDefault(); actMdInsert('heading'); }
+  });
+})();
+
 function activityItemHtml(a) {
   const canEdit = actCanEdit();
   const canDel  = actCanDelete();
@@ -4102,7 +4502,7 @@ function activityItemHtml(a) {
   return `<div class="act-item">
     <div class="act-item-body">
       <div class="act-item-title">${esc(a.title || '(untitled)')}</div>
-      ${a.description ? `<div class="act-item-desc">${esc(a.description)}</div>` : ''}
+      ${a.description ? `<div class="act-item-desc">${mdToHtml(a.description)}</div>` : ''}
       ${meta.length ? `<div class="act-item-meta">${meta.join('')}</div>` : ''}
     </div>
     ${actions}
@@ -4120,6 +4520,11 @@ function openActivityModal(defaultLoc) {
   document.getElementById('actTime').value = '';
   document.getElementById('actSource').value = '';
   document.getElementById('actLocation').value = defaultLoc || 'indoor';
+  _actMdPreviewOpen = false;
+  const prevBox = document.getElementById('actMdPreview');
+  const prevBtn = document.getElementById('actMdPreviewBtn');
+  if (prevBox) prevBox.style.display = 'none';
+  if (prevBtn) prevBtn.textContent = 'Preview';
   document.getElementById('activityModal').classList.add('open');
   setTimeout(() => document.getElementById('actTitle').focus(), 60);
 }
