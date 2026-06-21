@@ -2243,7 +2243,7 @@
       <div class="act-import-panel" id="actImportPanel-url">
         <label class="form-label" for="actUrlInput">URL of an activities page</label>
         <input id="actUrlInput" type="url" class="form-input" placeholder="https://example.com/summer-activities">
-        <div class="act-import-hint">The browser may block direct fetching for some sites. If a URL fails, switch to Paste text instead.</div>
+        <div class="act-import-hint">Works for most blogs and content sites. Sites with bot protection (Pinterest, Instagram, Facebook, Etsy) or login walls won't work — use Paste text for those.</div>
         <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:10px" onclick="actImportFromUrl()">
           <i class="ti ti-world-download"></i> Fetch &amp; parse
         </button>
@@ -4774,17 +4774,32 @@ async function actImportFromText() {
 }
 window.actImportFromText = actImportFromText;
 
+// URL of the camp Cloudflare Worker that fetches arbitrary pages server-side
+// and returns the HTML. Replaces the unreliable public CORS proxies we used
+// to depend on. Hosted free on Cloudflare's Workers platform; the Worker code
+// lives in camp-url-fetcher.js in this repo. CORS-locked to the camp app's
+// origins so it can't be used as a free public proxy.
+const CAMP_URL_FETCHER = 'https://campurlfetcher.littleladybugscamp.workers.dev';
+
 async function actImportFromUrl() {
   const url = document.getElementById('actUrlInput').value.trim();
   if (!url) { showToast('Enter a URL', 'error'); return; }
   if (!/^https?:\/\//i.test(url)) { showToast('URL must start with http:// or https://', 'error'); return; }
   showToast('Fetching page…');
   try {
-    // CORS proxy — corsproxy.io is a public free service. If it stops working,
-    // swap in another (allorigins.win, cors-anywhere clone, etc.).
-    const proxied = 'https://corsproxy.io/?' + encodeURIComponent(url);
-    const res = await fetch(proxied, { method: 'GET' });
-    if (!res.ok) throw new Error('Server returned ' + res.status);
+    const fetcherUrl = CAMP_URL_FETCHER + '/?url=' + encodeURIComponent(url);
+    const res = await fetch(fetcherUrl, { method: 'GET' });
+    if (!res.ok) {
+      // Try to read a structured JSON error message from the Worker, which
+      // gives nicer hints (e.g. "Upstream returned 403 — site may block
+      // automated access; try Paste text instead.")
+      let detail = '';
+      try {
+        const j = await res.json();
+        if (j && j.error) detail = j.error;
+      } catch (_) { /* not JSON */ }
+      throw new Error(detail || ('Server returned ' + res.status));
+    }
     const html = await res.text();
     // Strip script/style blocks and tags to get visible text
     const text = html
