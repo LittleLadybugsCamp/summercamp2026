@@ -347,8 +347,22 @@
     background: var(--bg);
   }
   .act-item-body { flex: 1; min-width: 0; }
-  .act-item-title { font-weight: 600; color: var(--text); font-size: 14px; }
-  .act-item-desc  { color: var(--text-2); font-size: 13px; margin-top: 2px; white-space: normal; word-wrap: break-word; }
+  .act-item-title {
+    font-weight: 600; color: var(--text); font-size: 14px;
+    line-height: 1.35; word-break: break-word;
+  }
+  .act-item-title-sep    { color: var(--text-3); margin: 0 2px; }
+  .act-item-title-source {
+    color: var(--green); text-decoration: none;
+    font-weight: 600; font-size: 14px;       /* same weight & size as title */
+    white-space: nowrap;
+  }
+  .act-item-title-source:hover { text-decoration: underline; }
+  .act-item-title-source i { font-size: 14px; vertical-align: -1px; }
+  .act-item-desc  {
+    color: var(--text-2); font-size: 13px; margin-top: 10px;
+    white-space: normal; word-wrap: break-word;
+  }
 
   /* ── Markdown rendering inside activity descriptions ── */
   .act-item-desc .md-p { margin: 0 0 8px; line-height: 1.5; }
@@ -455,6 +469,20 @@
   .act-import-hint { font-size: 12px; color: var(--text-3); margin-top: 6px; }
   .act-import-preview { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
   .act-import-preview-head { font-size: 13px; color: var(--text-2); margin-bottom: 10px; }
+  .act-import-modes {
+    display: flex; gap: 6px; margin-bottom: 14px; padding: 4px;
+    background: var(--bg); border-radius: 10px; border: 1px solid var(--border);
+  }
+  .act-import-mode {
+    flex: 1; padding: 9px 10px; border: none; border-radius: 7px;
+    background: transparent; color: var(--text-2); cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background .15s, color .15s;
+  }
+  .act-import-mode:hover { color: var(--text); }
+  .act-import-mode.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .act-import-mode i { font-size: 16px; }
   .act-import-row {
     display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border);
     align-items: stretch;
@@ -4510,12 +4538,17 @@ function activityItemHtml(a) {
       ${canEdit ? `<button class="btn btn-ghost btn-icon" title="Edit" onclick="editActivity('${idEsc}')"><i class="ti ti-pencil"></i></button>` : ''}
       ${canDel  ? `<button class="btn btn-ghost btn-icon" title="Delete" onclick="deleteActivity('${idEsc}')"><i class="ti ti-trash"></i></button>` : ''}
     </div>` : '';
+  // Source link goes on the title line — same font weight, separated by an em
+  // dash. Time (if any) stays in the meta row below the description because
+  // it's a secondary attribute, not part of the activity's identity.
+  const titleHtml = a.sourceUrl
+    ? `${esc(a.title || '(untitled)')} <span class="act-item-title-sep">—</span> <a class="act-item-title-source" href="${esc(a.sourceUrl)}" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link"></i> Source</a>`
+    : esc(a.title || '(untitled)');
   const meta = [];
-  if (a.time)      meta.push(`<span><i class="ti ti-clock"></i> ${esc(a.time)}</span>`);
-  if (a.sourceUrl) meta.push(`<a href="${esc(a.sourceUrl)}" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link"></i> Source</a>`);
+  if (a.time) meta.push(`<span><i class="ti ti-clock"></i> ${esc(a.time)}</span>`);
   return `<div class="act-item">
     <div class="act-item-body">
-      <div class="act-item-title">${esc(a.title || '(untitled)')}</div>
+      <div class="act-item-title">${titleHtml}</div>
       ${a.description ? `<div class="act-item-desc">${mdToHtml(a.description)}</div>` : ''}
       ${meta.length ? `<div class="act-item-meta">${meta.join('')}</div>` : ''}
     </div>
@@ -4781,6 +4814,231 @@ window.actImportFromText = actImportFromText;
 // origins so it can't be used as a free public proxy.
 const CAMP_URL_FETCHER = 'https://campurlfetcher.littleladybugscamp.workers.dev';
 
+// ── Smart HTML article extraction ──
+// Strips navigation/sidebar/footer junk before parsing so we don't pollute
+// the preview with menu links and page chrome. Returns:
+//   { title, byline, sections } where sections[] = { heading, level, body }
+// Sections split at h1/h2/h3 boundaries; lead text before the first heading
+// is captured as an isLead section with empty heading.
+function extractArticleFromHtml(rawHtml) {
+  if (!rawHtml) return null;
+  let html = rawHtml
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '');
+
+  // Title from <title>; strip common " | Site Name" suffix
+  let title = '';
+  const tm = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (tm) title = htmlText(tm[1]).trim();
+  title = title.replace(/\s*[|\-–—]\s*[^|\-–—]{2,40}$/, '').trim();
+
+  // Find the article container in order of specificity. We require ≥400 chars
+  // inside so we don't grab a tiny "share" section that happens to use <article>.
+  let article = '';
+  const candidates = [
+    /<article\b[^>]*>([\s\S]*?)<\/article>/i,
+    /<main\b[^>]*>([\s\S]*?)<\/main>/i,
+    /<div\b[^>]*class="[^"]*(?:post-content|entry-content|article-content|article-body|post-body|blog-post-content|blog-content|content-area|post__content|article__body)[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?:<\/div>|<footer|<\/article|<\/main)/i,
+    /<div\b[^>]*id="(?:post|content|main-content|article|primary)"[^>]*>([\s\S]*?)<\/div>/i,
+  ];
+  for (const re of candidates) {
+    const m = html.match(re);
+    if (m && m[1] && m[1].length > 400) { article = m[1]; break; }
+  }
+  if (!article) {
+    const bodyMatch = html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
+    article = bodyMatch ? bodyMatch[1] : html;
+  }
+  // Strip nav / header / footer / aside / form inside the article too
+  article = article
+    .replace(/<nav\b[^>]*>[\s\S]*?<\/nav>/gi, '')
+    .replace(/<header\b[^>]*>[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer\b[^>]*>[\s\S]*?<\/footer>/gi, '')
+    .replace(/<aside\b[^>]*>[\s\S]*?<\/aside>/gi, '')
+    .replace(/<form\b[^>]*>[\s\S]*?<\/form>/gi, '')
+    .replace(/<div\b[^>]*class="[^"]*(?:sidebar|comments?|related-?posts?|share|social|widget|cookie|navigation|breadcrumb|tags|categories|author-bio|author-card|newsletter|subscribe|signup|advert|sponsored|promo)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
+
+  // Byline (best-effort) — keep it short
+  let byline = '';
+  const bm = article.match(/<[^>]*(?:class|rel)="[^"]*(?:author|byline)[^"]*"[^>]*>([\s\S]*?)<\//i);
+  if (bm) byline = htmlText(bm[1]).trim().slice(0, 100);
+
+  // Walk the article HTML and build a flat list of heading-marked segments.
+  // We don't yet decide which level to split on — we record everything h1-h6
+  // and pick the "split level" afterward based on what's actually used.
+  const allSegments = []; // { level (1-6 or 0 for lead), heading, htmlChunk }
+  const headingRe = /<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi;
+  let lastIdx = 0;
+  let lastHeading = null;
+  let m;
+  while ((m = headingRe.exec(article)) !== null) {
+    const bodyChunk = article.slice(lastIdx, m.index);
+    if (lastHeading) {
+      allSegments.push({ level: lastHeading.level, heading: lastHeading.text, htmlChunk: bodyChunk });
+    } else if (bodyChunk.trim()) {
+      // Lead-in content before the first heading
+      allSegments.push({ level: 0, heading: '', htmlChunk: bodyChunk, isLead: true });
+    }
+    lastHeading = { level: parseInt(m[1], 10), text: htmlText(m[2]).trim() };
+    lastIdx = headingRe.lastIndex;
+  }
+  if (lastHeading) {
+    allSegments.push({ level: lastHeading.level, heading: lastHeading.text, htmlChunk: article.slice(lastIdx) });
+  } else if (allSegments.length === 0) {
+    allSegments.push({ level: 0, heading: '', htmlChunk: article, isLead: true });
+  }
+
+  // Decide the "split level": which heading level represents real activity
+  // boundaries vs sub-sections that should be rolled into the activity body.
+  // Heuristic: pick the SHALLOWEST level that appears at least twice, ignoring
+  // h1 (typically the article title itself). If only h1 exists, split there.
+  const levelCounts = {};
+  allSegments.forEach(s => { if (!s.isLead && s.level > 0) levelCounts[s.level] = (levelCounts[s.level] || 0) + 1; });
+  let splitLevel = 0;
+  for (let lvl = 2; lvl <= 6; lvl++) {
+    if (levelCounts[lvl] >= 2) { splitLevel = lvl; break; }
+  }
+  // If no level has ≥2 occurrences, fall back to whatever level shows up most
+  if (!splitLevel) {
+    let maxCount = 0;
+    for (const lvl in levelCounts) {
+      if (levelCounts[lvl] > maxCount) { maxCount = levelCounts[lvl]; splitLevel = parseInt(lvl, 10); }
+    }
+  }
+  if (!splitLevel) splitLevel = 2;
+
+  // If the only h1 segment matches the article title (or is the only h1 in
+  // an article whose split-level is h2+), demote it to lead — it's the
+  // article title, not a section heading. This keeps the split list from
+  // starting with a redundant "Article Title" activity.
+  const h1Count = allSegments.filter(s => s.level === 1).length;
+  if (h1Count === 1 && splitLevel >= 2) {
+    const h1Seg = allSegments.find(s => s.level === 1);
+    if (h1Seg) h1Seg.level = 0; // becomes lead, never splits a section
+  }
+
+  // Now collapse: each split-level heading starts a new section, and any
+  // segments of deeper levels (sub-headings) get FOLDED into that section's
+  // body, with the sub-heading rendered as a bold line above its content.
+  const sections = [];
+  let current = null;
+  for (const seg of allSegments) {
+    if (seg.isLead || seg.level === 0) {
+      // Lead content (before the first split-level heading, OR a demoted h1)
+      const leadHtml = (seg.heading && !seg.isLead)
+        // A demoted h1 — include its text as a lead paragraph
+        ? `<p><strong>${seg.heading}</strong></p>` + seg.htmlChunk
+        : seg.htmlChunk;
+      const leadText = htmlToMarkdown(leadHtml).trim();
+      if (leadText.length > 20) sections.push({ heading: '', level: 0, body: leadText, isLead: true });
+      continue;
+    }
+    if (seg.level <= splitLevel) {
+      if (current) sections.push(current);
+      current = { heading: seg.heading, level: seg.level, body: htmlToMarkdown(seg.htmlChunk).trim() };
+    } else if (current) {
+      const subBody = htmlToMarkdown(seg.htmlChunk).trim();
+      const subBlock = (current.body ? '\n\n' : '') + `**${seg.heading}**` + (subBody ? '\n' + subBody : '');
+      current.body = (current.body + subBlock).trim();
+    } else {
+      sections.push({ heading: seg.heading, level: seg.level, body: htmlToMarkdown(seg.htmlChunk).trim() });
+    }
+  }
+  if (current) sections.push(current);
+
+  return { title, byline, sections };
+}
+
+// HTML → plain text (no markdown). Used for titles and short fields.
+function htmlText(html) {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/\s+/g, ' ').trim();
+}
+
+// HTML → markdown for activity descriptions. Preserves lists, links, bold,
+// italic; flattens sub-headings to bold lines; trims aggressively.
+function htmlToMarkdown(html) {
+  if (!html) return '';
+  let t = html;
+  t = t.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (_, inner) => '\n- ' + htmlText(inner));
+  t = t.replace(/<\/?(ul|ol)\b[^>]*>/gi, '\n');
+  t = t.replace(/<h[4-6]\b[^>]*>([\s\S]*?)<\/h[4-6]>/gi, (_, inner) => '\n\n**' + htmlText(inner) + '**\n');
+  t = t.replace(/<\/(p|div|section|article|blockquote|tr|table)>/gi, '\n\n');
+  t = t.replace(/<br\s*\/?>/gi, '\n');
+  t = t.replace(/<(strong|b)\b[^>]*>([\s\S]*?)<\/\1>/gi, '**$2**');
+  t = t.replace(/<(em|i)\b[^>]*>([\s\S]*?)<\/\1>/gi, '*$2*');
+  t = t.replace(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_, href, label) => {
+    const lbl = htmlText(label);
+    return lbl ? `[${lbl}](${href})` : '';
+  });
+  t = t.replace(/<[^>]+>/g, '');
+  t = t.replace(/&nbsp;/g, ' ')
+       .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+       .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'")
+       .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)));
+  t = t.replace(/[ \t]+/g, ' ')
+       .replace(/ *\n */g, '\n')
+       .replace(/\n{3,}/g, '\n\n')
+       .trim();
+  return t;
+}
+
+// Junk filter — skip sections that are obviously navigation/sidebar cruft
+// rather than real article content. Catches lone "Search", "Home", date-only
+// headings, empty bodies, etc.
+const JUNK_HEADING_RE = /^(home|about(?:\s+us)?|contact(?:\s+us)?|search|login|sign\s*(?:in|up)|subscribe|newsletter|categories|tags|archive|recent\s+posts?|popular\s+posts?|related\s+(?:posts?|articles?)|share|comments?|reply|leave\s+a\s+(?:reply|comment)|post\s+contributors?|menu|navigation|breadcrumb|all\s+posts|skip\s+to\s+(?:content|main)|page\s+\d+|next|previous|prev|footer|header|sidebar|widgets?|advertisement|sponsored|cookie|privacy|terms|copyright|all\s+rights\s+reserved|powered\s+by|top\s+of\s+page|bottom\s+of\s+page|teacher\s+resources?)$/i;
+function isJunkSection(s) {
+  const h = (s.heading || '').trim();
+  const b = (s.body || '').trim();
+  // Empty: not useful
+  if (!h && b.length < 40) return true;
+  // Heading matches known navigation labels
+  if (h && JUNK_HEADING_RE.test(h)) return true;
+  // Heading is just a year/date
+  if (h && /^(?:19|20)\d{2}(?:[-/]\d{1,2})?(?:[-/]\d{1,2})?$/.test(h)) return true;
+  // Heading is unreasonably long (probably an entire paragraph misformatted as h)
+  if (h.length > 120) return true;
+  // No body at all AND heading is short — almost certainly a menu link
+  if (!b && h.length < 30) return true;
+  return false;
+}
+
+// Compose an "individual section" activity for the split-mode preview.
+function sectionToActivity(s, defaultLoc) {
+  return {
+    title: s.heading.slice(0, 200),
+    description: s.body,
+    time: '',
+    location: actClassifyLocation(s.heading + ' ' + s.body) || defaultLoc || 'indoor'
+  };
+}
+
+// Compose a "whole article" activity for the whole-mode preview.
+function articleAsWhole(article, defaultLoc) {
+  const desc = article.sections.map(s => {
+    if (s.isLead) return s.body;
+    return s.heading ? `## ${s.heading}\n\n${s.body}` : s.body;
+  }).join('\n\n').trim();
+  return {
+    title: (article.title || 'Imported article').slice(0, 200),
+    description: desc,
+    time: '',
+    location: actClassifyLocation((article.title || '') + ' ' + desc) || defaultLoc || 'indoor'
+  };
+}
+
+// ── Dual-mode preview state ──
+let _actImportMode = 'split';
+let _actImportWhole = null;
+let _actImportSplits = [];
+
 async function actImportFromUrl() {
   const url = document.getElementById('actUrlInput').value.trim();
   if (!url) { showToast('Enter a URL', 'error'); return; }
@@ -4790,32 +5048,42 @@ async function actImportFromUrl() {
     const fetcherUrl = CAMP_URL_FETCHER + '/?url=' + encodeURIComponent(url);
     const res = await fetch(fetcherUrl, { method: 'GET' });
     if (!res.ok) {
-      // Try to read a structured JSON error message from the Worker, which
-      // gives nicer hints (e.g. "Upstream returned 403 — site may block
-      // automated access; try Paste text instead.")
       let detail = '';
       try {
         const j = await res.json();
         if (j && j.error) detail = j.error;
-      } catch (_) { /* not JSON */ }
+      } catch (_) {}
       throw new Error(detail || ('Server returned ' + res.status));
     }
     const html = await res.text();
-    // Strip script/style blocks and tags to get visible text
-    const text = html
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/(p|div|li|h\d|tr)>/gi, '\n')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-    const parsed = parseActivitiesFromText(text);
-    if (!parsed.length) {
-      showToast('Page fetched but no activities found. Try Paste text instead.', 'error');
+    const article = extractArticleFromHtml(html);
+    if (!article || article.sections.length === 0) {
+      showToast('Page fetched but no article content found. Try Paste text instead.', 'error');
       return;
     }
-    showActImportPreview(parsed, url);
+    // Build BOTH options. Default location follows the day's current section
+    // (which the picker stores in _actActiveLocation), but we don't track that;
+    // safest default is indoor — admin can change per-row.
+    const defaultLoc = 'indoor';
+
+    // Whole-article option
+    _actImportWhole = articleAsWhole(article, defaultLoc);
+    _actImportWhole.sourceUrl = url;
+
+    // Split-mode option: one activity per non-junk section. Sections that are
+    // pure lead-in text aren't useful as standalone activities, so skip those
+    // when building the split list.
+    const realSections = article.sections.filter(s => !s.isLead && !isJunkSection(s));
+    _actImportSplits = realSections.map(s => {
+      const a = sectionToActivity(s, defaultLoc);
+      a.sourceUrl = url;
+      return a;
+    });
+
+    // Decide initial mode: if the article has at least 2 real sections, default
+    // to split-mode; otherwise default to whole-article (split would only show 1).
+    _actImportMode = (_actImportSplits.length >= 2) ? 'split' : 'whole';
+    showActImportPreview(null, url);
   } catch (e) {
     showToast('Could not fetch URL: ' + (e.message || 'error') + '. Try Paste text instead.', 'error');
   }
@@ -4847,13 +5115,44 @@ async function actImportFromPdf(file) {
 window.actImportFromPdf = actImportFromPdf;
 
 function showActImportPreview(parsed, sourceUrl) {
-  _actImportPending = parsed.map(p => ({ ...p, sourceUrl: sourceUrl || '', _skip: false }));
+  // Two entry paths:
+  //   • From URL fetch: parsed is null, _actImportWhole and _actImportSplits
+  //     are pre-populated by the caller, and _actImportMode tells us which to
+  //     show first. A toggle lets the user flip modes before saving.
+  //   • From text/PDF: parsed is the already-built array, and there's no
+  //     "whole" mode — we just render the parsed list directly.
+  const isUrlMode = parsed === null;
+
+  if (isUrlMode) {
+    rebuildImportPendingFromMode();
+  } else {
+    _actImportMode = 'split';
+    _actImportWhole = null;
+    _actImportSplits = parsed.map(p => ({ ...p, sourceUrl: sourceUrl || '' }));
+    _actImportPending = _actImportSplits.map(p => ({ ...p, _skip: false }));
+  }
+
+  // Mode toggle row (only shown when both options exist)
+  const showToggle = isUrlMode && _actImportWhole && _actImportSplits.length >= 1;
+  const toggleHtml = showToggle ? `
+    <div class="act-import-modes">
+      <button class="act-import-mode${_actImportMode === 'whole' ? ' active' : ''}"
+              onclick="actImportSetMode('whole')">
+        <i class="ti ti-file-text"></i> Whole article (1 activity)
+      </button>
+      <button class="act-import-mode${_actImportMode === 'split' ? ' active' : ''}"
+              onclick="actImportSetMode('split')">
+        <i class="ti ti-layout-list"></i> Split by section (${_actImportSplits.length} activities)
+      </button>
+    </div>` : '';
+
   document.getElementById('actImportFoundCount').textContent = _actImportPending.length;
-  document.getElementById('actImportList').innerHTML = _actImportPending.map((a, i) =>
+
+  const listHtml = _actImportPending.map((a, i) =>
     `<div class="act-import-row" id="actImpRow-${i}">
        <div class="act-import-row-body">
          <div class="act-import-row-title">${esc(a.title)}</div>
-         ${a.description ? `<div class="act-import-row-desc">${esc(a.description)}</div>` : ''}
+         ${a.description ? `<div class="act-import-row-desc">${esc(a.description.length > 220 ? a.description.slice(0, 220) + '…' : a.description)}</div>` : ''}
          ${a.time ? `<div class="act-import-row-desc"><i class="ti ti-clock"></i> ${esc(a.time)}</div>` : ''}
        </div>
        <div class="act-import-row-controls">
@@ -4865,7 +5164,29 @@ function showActImportPreview(parsed, sourceUrl) {
        </div>
      </div>`
   ).join('');
+
+  document.getElementById('actImportList').innerHTML = toggleHtml + listHtml;
   document.getElementById('actImportPreview').style.display = '';
+}
+
+// Switch between "whole article" and "split sections" view; rebuilds the
+// pending list and re-renders. Skip flags reset because the row indices change.
+function actImportSetMode(mode) {
+  if (mode !== 'whole' && mode !== 'split') return;
+  _actImportMode = mode;
+  rebuildImportPendingFromMode();
+  // Re-render the preview without re-fetching
+  showActImportPreview(null, _actImportWhole ? _actImportWhole.sourceUrl : '');
+}
+window.actImportSetMode = actImportSetMode;
+
+// Refresh _actImportPending from whichever mode is active.
+function rebuildImportPendingFromMode() {
+  if (_actImportMode === 'whole' && _actImportWhole) {
+    _actImportPending = [{ ..._actImportWhole, _skip: false }];
+  } else {
+    _actImportPending = _actImportSplits.map(p => ({ ...p, _skip: false }));
+  }
 }
 
 function actImportSkipRow(i) {
