@@ -4248,12 +4248,16 @@ function mdToHtml(src) {
   let codeBuf = [];
   let listType = null;         // 'ul' | 'ol' | null
   let listBuf = [];
+  let olStart = 1;             // the first number used in the current <ol>
   let quoteBuf = [];
 
   const flushList = () => {
     if (!listType) return;
-    out.push('<' + listType + ' class="md-list">' + listBuf.map(li => '<li>' + applyInline(li) + '</li>').join('') + '</' + listType + '>');
-    listType = null; listBuf = [];
+    // For <ol>, honor the number the user actually typed for the first item.
+    // Subsequent <li> elements get auto-numbered by the browser from there.
+    const startAttr = (listType === 'ol' && olStart !== 1) ? ` start="${olStart}"` : '';
+    out.push('<' + listType + startAttr + ' class="md-list">' + listBuf.map(li => '<li>' + applyInline(li) + '</li>').join('') + '</' + listType + '>');
+    listType = null; listBuf = []; olStart = 1;
   };
   const flushQuote = () => {
     if (!quoteBuf.length) return;
@@ -4305,11 +4309,15 @@ function mdToHtml(src) {
       continue;
     }
     // ── Numbered list (1. / 2) / etc.) ──
-    const olMatch = line.match(/^\s*\d+[.)]\s+(.+)$/);
+    // Capture the digit so we can honor the user's chosen starting number.
+    const olMatch = line.match(/^\s*(\d+)[.)]\s+(.+)$/);
     if (olMatch) {
       flushQuote();
       if (listType && listType !== 'ol') flushList();
-      listType = 'ol'; listBuf.push(olMatch[1]);
+      // First item of a fresh <ol> sets the starting number; later items
+      // just append (we rely on browser auto-numbering from there).
+      if (listType !== 'ol') olStart = parseInt(olMatch[1], 10) || 1;
+      listType = 'ol'; listBuf.push(olMatch[2]);
       continue;
     }
 
@@ -4323,6 +4331,23 @@ function mdToHtml(src) {
 
     // ── Blank line ──
     if (/^\s*$/.test(line)) {
+      // If we're currently in a list and the NEXT non-blank line continues
+      // the same kind of list, treat this blank line as just a visual
+      // separator — keep the list open so the items stay numbered/bulleted
+      // in one continuous list rather than fragmenting into a new <ol>
+      // (or <ul>) that restarts at 1.
+      if (listType) {
+        let j = i + 1;
+        while (j < lines.length && /^\s*$/.test(lines[j])) j++;
+        if (j < lines.length) {
+          const next = lines[j];
+          const nextIsUl = /^\s*[-*+•]\s+/.test(next);
+          const nextIsOl = /^\s*\d+[.)]\s+/.test(next);
+          if ((listType === 'ul' && nextIsUl) || (listType === 'ol' && nextIsOl)) {
+            continue; // skip the blank; let the list keep going
+          }
+        }
+      }
       flushList(); flushQuote();
       out.push(''); // becomes paragraph separator below
       continue;
@@ -4520,12 +4545,58 @@ function actMdSyncPreview() {
   ta.addEventListener('input', actMdSyncPreview);
   ta.addEventListener('keydown', (e) => {
     const mod = e.metaKey || e.ctrlKey;
-    if (!mod) return;
-    const k = e.key.toLowerCase();
-    if (k === 'b') { e.preventDefault(); actMdInsert('bold'); }
-    else if (k === 'i') { e.preventDefault(); actMdInsert('italic'); }
-    else if (k === 'k') { e.preventDefault(); actMdInsert('link'); }
-    else if (e.altKey && k === '1') { e.preventDefault(); actMdInsert('heading'); }
+    // ── Cmd/Ctrl shortcuts ──
+    if (mod) {
+      const k = e.key.toLowerCase();
+      if (k === 'b') { e.preventDefault(); actMdInsert('bold'); return; }
+      if (k === 'i') { e.preventDefault(); actMdInsert('italic'); return; }
+      if (k === 'k') { e.preventDefault(); actMdInsert('link'); return; }
+      if (e.altKey && k === '1') { e.preventDefault(); actMdInsert('heading'); return; }
+      return;
+    }
+    // ── Enter: continue lists ──
+    // When the cursor sits on a line that starts with "- ", "* ", "• ", or
+    // "N. ", pressing Enter should insert a new marker on the next line so
+    // the user keeps typing list items without manually re-typing the prefix.
+    // On an empty list item ("3. " followed by Enter), kill the marker and
+    // exit list mode — same behavior as Google Docs, Notion, etc.
+    // Shift+Enter is intentionally not intercepted (used for hard line breaks).
+    if (e.key === 'Enter' && !e.shiftKey && !e.altKey &&
+        ta.selectionStart === ta.selectionEnd) {
+      const value = ta.value;
+      const pos = ta.selectionStart;
+      const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
+      const currentLine = value.slice(lineStart, pos);
+      const ulMatch = currentLine.match(/^(\s*)([-*+•])\s+(.*)$/);
+      const olMatch = currentLine.match(/^(\s*)(\d+)([.)])\s+(.*)$/);
+      if (ulMatch || olMatch) {
+        const indent  = (ulMatch || olMatch)[1];
+        const content = ulMatch ? ulMatch[3] : olMatch[4];
+        if (!content.trim()) {
+          // Empty list item — strip the marker and exit list mode
+          e.preventDefault();
+          ta.value = value.slice(0, lineStart) + value.slice(pos);
+          ta.setSelectionRange(lineStart, lineStart);
+          actMdSyncPreview();
+          return;
+        }
+        // Continue the list: insert "\n<indent><nextMarker> "
+        let nextMarker;
+        if (ulMatch) {
+          nextMarker = ulMatch[2] + ' ';
+        } else {
+          const nextNum = parseInt(olMatch[2], 10) + 1;
+          nextMarker = nextNum + olMatch[3] + ' ';
+        }
+        e.preventDefault();
+        const insertion = '\n' + indent + nextMarker;
+        ta.value = value.slice(0, pos) + insertion + value.slice(pos);
+        const newPos = pos + insertion.length;
+        ta.setSelectionRange(newPos, newPos);
+        actMdSyncPreview();
+        return;
+      }
+    }
   });
 })();
 
