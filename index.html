@@ -4362,6 +4362,99 @@ function actClassifyLocation(text) {
 function actCanEdit()   { return window._userRole === 'admin' || window._userRole === 'employee'; }
 function actCanDelete() { return window._userRole === 'admin'; }
 
+// ── Manual sort ordering ──
+// Activities within a (date, location) group sort by their `sortOrder` field
+// (lower = earlier in the list). Activities WITHOUT a sortOrder fall back to
+// createdAt, then to doc id. Activities WITH sortOrder always come before
+// those without — once a group has been touched by the user the explicit
+// order takes over.
+function sortActivitiesByOrder(items) {
+  return items.slice().sort((a, b) => {
+    const aHas = typeof a.sortOrder === 'number';
+    const bHas = typeof b.sortOrder === 'number';
+    if (aHas && bHas) return a.sortOrder - b.sortOrder;
+    if (aHas) return -1;
+    if (bHas) return 1;
+    const aTs = (a.createdAt && a.createdAt.seconds) || 0;
+    const bTs = (b.createdAt && b.createdAt.seconds) || 0;
+    if (aTs !== bTs) return aTs - bTs;
+    return String(a.id).localeCompare(String(b.id));
+  });
+}
+
+// Find the next available sortOrder for a new activity in a (date, location)
+// group. We use `max + 10` instead of `max + 1` so there's room to insert
+// items between existing ones later without a full re-shuffle. (Not used by
+// the up/down buttons, but useful for any future drag-to-position feature.)
+function nextSortOrderFor(date, location) {
+  const peers = _activities.filter(a => a.date === date && a.location === location);
+  let max = -1;
+  peers.forEach(a => { if (typeof a.sortOrder === 'number' && a.sortOrder > max) max = a.sortOrder; });
+  return (max < 0) ? 10 : max + 10;
+}
+
+// Move an activity up or down in its (date, location) group.
+//   direction: -1 = up, +1 = down
+// If the group has any items missing a sortOrder, backfill the whole group
+// first using the current sort order. Then swap sortOrders with the neighbor.
+// Writes are awaited so the UI updates only after Firestore confirms.
+async function moveActivity(id, direction) {
+  if (!actCanEdit()) { showToast('Permission denied', 'error'); return; }
+  const a = _activities.find(x => x.id === id);
+  if (!a) return;
+  const peers = sortActivitiesByOrder(
+    _activities.filter(x => x.date === a.date && x.location === a.location)
+  );
+  const idx = peers.findIndex(x => x.id === id);
+  const newIdx = idx + direction;
+  if (idx === -1 || newIdx < 0 || newIdx >= peers.length) return;
+
+  // Backfill: ensure EVERY peer has a sortOrder we can swap with.
+  // Use spaced values (10, 20, 30, …) for future insertion room.
+  const writes = [];
+  let needsBackfill = peers.some(p => typeof p.sortOrder !== 'number');
+  if (needsBackfill) {
+    peers.forEach((p, i) => {
+      const target = (i + 1) * 10;
+      if (p.sortOrder !== target) {
+        p.sortOrder = target; // mutate local cache; snapshot will catch up
+        writes.push(window._updateDoc(
+          window._doc(window._db, 'activities', p.id),
+          { sortOrder: target, updatedAt: window._serverTimestamp() }
+        ));
+      }
+    });
+  }
+
+  // Swap sortOrders between the moving item and its neighbor.
+  const me = peers[idx];
+  const neighbor = peers[newIdx];
+  const mySO  = me.sortOrder;
+  const nbrSO = neighbor.sortOrder;
+  if (mySO !== nbrSO) {
+    writes.push(window._updateDoc(
+      window._doc(window._db, 'activities', me.id),
+      { sortOrder: nbrSO, updatedAt: window._serverTimestamp() }
+    ));
+    writes.push(window._updateDoc(
+      window._doc(window._db, 'activities', neighbor.id),
+      { sortOrder: mySO, updatedAt: window._serverTimestamp() }
+    ));
+  } else {
+    // Identical sortOrders (rare after backfill); nudge one
+    writes.push(window._updateDoc(
+      window._doc(window._db, 'activities', me.id),
+      { sortOrder: nbrSO + direction, updatedAt: window._serverTimestamp() }
+    ));
+  }
+  try {
+    await Promise.all(writes);
+  } catch (e) {
+    showToast('Could not reorder: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+window.moveActivity = moveActivity;
+
 // ── Week + Day picker ──
 function renderActivities() {
   const page = document.getElementById('page-activities');
@@ -4471,8 +4564,8 @@ function renderActivityDay() {
   const ymd = _actActiveDate;
   const d = new Date(ymd + 'T00:00:00');
   const dayActs = _activities.filter(a => a.date === ymd);
-  const indoor  = dayActs.filter(a => a.location === 'indoor');
-  const outdoor = dayActs.filter(a => a.location === 'outdoor');
+  const indoor  = sortActivitiesByOrder(dayActs.filter(a => a.location === 'indoor'));
+  const outdoor = sortActivitiesByOrder(dayActs.filter(a => a.location === 'outdoor'));
   const canEdit = actCanEdit();
 
   const headerActions = canEdit ? `
@@ -4482,10 +4575,10 @@ function renderActivityDay() {
     </div>` : '';
 
   const indoorRows = indoor.length
-    ? indoor.map(a => activityItemHtml(a)).join('')
+    ? indoor.map((a, i) => activityItemHtml(a, i, indoor.length)).join('')
     : '<div class="act-empty">No indoor activities for this day yet.</div>';
   const outdoorRows = outdoor.length
-    ? outdoor.map(a => activityItemHtml(a)).join('')
+    ? outdoor.map((a, i) => activityItemHtml(a, i, outdoor.length)).join('')
     : '<div class="act-empty">No outdoor activities for this day yet.</div>';
 
   wrap.innerHTML = `
@@ -4895,12 +4988,19 @@ function actMdSyncPreview() {
   });
 })();
 
-function activityItemHtml(a) {
+function activityItemHtml(a, idx, total) {
   const canEdit = actCanEdit();
   const canDel  = actCanDelete();
   const idEsc = jsArg(a.id);
+  // Up/Down arrows (only for editors). Disabled at the top/bottom of the
+  // sorted group. We render them BEFORE Edit/Delete so the natural left-to-
+  // right reading order is: reorder, modify, destroy.
+  const sortBtns = (canEdit && typeof idx === 'number' && typeof total === 'number') ? `
+    <button class="btn btn-ghost btn-icon" title="Move up"   onclick="moveActivity('${idEsc}', -1)" ${idx === 0 ? 'disabled' : ''}><i class="ti ti-chevron-up"></i></button>
+    <button class="btn btn-ghost btn-icon" title="Move down" onclick="moveActivity('${idEsc}', 1)"  ${idx === total - 1 ? 'disabled' : ''}><i class="ti ti-chevron-down"></i></button>` : '';
   const actions = (canEdit || canDel) ? `
     <div class="act-item-actions">
+      ${sortBtns}
       ${canEdit ? `<button class="btn btn-ghost btn-icon" title="Edit" onclick="editActivity('${idEsc}')"><i class="ti ti-pencil"></i></button>` : ''}
       ${canDel  ? `<button class="btn btn-ghost btn-icon" title="Delete" onclick="deleteActivity('${idEsc}')"><i class="ti ti-trash"></i></button>` : ''}
     </div>` : '';
@@ -5092,6 +5192,8 @@ async function saveActivity() {
     } else {
       data.createdAt = window._serverTimestamp();
       data.createdBy = (window._userEmail || '').toLowerCase();
+      // Place new activities at the end of their (date, location) group
+      data.sortOrder = nextSortOrderFor(data.date, data.location);
       const ref = await window._addDoc(window._collection(window._db, 'activities'), data);
       activityId = ref.id;
     }
@@ -5755,25 +5857,35 @@ async function saveAllImportedActivities() {
   const items = _actImportPending.filter(p => !p._skip);
   if (!items.length) { showToast('Nothing to save', 'error'); return; }
   if (!actCanEdit()) { showToast('Permission denied', 'error'); return; }
+  // Track the running sortOrder max per (date, location) so each imported
+  // activity gets placed at the end of its group, in the order shown in the
+  // preview. Initialized from the current cached activities.
+  const sortMaxes = {};
+  const sortKey = (date, loc) => date + '|' + loc;
+  const getNextSort = (date, loc) => {
+    const k = sortKey(date, loc);
+    if (!(k in sortMaxes)) sortMaxes[k] = nextSortOrderFor(date, loc) - 10;
+    sortMaxes[k] += 10;
+    return sortMaxes[k];
+  };
   let saved = 0, failed = 0;
   for (const a of items) {
     try {
+      const loc = a.location || 'indoor';
       const activityData = {
         date: _actActiveDate,
-        location: a.location || 'indoor',
+        location: loc,
         title: a.title,
         description: a.description || '',
         time: a.time || '',
         sourceUrl: a.sourceUrl || '',
         createdBy: (window._userEmail || '').toLowerCase(),
         createdAt: window._serverTimestamp(),
-        updatedAt: window._serverTimestamp()
+        updatedAt: window._serverTimestamp(),
+        sortOrder: getNextSort(_actActiveDate, loc)
       };
       if (a.photo) activityData.hasPhoto = true;
       const ref = await window._addDoc(window._collection(window._db, 'activities'), activityData);
-      // Write the photo to its companion doc if present. Done after the
-      // activity is created so we have its ID. Failure here is logged but
-      // doesn't roll back the activity — the activity is still useful.
       if (a.photo && ref && ref.id) {
         try {
           await window._setDoc(window._doc(window._db, 'activityPhotos', ref.id), { photo: a.photo });
