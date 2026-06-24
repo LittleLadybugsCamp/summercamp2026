@@ -346,6 +346,13 @@
     padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
     background: var(--bg);
   }
+  .act-item-thumb {
+    flex: 0 0 96px; width: 96px; height: 96px; padding: 0;
+    background: none; border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; cursor: pointer; align-self: flex-start;
+  }
+  .act-item-thumb:hover { border-color: var(--green); }
+  .act-item-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .act-item-body { flex: 1; min-width: 0; }
   .act-item-title {
     font-weight: 600; color: var(--text); font-size: 14px;
@@ -457,6 +464,53 @@
   .act-item-meta a:hover { text-decoration: underline; }
   .act-item-actions { display: flex; gap: 2px; flex-shrink: 0; }
   .act-empty { font-size: 13px; color: var(--text-3); padding: 10px 4px; text-align: center; font-style: italic; }
+
+  /* ── Photo upload row in the Add/Edit modal ── */
+  .act-photo-row { display: flex; gap: 12px; align-items: center; }
+  .act-photo-row .act-photo-add {
+    flex: 1; justify-content: center; padding: 12px;
+    background: var(--bg); border: 1px dashed var(--border); color: var(--text-2);
+  }
+  .act-photo-row .act-photo-add:hover { border-color: var(--green); color: var(--text); }
+  .act-photo-preview {
+    flex: 0 0 120px; width: 120px; height: 120px;
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+    background: var(--bg);
+  }
+  .act-photo-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .act-photo-actions { display: flex; flex-direction: column; gap: 6px; }
+
+  /* ── Lightbox for full-size photo view ── */
+  .act-photo-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.85);
+    display: none; align-items: center; justify-content: center;
+    z-index: 9999; cursor: zoom-out; padding: 32px;
+  }
+  .act-photo-overlay.open { display: flex; }
+  .act-photo-overlay img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+  .act-photo-close {
+    position: absolute; top: 14px; right: 14px;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,.12); color: #fff; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+  .act-photo-close:hover { background: rgba(255,255,255,.25); }
+
+  /* ── Small photo thumb in the import preview rows ── */
+  .act-import-row-thumb {
+    flex: 0 0 56px; width: 56px; height: 56px; padding: 0; position: relative;
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    overflow: hidden; cursor: pointer; align-self: flex-start;
+  }
+  .act-import-row-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .act-import-row-thumb-x {
+    position: absolute; top: 2px; right: 2px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: rgba(0,0,0,.6); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+    opacity: 0; transition: opacity .15s;
+  }
+  .act-import-row-thumb:hover .act-import-row-thumb-x { opacity: 1; }
 
   .act-import-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
   .act-import-tab {
@@ -1377,6 +1431,11 @@
     .act-day-title { font-size: 22px; }
     .act-section { padding: 12px; }
     .form-row-grid { grid-template-columns: 1fr; gap: 8px; }
+    .act-item-thumb { flex: 0 0 72px; width: 72px; height: 72px; }
+    .act-photo-row { flex-direction: column; align-items: stretch; }
+    .act-photo-preview { flex: 0 0 auto; width: 100%; height: 200px; }
+    .act-photo-actions { flex-direction: row; }
+    .act-import-row-thumb-x { opacity: 1; } /* always visible on touch */
 
     /* ── Toolbar ── */
     .toolbar { gap: 6px; margin-bottom: 12px; }
@@ -2247,6 +2306,13 @@
         <label class="form-label" for="actSource">Source URL (optional)</label>
         <input id="actSource" type="url" class="form-input" placeholder="https://…">
       </div>
+      <div class="form-row">
+        <label class="form-label">Photo (optional)</label>
+        <div class="act-photo-row" id="actPhotoRow">
+          <!-- Filled by JS: either an "Add photo" button, or a thumbnail with Replace/Remove -->
+        </div>
+        <input id="actPhotoFile" type="file" accept="image/*" style="display:none" onchange="actHandlePhotoFile(this.files[0])">
+      </div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="saveActivity()">
         <i class="ti ti-check"></i> <span id="actSaveLabel">Add activity</span>
       </button>
@@ -2700,10 +2766,11 @@ window._fetchFinances = async function() {
   return out;
 };
 
-const campersRef    = collection(db, "campers");
-const adminRef      = collection(db, "admin");
-const activitiesRef = collection(db, "activities");
-const settingsRef   = doc(db, "settings", "jotform");
+const campersRef        = collection(db, "campers");
+const adminRef          = collection(db, "admin");
+const activitiesRef     = collection(db, "activities");
+const activityPhotosRef = collection(db, "activityPhotos");
+const settingsRef       = doc(db, "settings", "jotform");
 
 // Real-time listeners are only started AFTER a verified sign-in, so that once
 // the database rules are locked down they never fire while signed-out (which
@@ -2807,8 +2874,6 @@ function startDataListeners() {
   _unsubscribers.push(onSnapshot(activitiesRef, (snap) => {
     window._activities = [];
     snap.forEach(d => window._activities.push({ id: d.id, ...d.data() }));
-    // The activities module reads from its own module-scope variable, so push
-    // the data in there too via the window proxy that the module reads.
     if (typeof window._setActivities === 'function') window._setActivities(window._activities);
     if (_actTimer) clearTimeout(_actTimer);
     _actTimer = setTimeout(() => {
@@ -2819,6 +2884,26 @@ function startDataListeners() {
       }
     }, 80);
   }, (err) => console.error('activities snapshot error', err)));
+
+  // Activity photos live in a separate Firestore collection so the activity
+  // documents themselves stay under the 1MB doc-size limit. Each photo doc
+  // path is activityPhotos/{activityId}, containing {photo: 'data:image/...'}.
+  // We cache them in window._activityPhotos as a map keyed by activity id.
+  let _actPhotoTimer = null;
+  window._activityPhotos = window._activityPhotos || {};
+  _unsubscribers.push(onSnapshot(activityPhotosRef, (snap) => {
+    const next = {};
+    snap.forEach(d => { next[d.id] = d.data().photo || ''; });
+    window._activityPhotos = next;
+    if (_actPhotoTimer) clearTimeout(_actPhotoTimer);
+    _actPhotoTimer = setTimeout(() => {
+      _actPhotoTimer = null;
+      const ap = document.getElementById('page-activities');
+      if (typeof window.renderActivities === 'function' && ap && ap.classList.contains('active')) {
+        window.renderActivities();
+      }
+    }, 80);
+  }, (err) => console.error('activityPhotos snapshot error', err)));
 }
 
 function stopDataListeners() {
@@ -4014,6 +4099,48 @@ let _actImportTab = 'url';
 let _actImportPending = []; // staged activities awaiting save
 let _actEditingId = null; // when set, saveActivity updates instead of inserting
 
+// Pending photo for the Add/Edit modal. When set, saveActivity writes it to
+// activityPhotos/{id}. Cleared on modal close. The string 'REMOVE' is a
+// sentinel meaning "delete the existing photo for this activity".
+let _actModalPhoto = null;
+
+// ── Image compression ──
+// Browser-side compression so we never write multi-megabyte phone photos to
+// Firestore. Reads the file, draws it onto a canvas resized to fit MAX_DIM
+// on the long edge, and re-encodes as JPEG at QUALITY. Typical output is
+// 150-400KB for a phone photo, well within Firestore's 1MB-per-field limit.
+const PHOTO_MAX_DIM = 1200;
+const PHOTO_QUALITY = 0.85;
+function compressImagePhoto(fileOrDataUri) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const longEdge = Math.max(img.width, img.height);
+      const scale = Math.min(1, PHOTO_MAX_DIM / longEdge);
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      try {
+        const dataUri = canvas.toDataURL('image/jpeg', PHOTO_QUALITY);
+        resolve({ dataUri, width: w, height: h });
+      } catch (e) { reject(e); }
+    };
+    img.onerror = () => reject(new Error('Could not decode image'));
+    if (typeof fileOrDataUri === 'string') {
+      img.src = fileOrDataUri;
+    } else {
+      const r = new FileReader();
+      r.onload = () => { img.src = r.result; };
+      r.onerror = () => reject(new Error('Could not read file'));
+      r.readAsDataURL(fileOrDataUri);
+    }
+  });
+}
+
 // Generate the list of camp weekdays (Mon-Fri, minus holidays) from WEEKS.
 // `holidayDays` is indexed from Monday (0=Mon, 1=Tue, ... 4=Fri), with `start`
 // being the first ACTUAL camp day. For Week 4 the week starts on a Tuesday
@@ -4609,15 +4736,21 @@ function activityItemHtml(a) {
       ${canEdit ? `<button class="btn btn-ghost btn-icon" title="Edit" onclick="editActivity('${idEsc}')"><i class="ti ti-pencil"></i></button>` : ''}
       ${canDel  ? `<button class="btn btn-ghost btn-icon" title="Delete" onclick="deleteActivity('${idEsc}')"><i class="ti ti-trash"></i></button>` : ''}
     </div>` : '';
-  // Source link goes on the title line — same font weight, separated by an em
-  // dash. Time (if any) stays in the meta row below the description because
-  // it's a secondary attribute, not part of the activity's identity.
   const titleHtml = a.sourceUrl
     ? `${esc(a.title || '(untitled)')} <span class="act-item-title-sep">—</span> <a class="act-item-title-source" href="${esc(a.sourceUrl)}" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link"></i> Source</a>`
     : esc(a.title || '(untitled)');
   const meta = [];
   if (a.time) meta.push(`<span><i class="ti ti-clock"></i> ${esc(a.time)}</span>`);
+  // Photo thumbnail on the left of the card if this activity has one.
+  // window._activityPhotos is populated by the activityPhotos snapshot listener.
+  const photoData = (window._activityPhotos || {})[a.id];
+  const thumb = photoData
+    ? `<button class="act-item-thumb" onclick="openActivityPhoto('${idEsc}')" aria-label="View photo">
+         <img src="${esc(photoData)}" alt="">
+       </button>`
+    : '';
   return `<div class="act-item">
+    ${thumb}
     <div class="act-item-body">
       <div class="act-item-title">${titleHtml}</div>
       ${a.description ? `<div class="act-item-desc">${mdToHtml(a.description)}</div>` : ''}
@@ -4627,10 +4760,38 @@ function activityItemHtml(a) {
   </div>`;
 }
 
+// ── Photo lightbox ──
+// Click any thumb to open a full-screen overlay; close on background click or Esc.
+function openActivityPhoto(activityId) {
+  const photoData = (window._activityPhotos || {})[activityId];
+  if (!photoData) return;
+  let overlay = document.getElementById('actPhotoOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'actPhotoOverlay';
+    overlay.className = 'act-photo-overlay';
+    overlay.onclick = closeActivityPhoto;
+    overlay.innerHTML = `<button class="act-photo-close" aria-label="Close"><i class="ti ti-x"></i></button><img id="actPhotoOverlayImg" alt="">`;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.act-photo-close').onclick = (e) => { e.stopPropagation(); closeActivityPhoto(); };
+  }
+  document.getElementById('actPhotoOverlayImg').src = photoData;
+  overlay.classList.add('open');
+  const escHandler = (e) => { if (e.key === 'Escape') { closeActivityPhoto(); document.removeEventListener('keydown', escHandler); } };
+  document.addEventListener('keydown', escHandler);
+}
+function closeActivityPhoto() {
+  const overlay = document.getElementById('actPhotoOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+window.openActivityPhoto = openActivityPhoto;
+window.closeActivityPhoto = closeActivityPhoto;
+
 // ── Add / Edit modal ──
 function openActivityModal(defaultLoc) {
   if (!actCanEdit()) { showToast('Sign in as admin or employee to add activities', 'error'); return; }
   _actEditingId = null;
+  _actModalPhoto = null;
   document.getElementById('activityModalTitle').textContent = 'Add activity';
   document.getElementById('actSaveLabel').textContent = 'Add activity';
   document.getElementById('actTitle').value = '';
@@ -4643,6 +4804,7 @@ function openActivityModal(defaultLoc) {
   const prevBtn = document.getElementById('actMdPreviewBtn');
   if (prevBox) prevBox.style.display = 'none';
   if (prevBtn) prevBtn.textContent = 'Preview';
+  actRenderPhotoRow(null);
   document.getElementById('activityModal').classList.add('open');
   setTimeout(() => document.getElementById('actTitle').focus(), 60);
 }
@@ -4650,6 +4812,7 @@ window.openActivityModal = openActivityModal;
 function closeActivityModal() {
   document.getElementById('activityModal').classList.remove('open');
   _actEditingId = null;
+  _actModalPhoto = null;
 }
 window.closeActivityModal = closeActivityModal;
 
@@ -4658,6 +4821,7 @@ function editActivity(id) {
   const a = _activities.find(x => x.id === id);
   if (!a) return;
   _actEditingId = id;
+  _actModalPhoto = null; // null = no change to existing photo
   document.getElementById('activityModalTitle').textContent = 'Edit activity';
   document.getElementById('actSaveLabel').textContent = 'Save changes';
   document.getElementById('actTitle').value = a.title || '';
@@ -4665,10 +4829,70 @@ function editActivity(id) {
   document.getElementById('actTime').value = a.time || '';
   document.getElementById('actSource').value = a.sourceUrl || '';
   document.getElementById('actLocation').value = a.location || 'indoor';
+  const existing = (window._activityPhotos || {})[id] || null;
+  actRenderPhotoRow(existing);
   document.getElementById('activityModal').classList.add('open');
   setTimeout(() => document.getElementById('actTitle').focus(), 60);
 }
 window.editActivity = editActivity;
+
+// ── Photo row management inside the modal ──
+// _actModalPhoto states:
+//   null              → no change (keep existing photo if any; or no photo)
+//   'REMOVE'          → user clicked Remove on the existing photo
+//   string dataURI    → newly uploaded photo, overwrites on save
+function actRenderPhotoRow(existingDataUri) {
+  const row = document.getElementById('actPhotoRow');
+  if (!row) return;
+  const shownPhoto =
+    (typeof _actModalPhoto === 'string' && _actModalPhoto !== 'REMOVE') ? _actModalPhoto
+    : (_actModalPhoto === 'REMOVE') ? null
+    : existingDataUri;
+  if (shownPhoto) {
+    row.innerHTML = `
+      <div class="act-photo-preview">
+        <img src="${esc(shownPhoto)}" alt="">
+      </div>
+      <div class="act-photo-actions">
+        <button type="button" class="btn btn-sm" onclick="document.getElementById('actPhotoFile').click()">
+          <i class="ti ti-photo-edit"></i> Replace
+        </button>
+        <button type="button" class="btn btn-sm" onclick="actRemovePhoto()">
+          <i class="ti ti-trash"></i> Remove
+        </button>
+      </div>`;
+  } else {
+    row.innerHTML = `
+      <button type="button" class="btn act-photo-add" onclick="document.getElementById('actPhotoFile').click()">
+        <i class="ti ti-photo-plus"></i> Add photo
+      </button>`;
+  }
+}
+window.actRenderPhotoRow = actRenderPhotoRow;
+
+async function actHandlePhotoFile(file) {
+  if (!file) return;
+  if (!/^image\//.test(file.type)) {
+    showToast('That doesn\'t look like an image file', 'error'); return;
+  }
+  try {
+    showToast('Processing photo…');
+    const { dataUri } = await compressImagePhoto(file);
+    _actModalPhoto = dataUri;
+    actRenderPhotoRow(null);
+  } catch (e) {
+    showToast('Could not load image: ' + (e.message || 'error'), 'error');
+  }
+  const fi = document.getElementById('actPhotoFile');
+  if (fi) fi.value = ''; // allow re-selecting same file
+}
+window.actHandlePhotoFile = actHandlePhotoFile;
+
+function actRemovePhoto() {
+  _actModalPhoto = 'REMOVE';
+  actRenderPhotoRow(null);
+}
+window.actRemovePhoto = actRemovePhoto;
 
 async function saveActivity() {
   if (!actCanEdit()) { showToast('Permission denied', 'error'); return; }
@@ -4683,16 +4907,32 @@ async function saveActivity() {
     sourceUrl: document.getElementById('actSource').value.trim(),
     updatedAt: window._serverTimestamp()
   };
+  // hasPhoto flag reflects the post-save state when the photo intent changes
+  if (typeof _actModalPhoto === 'string' && _actModalPhoto !== 'REMOVE') {
+    data.hasPhoto = true;
+  } else if (_actModalPhoto === 'REMOVE') {
+    data.hasPhoto = false;
+  }
   try {
+    let activityId = _actEditingId;
     if (_actEditingId) {
       await window._updateDoc(window._doc(window._db, 'activities', _actEditingId), data);
-      showToast('Activity updated');
     } else {
       data.createdAt = window._serverTimestamp();
       data.createdBy = (window._userEmail || '').toLowerCase();
-      await window._addDoc(window._collection(window._db, 'activities'), data);
-      showToast('Activity added');
+      const ref = await window._addDoc(window._collection(window._db, 'activities'), data);
+      activityId = ref.id;
     }
+    // Save the photo only after we have an activity ID
+    if (activityId && _actModalPhoto) {
+      if (_actModalPhoto === 'REMOVE') {
+        try { await window._deleteDoc(window._doc(window._db, 'activityPhotos', activityId)); }
+        catch (e) { /* ignore if didn't exist */ }
+      } else {
+        await window._setDoc(window._doc(window._db, 'activityPhotos', activityId), { photo: _actModalPhoto });
+      }
+    }
+    showToast(_actEditingId ? 'Activity updated' : 'Activity added');
     closeActivityModal();
   } catch (e) {
     showToast('Could not save: ' + (e.code || e.message || 'error'), 'error');
@@ -4707,6 +4947,9 @@ async function deleteActivity(id) {
   if (!confirm('Delete this activity?')) return;
   try {
     await window._deleteDoc(window._doc(window._db, 'activities', id));
+    // Clean up the photo if there was one; ignore "not found"
+    try { await window._deleteDoc(window._doc(window._db, 'activityPhotos', id)); }
+    catch (e) { /* photo may not exist */ }
     showToast('Activity deleted');
   } catch (e) {
     showToast('Could not delete: ' + (e.code || e.message || 'error'), 'error');
@@ -5019,7 +5262,32 @@ function extractArticleFromHtml(rawHtml) {
   }
   if (current) sections.push(current);
 
-  return { title, byline, sections };
+  // Try to find a representative image. Order: og:image → twitter:image →
+  // first non-tracker <img> in the article. URL may be relative — caller
+  // resolves it. May be empty if no candidate is found.
+  let imageUrl = '';
+  const ogMatch = html.match(/<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i)
+              || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::secure_url)?["']/i);
+  if (ogMatch) imageUrl = ogMatch[1];
+  if (!imageUrl) {
+    const twMatch = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)
+                 || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i);
+    if (twMatch) imageUrl = twMatch[1];
+  }
+  if (!imageUrl) {
+    const imgRe = /<img\b[^>]*src=["']([^"']+)["'][^>]*>/gi;
+    let im;
+    while ((im = imgRe.exec(article)) !== null) {
+      const src = im[1];
+      if (/^data:/.test(src)) continue;
+      if (/\b(spacer|pixel|tracker|blank|placeholder|emoji|icon|logo|avatar)\b/i.test(src)) continue;
+      if (!/^https?:\/\//i.test(src) && !src.startsWith('/')) continue;
+      imageUrl = src;
+      break;
+    }
+  }
+
+  return { title, byline, sections, imageUrl };
 }
 
 // HTML → plain text (no markdown). Used for titles and short fields.
@@ -5132,27 +5400,44 @@ async function actImportFromUrl() {
       showToast('Page fetched but no article content found. Try Paste text instead.', 'error');
       return;
     }
-    // Build BOTH options. Default location follows the day's current section
-    // (which the picker stores in _actActiveLocation), but we don't track that;
-    // safest default is indoor — admin can change per-row.
     const defaultLoc = 'indoor';
 
-    // Whole-article option
+    // Try to fetch and compress the article's image. Best-effort — failures
+    // don't block the import.
+    let photoDataUri = '';
+    if (article.imageUrl) {
+      try {
+        const absoluteImgUrl = new URL(article.imageUrl, url).href;
+        showToast('Fetching image…');
+        const imgRes = await fetch(CAMP_URL_FETCHER + '/?url=' + encodeURIComponent(absoluteImgUrl), { method: 'GET' });
+        if (imgRes.ok) {
+          const blob = await imgRes.blob();
+          const rawDataUri = await new Promise((res2, rej) => {
+            const r = new FileReader();
+            r.onload = () => res2(r.result);
+            r.onerror = () => rej(new Error('read fail'));
+            r.readAsDataURL(blob);
+          });
+          const compressed = await compressImagePhoto(rawDataUri);
+          photoDataUri = compressed.dataUri;
+        }
+      } catch (e) {
+        console.warn('Image fetch failed:', e.message || e);
+      }
+    }
+
     _actImportWhole = articleAsWhole(article, defaultLoc);
     _actImportWhole.sourceUrl = url;
+    _actImportWhole.photo = photoDataUri;
 
-    // Split-mode option: one activity per non-junk section. Sections that are
-    // pure lead-in text aren't useful as standalone activities, so skip those
-    // when building the split list.
     const realSections = article.sections.filter(s => !s.isLead && !isJunkSection(s));
     _actImportSplits = realSections.map(s => {
       const a = sectionToActivity(s, defaultLoc);
       a.sourceUrl = url;
+      a.photo = photoDataUri;
       return a;
     });
 
-    // Decide initial mode: if the article has at least 2 real sections, default
-    // to split-mode; otherwise default to whole-article (split would only show 1).
     _actImportMode = (_actImportSplits.length >= 2) ? 'split' : 'whole';
     showActImportPreview(null, url);
   } catch (e) {
@@ -5219,8 +5504,17 @@ function showActImportPreview(parsed, sourceUrl) {
 
   document.getElementById('actImportFoundCount').textContent = _actImportPending.length;
 
-  const listHtml = _actImportPending.map((a, i) =>
-    `<div class="act-import-row" id="actImpRow-${i}">
+  const listHtml = _actImportPending.map((a, i) => {
+    // Photo thumb with X overlay — click anywhere on the thumb to drop the
+    // photo for that row (in case the auto-detected one isn't relevant).
+    const photoHtml = a.photo
+      ? `<button class="act-import-row-thumb" onclick="actImportTogglePhoto(${i})" title="Remove photo">
+           <img src="${esc(a.photo)}" alt="">
+           <span class="act-import-row-thumb-x"><i class="ti ti-x"></i></span>
+         </button>`
+      : '';
+    return `<div class="act-import-row" id="actImpRow-${i}">
+       ${photoHtml}
        <div class="act-import-row-body">
          <div class="act-import-row-title">${esc(a.title)}</div>
          ${a.description ? `<div class="act-import-row-desc">${esc(a.description.length > 220 ? a.description.slice(0, 220) + '…' : a.description)}</div>` : ''}
@@ -5233,8 +5527,8 @@ function showActImportPreview(parsed, sourceUrl) {
          </select>
          <button class="act-skip" onclick="actImportSkipRow(${i})">Skip</button>
        </div>
-     </div>`
-  ).join('');
+     </div>`;
+  }).join('');
 
   document.getElementById('actImportList').innerHTML = toggleHtml + listHtml;
   document.getElementById('actImportPreview').style.display = '';
@@ -5270,6 +5564,21 @@ function actImportSkipRow(i) {
 }
 window.actImportSkipRow = actImportSkipRow;
 
+// Toggle the auto-detected photo on an import preview row. If a photo is
+// currently attached, click drops it. (We don't support re-adding here since
+// the user can always edit the activity after save and upload one manually.)
+function actImportTogglePhoto(i) {
+  if (!_actImportPending[i]) return;
+  _actImportPending[i].photo = '';
+  // Re-render just this row's thumb area
+  const row = document.getElementById('actImpRow-' + i);
+  if (row) {
+    const thumb = row.querySelector('.act-import-row-thumb');
+    if (thumb) thumb.remove();
+  }
+}
+window.actImportTogglePhoto = actImportTogglePhoto;
+
 async function saveAllImportedActivities() {
   const items = _actImportPending.filter(p => !p._skip);
   if (!items.length) { showToast('Nothing to save', 'error'); return; }
@@ -5277,7 +5586,7 @@ async function saveAllImportedActivities() {
   let saved = 0, failed = 0;
   for (const a of items) {
     try {
-      await window._addDoc(window._collection(window._db, 'activities'), {
+      const activityData = {
         date: _actActiveDate,
         location: a.location || 'indoor',
         title: a.title,
@@ -5287,7 +5596,19 @@ async function saveAllImportedActivities() {
         createdBy: (window._userEmail || '').toLowerCase(),
         createdAt: window._serverTimestamp(),
         updatedAt: window._serverTimestamp()
-      });
+      };
+      if (a.photo) activityData.hasPhoto = true;
+      const ref = await window._addDoc(window._collection(window._db, 'activities'), activityData);
+      // Write the photo to its companion doc if present. Done after the
+      // activity is created so we have its ID. Failure here is logged but
+      // doesn't roll back the activity — the activity is still useful.
+      if (a.photo && ref && ref.id) {
+        try {
+          await window._setDoc(window._doc(window._db, 'activityPhotos', ref.id), { photo: a.photo });
+        } catch (photoErr) {
+          console.warn('Photo save failed for ' + ref.id + ':', photoErr);
+        }
+      }
       saved++;
     } catch (e) { failed++; console.error('Import error', e); }
   }
