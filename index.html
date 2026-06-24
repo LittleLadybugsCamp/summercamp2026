@@ -342,17 +342,25 @@
 
   .act-list { display: flex; flex-direction: column; gap: 8px; }
   .act-item {
-    display: flex; gap: 10px; align-items: flex-start;
+    display: flex; flex-direction: column; gap: 10px;
     padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
     background: var(--bg);
   }
+  /* When a photo is present, the photo banner sits at the top with no extra
+     padding above it (looks better flush to the card's rounded corners). */
+  .act-item.act-item-has-photo { padding-top: 10px; }
   .act-item-thumb {
-    flex: 0 0 96px; width: 96px; height: 96px; padding: 0;
-    background: none; border: 1px solid var(--border); border-radius: 8px;
-    overflow: hidden; cursor: pointer; align-self: flex-start;
+    width: 100%; height: 240px; padding: 0;
+    background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; cursor: pointer;
+    display: block;
   }
   .act-item-thumb:hover { border-color: var(--green); }
   .act-item-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .act-item-content {
+    display: flex; gap: 10px; align-items: flex-start;
+  }
   .act-item-body { flex: 1; min-width: 0; }
   .act-item-title {
     font-weight: 600; color: var(--text); font-size: 14px;
@@ -1443,7 +1451,7 @@
     .act-day-title { font-size: 22px; }
     .act-section { padding: 12px; }
     .form-row-grid { grid-template-columns: 1fr; gap: 8px; }
-    .act-item-thumb { flex: 0 0 72px; width: 72px; height: 72px; }
+    .act-item-thumb { height: 200px; }   /* shorter banner on phones */
     .act-photo-row { flex-direction: column; align-items: stretch; }
     .act-photo-preview { flex: 0 0 auto; width: 100%; height: 200px; }
     .act-photo-actions { flex-direction: row; }
@@ -4900,22 +4908,26 @@ function activityItemHtml(a) {
     : esc(a.title || '(untitled)');
   const meta = [];
   if (a.time) meta.push(`<span><i class="ti ti-clock"></i> ${esc(a.time)}</span>`);
-  // Photo thumbnail on the left of the card if this activity has one.
-  // window._activityPhotos is populated by the activityPhotos snapshot listener.
+  // Photo as a banner at the TOP of the card if this activity has one.
+  // Full card-width, fixed height with object-fit:cover so the activity list
+  // stays visually consistent regardless of source-photo aspect ratio. Click
+  // to open the lightbox at full resolution. Same layout on mobile.
   const photoData = (window._activityPhotos || {})[a.id];
   const thumb = photoData
     ? `<button class="act-item-thumb" onclick="openActivityPhoto('${idEsc}')" aria-label="View photo">
          <img src="${esc(photoData)}" alt="">
        </button>`
     : '';
-  return `<div class="act-item">
+  return `<div class="act-item${photoData ? ' act-item-has-photo' : ''}">
     ${thumb}
-    <div class="act-item-body">
-      <div class="act-item-title">${titleHtml}</div>
-      ${a.description ? `<div class="act-item-desc">${mdToHtml(a.description)}</div>` : ''}
-      ${meta.length ? `<div class="act-item-meta">${meta.join('')}</div>` : ''}
+    <div class="act-item-content">
+      <div class="act-item-body">
+        <div class="act-item-title">${titleHtml}</div>
+        ${a.description ? `<div class="act-item-desc">${mdToHtml(a.description)}</div>` : ''}
+        ${meta.length ? `<div class="act-item-meta">${meta.join('')}</div>` : ''}
+      </div>
+      ${actions}
     </div>
-    ${actions}
   </div>`;
 }
 
