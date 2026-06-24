@@ -342,24 +342,24 @@
 
   .act-list { display: flex; flex-direction: column; gap: 8px; }
   .act-item {
-    display: flex; flex-direction: column; gap: 10px;
+    display: flex; flex-direction: row; gap: 12px; align-items: flex-start;
     padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
     background: var(--bg);
   }
-  /* When a photo is present, the photo banner sits at the top with no extra
-     padding above it (looks better flush to the card's rounded corners). */
-  .act-item.act-item-has-photo { padding-top: 10px; }
+  /* Photo sits on the LEFT of the card on desktop, square. */
   .act-item-thumb {
-    width: 240px; height: 240px; padding: 0;
-    margin: 0 auto;                /* center horizontally at the top */
+    flex: 0 0 200px; width: 200px; height: 200px; padding: 0;
     background: var(--surface);
     border: 1px solid var(--border); border-radius: 8px;
     overflow: hidden; cursor: pointer;
-    display: block;
+    display: block; align-self: flex-start;
   }
   .act-item-thumb:hover { border-color: var(--green); }
   .act-item-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* The content column (title + desc + meta + actions). On desktop the actions
+     sit at the top-right of the content area (same row as the title). */
   .act-item-content {
+    flex: 1; min-width: 0;
     display: flex; gap: 10px; align-items: flex-start;
   }
   .act-item-body { flex: 1; min-width: 0; }
@@ -1452,7 +1452,17 @@
     .act-day-title { font-size: 22px; }
     .act-section { padding: 12px; }
     .form-row-grid { grid-template-columns: 1fr; gap: 8px; }
-    .act-item-thumb { width: 200px; height: 200px; }   /* square, slightly smaller on phones */
+    /* On mobile, switch to a vertical stack: photo centered on top, then
+       text content full-width, then the action row beneath the text. This
+       gives the title and description the entire card width to breathe in,
+       and avoids actions squeezing into the right column. */
+    .act-item { flex-direction: column; }
+    .act-item-thumb { flex: 0 0 auto; width: 200px; height: 200px; margin: 0 auto; }
+    .act-item-content { flex-direction: column; gap: 8px; }
+    .act-item-actions {
+      width: 100%; justify-content: flex-end;
+      padding-top: 4px; border-top: 1px solid var(--border);
+    }
     .act-photo-row { flex-direction: column; align-items: stretch; }
     .act-photo-preview { flex: 0 0 auto; width: 100%; height: 200px; }
     .act-photo-actions { flex-direction: row; }
