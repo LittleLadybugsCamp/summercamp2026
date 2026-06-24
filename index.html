@@ -1141,6 +1141,16 @@
   .login-btn:hover { opacity: .92; }
   .login-btn:active { transform: scale(.99); }
   .login-btn:disabled { opacity: .55; cursor: default; }
+  .login-forgot {
+    width: 100%; margin-top: 10px;
+    padding: 8px; font-size: 13px;
+    color: var(--green); background: transparent;
+    border: none; border-radius: var(--radius); cursor: pointer;
+    text-decoration: underline; text-underline-offset: 2px;
+    text-decoration-color: rgba(0,0,0,0); /* show underline only on hover */
+    transition: text-decoration-color .15s, opacity .15s;
+  }
+  .login-forgot:hover { text-decoration-color: currentColor; }
   .login-error {
     display: none; margin-top: 14px; padding: 9px 12px;
     background: #FDECEA; color: #9A2A1E;
@@ -1148,7 +1158,8 @@
     font-size: 12.5px; text-align: left; line-height: 1.4;
   }
   .login-error.show { display: block; }
-  /* sign-out button in sidebar */
+  .login-error:not(:empty) { display: block; }   /* show when JS sets text */
+  /* sidebar user block + buttons */
   .sidebar-user {
     margin-top: auto; padding: 12px;
     border-top: 1px solid var(--border);
@@ -1156,14 +1167,15 @@
   }
   .sidebar-user .su-name { font-weight: 600; color: var(--text-2); margin-bottom: 2px; }
   .sidebar-user .su-role { color: var(--text-3); font-size: 11px; text-transform: capitalize; }
-  .sidebar-signout {
+  .sidebar-signout, .sidebar-changepw {
     margin-top: 8px; width: 100%;
     padding: 7px; font-size: 12.5px; font-weight: 600;
     color: var(--text-2); background: transparent;
     border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer;
     display: flex; align-items: center; justify-content: center; gap: 6px;
   }
-  .sidebar-signout:hover { background: var(--bg); color: var(--text); }
+  .sidebar-signout:hover, .sidebar-changepw:hover { background: var(--bg); color: var(--text); }
+  .form-hint { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
 
   /* ── Toast ── */
   .toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
@@ -1811,6 +1823,7 @@
     <div class="sidebar-user" id="sidebarUser" style="display:none">
       <div class="su-name" id="suName"></div>
       <div class="su-role" id="suRole"></div>
+      <button class="sidebar-changepw" onclick="openChangePasswordModal()"><i class="ti ti-key"></i> Change password</button>
       <button class="sidebar-signout" onclick="doSignOut()"><i class="ti ti-logout"></i> Sign out</button>
     </div>
   </aside>
@@ -2256,6 +2269,38 @@
 </div>
 
 
+<!-- Change Password Modal -->
+<div class="modal-overlay" id="changePasswordModal" onclick="if(event.target===this)closeChangePasswordModal()">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">Change password</div>
+      <button class="btn btn-icon" onclick="closeChangePasswordModal()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="changePasswordForm" onsubmit="doChangePassword(event)">
+        <div class="form-row">
+          <label class="form-label" for="cpCurrent">Current password</label>
+          <input id="cpCurrent" type="password" class="form-input" autocomplete="current-password" required>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="cpNew">New password</label>
+          <input id="cpNew" type="password" class="form-input" autocomplete="new-password" minlength="6" required>
+          <div class="form-hint">At least 6 characters.</div>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="cpConfirm">Confirm new password</label>
+          <input id="cpConfirm" type="password" class="form-input" autocomplete="new-password" minlength="6" required>
+        </div>
+        <button class="btn btn-primary" type="submit" id="cpSubmit" style="width:100%;justify-content:center;margin-top:4px">
+          <i class="ti ti-check"></i> Change password
+        </button>
+        <div class="login-error" id="cpError" style="margin-top:10px"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
 <!-- Activity Add/Edit Modal -->
 <div class="modal-overlay" id="activityModal" onclick="if(event.target===this)closeActivityModal()">
   <div class="modal" style="max-width:680px">
@@ -2668,7 +2713,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
-  createUserWithEmailAndPassword, sendPasswordResetEmail
+  createUserWithEmailAndPassword, sendPasswordResetEmail,
+  EmailAuthProvider, reauthenticateWithCredential, updatePassword
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -2742,6 +2788,19 @@ window._createEmployee = async function(name, email, password) {
 // Send an employee a password-reset email (they set their own new password;
 // the old one stops working once they complete it).
 window._sendReset = (email) => sendPasswordResetEmail(auth, email);
+
+// Change the CURRENTLY SIGNED-IN user's password in place. Firebase requires
+// re-authentication with the current password before allowing this — that
+// prevents someone walking up to an unlocked browser from hijacking the
+// account. We do the re-auth and the update as two awaited steps; if the
+// current password is wrong, the re-auth throws and we surface the error.
+window._changePassword = async (currentPassword, newPassword) => {
+  const user = auth.currentUser;
+  if (!user || !user.email) throw new Error('Not signed in');
+  const cred = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, cred);
+  await updatePassword(user, newPassword);
+};
 
 // Set an employee's active flag (deactivate / reactivate access instantly).
 window._setEmployeeActive = (uid, active) =>
@@ -3038,9 +3097,43 @@ function buildLoginForm() {
       '<input id="loginPassword" type="password" autocomplete="current-password" required>' +
     '</div>' +
     '<button class="login-btn" id="loginBtn" type="submit">Sign in</button>' +
+    '<button class="login-forgot" id="loginForgotBtn" type="button" onclick="doForgotPassword()">Forgot your password?</button>' +
     '<div class="login-error" id="loginError"></div>';
   mount.appendChild(form);
 }
+
+// Self-service password reset from the sign-in screen. We use whatever email
+// the user has typed into the form (or prompt for one if the field is empty).
+// We deliberately show the same success toast whether or not the address
+// exists in the system — leaking which emails are real accounts would be a
+// minor info-disclosure leak, so we keep the message generic.
+async function doForgotPassword() {
+  const emailField = document.getElementById('loginEmail');
+  let email = emailField ? emailField.value.trim() : '';
+  if (!email) {
+    email = (prompt('Enter your email address to get a reset link:') || '').trim();
+    if (!email) return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast('That doesn\'t look like a valid email address', 'error');
+    return;
+  }
+  try {
+    await window._sendReset(email);
+    showToast('If an account exists for ' + email + ', a reset link is on its way.');
+  } catch (e) {
+    // Don't surface "user not found" — that would leak whether the email is
+    // a real account. Only show errors that are unambiguously the user's fault.
+    const code = e.code || '';
+    if (code === 'auth/invalid-email') {
+      showToast('That doesn\'t look like a valid email address', 'error');
+    } else {
+      // Even for "user-not-found", we want to lie politely. Same generic message.
+      showToast('If an account exists for ' + email + ', a reset link is on its way.');
+    }
+  }
+}
+window.doForgotPassword = doForgotPassword;
 function destroyLoginForm() {
   // Drop focus first — a focused field can keep the iOS sheet alive — and
   // wipe values before tear-down so nothing lingers in the DOM tree.
@@ -3135,6 +3228,72 @@ async function doSignOut() {
   try { await window._authSignOut(); } catch (e) { console.error(e); }
   // onAuthStateChanged shows the login screen
 }
+
+// ── Self-service password change ──
+// The user re-enters their current password (Firebase requires this for any
+// password update), types a new one twice, and the modal updates it in place.
+// No email round-trip needed.
+function openChangePasswordModal() {
+  if (!window._userEmail) { showToast('Please sign in first', 'error'); return; }
+  const m = document.getElementById('changePasswordModal');
+  if (!m) return;
+  // Reset fields & error state every time we open
+  ['cpCurrent', 'cpNew', 'cpConfirm'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const err = document.getElementById('cpError');
+  if (err) err.textContent = '';
+  m.classList.add('open');
+  setTimeout(() => { const f = document.getElementById('cpCurrent'); if (f) f.focus(); }, 60);
+}
+window.openChangePasswordModal = openChangePasswordModal;
+
+function closeChangePasswordModal() {
+  const m = document.getElementById('changePasswordModal');
+  if (m) m.classList.remove('open');
+}
+window.closeChangePasswordModal = closeChangePasswordModal;
+
+async function doChangePassword(ev) {
+  if (ev && ev.preventDefault) ev.preventDefault();
+  const cur = document.getElementById('cpCurrent').value;
+  const nw  = document.getElementById('cpNew').value;
+  const cf  = document.getElementById('cpConfirm').value;
+  const errEl = document.getElementById('cpError');
+  const setErr = (msg) => { if (errEl) errEl.textContent = msg; };
+  setErr('');
+  // Client-side validation first — gives a faster response than waiting for
+  // Firebase to reject obvious mistakes.
+  if (!cur || !nw || !cf) { setErr('Please fill in all fields.'); return; }
+  if (nw.length < 6) { setErr('New password must be at least 6 characters.'); return; }
+  if (nw !== cf)     { setErr('The two "new password" fields don\'t match.'); return; }
+  if (nw === cur)    { setErr('Your new password must be different from your current one.'); return; }
+  const btn = document.getElementById('cpSubmit');
+  if (btn) btn.disabled = true;
+  try {
+    await window._changePassword(cur, nw);
+    showToast('Password changed');
+    closeChangePasswordModal();
+  } catch (e) {
+    // Map common Firebase error codes to friendlier messages
+    const code = e.code || '';
+    let msg = e.message || 'Could not change password';
+    if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+      msg = 'Your current password is incorrect.';
+    } else if (code === 'auth/weak-password') {
+      msg = 'That password is too weak. Try a longer one.';
+    } else if (code === 'auth/requires-recent-login') {
+      msg = 'For security, please sign out and back in, then try again.';
+    } else if (code === 'auth/too-many-requests') {
+      msg = 'Too many attempts. Please wait a few minutes before trying again.';
+    }
+    setErr(msg);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.doChangePassword = doChangePassword;
 
 // ── Employees management ──
 let _employees = [];
