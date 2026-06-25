@@ -2321,7 +2321,7 @@
 
 
 <!-- Activity Add/Edit Modal -->
-<div class="modal-overlay" id="activityModal" onclick="if(event.target===this)closeActivityModal()">
+<div class="modal-overlay" id="activityModal">
   <div class="modal" style="max-width:680px">
     <div class="modal-header">
       <div class="modal-title" id="activityModalTitle">Add activity</div>
@@ -2385,7 +2385,7 @@
 </div>
 
 <!-- Activity Import Modal -->
-<div class="modal-overlay" id="activityImportOverlay" onclick="if(event.target===this)closeActivityImport()">
+<div class="modal-overlay" id="activityImportOverlay">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
       <div class="modal-title">Import activities</div>
@@ -5097,6 +5097,29 @@ function closeActivityModal() {
   _actModalPhoto = null;
 }
 window.closeActivityModal = closeActivityModal;
+
+// Esc key closes the Add/Edit modal or the Import modal — whichever is open.
+// The modals deliberately no longer close on outside-click (clicking the
+// background) because a stray click on an unrelated part of the page used
+// to wipe out in-progress edits. Esc and the X button are the only exits.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const importEl   = document.getElementById('activityImportOverlay');
+  const addEditEl  = document.getElementById('activityModal');
+  // Close the topmost open modal first. The import modal is opened from inside
+  // the activity page (not nested inside the Add/Edit modal), so they should
+  // never both be open at once — but if they ever are, we close in reverse
+  // open order: import first, then Add/Edit.
+  if (importEl && importEl.classList.contains('open')) {
+    closeActivityImport();
+    e.stopPropagation();
+    return;
+  }
+  if (addEditEl && addEditEl.classList.contains('open')) {
+    closeActivityModal();
+    e.stopPropagation();
+  }
+});
 
 function editActivity(id) {
   if (!actCanEdit()) return;
