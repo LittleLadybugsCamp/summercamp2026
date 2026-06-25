@@ -383,6 +383,10 @@
   /* ── Markdown rendering inside activity descriptions ── */
   .act-item-desc .md-p { margin: 0 0 8px; line-height: 1.5; }
   .act-item-desc .md-p:last-child { margin-bottom: 0; }
+  /* Spacer paragraph: emitted for each extra blank line the user typed in
+     the editor, so 3 blank lines in the source render as 3 visible gaps
+     rather than collapsing to one. The &nbsp; gives it actual height. */
+  .act-item-desc .md-spacer { margin: 0 0 8px; line-height: 1.5; color: transparent; }
   .act-item-desc .md-h { color: var(--text); line-height: 1.3; font-weight: 600; }
   .act-item-desc .md-h3 { font-size: 15px; margin: 12px 0 6px; }   /* was # */
   .act-item-desc .md-h4 { font-size: 14px; margin: 10px 0 5px; }   /* was ## */
@@ -4747,14 +4751,28 @@ function mdToHtml(src) {
         }
       }
       flushList(); flushQuote();
-      out.push(''); // becomes paragraph separator below
+      // Count this and any consecutive blank lines. One blank line creates the
+      // default paragraph break (handled by <p> bottom margin). Each ADDITIONAL
+      // blank line emits a spacer paragraph to preserve the extra vertical
+      // space the user typed in the editor. This matches WYSIWYG expectations:
+      // 3 blank lines in the editor → 3 blank lines of space in the rendered
+      // output, instead of all collapsing to a single paragraph gap.
+      let blanks = 1;
+      while (i + 1 < lines.length && /^\s*$/.test(lines[i + 1])) {
+        blanks++;
+        i++;
+      }
+      for (let k = 1; k < blanks; k++) {
+        out.push('<p class="md-spacer">&nbsp;</p>');
+      }
+      out.push(''); // marker so out.filter(Boolean) doesn't merge surrounding blocks
       continue;
     }
 
     // ── Regular line ── (paragraph text — group consecutive non-empty into one <p>)
     flushList(); flushQuote();
     // Look ahead: collect this and any consecutive plain lines into one <p>
-    const para = [line];
+    const para = [preserveSpaces(line)];
     while (i + 1 < lines.length) {
       const next = lines[i + 1];
       if (/^\s*$/.test(next)) break;
@@ -4765,7 +4783,7 @@ function mdToHtml(src) {
       if (/^\s*\d+[.)]\s+/.test(next)) break;
       if (/^\s*&gt;\s?/.test(next)) break;
       if (/^\s*(?:-\s*){3,}$|^\s*(?:\*\s*){3,}$/.test(next)) break;
-      para.push(next);
+      para.push(preserveSpaces(next));
       i++;
     }
     out.push('<p class="md-p">' + applyInline(para.join('<br>')) + '</p>');
@@ -4774,6 +4792,20 @@ function mdToHtml(src) {
   if (inCode) { out.push('<pre class="md-pre"><code>' + codeBuf.join('\n') + '</code></pre>'); }
   flushList(); flushQuote();
   return out.filter(Boolean).join('\n');
+
+  // Preserve whitespace the user typed: leading spaces become a run of &nbsp;
+  // so indentation shows up, and any run of 2+ spaces within a line becomes a
+  // mix of a real space (so word wrapping still works) plus &nbsp; for the
+  // rest (so the visible gap doesn't collapse to one space). HTML's default
+  // is to collapse all whitespace; this fights that default selectively.
+  function preserveSpaces(s) {
+    if (!s) return s;
+    // Leading spaces (or tabs)
+    s = s.replace(/^[ \t]+/, m => '&nbsp;'.repeat(m.length));
+    // Internal runs of 2+ spaces
+    s = s.replace(/ {2,}/g, m => ' ' + '&nbsp;'.repeat(m.length - 1));
+    return s;
+  }
 
   // ── Inline transforms ── (applied to already-HTML-escaped text)
   function applyInline(s) {
