@@ -1369,8 +1369,10 @@
   }
   .mobile-nav-inner { display: flex; justify-content: space-around; }
   .mobile-nav-btn {
+    flex: 1 1 0;                 /* each tab takes equal share of viewport width */
+    min-width: 0;                /* allow labels to truncate */
     display: flex; flex-direction: column; align-items: center; gap: 2px;
-    padding: 5px 18px;
+    padding: 5px 4px;            /* horizontal padding shrunk so 6 tabs fit */
     background: none !important;
     border: none; cursor: pointer;
     color: var(--text-3) !important;
@@ -1379,8 +1381,10 @@
     border-radius: 8px;
     transition: color .15s;
     letter-spacing: -0.01em;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .mobile-nav .mobile-nav-btn i { font-size: 22px; color: var(--text-3); transition: color .15s; }
+  .mobile-nav .mobile-nav-btn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .mobile-nav .mobile-nav-btn.active { color: var(--green) !important; background: none !important; }
   .mobile-nav .mobile-nav-btn.active i { color: var(--green) !important; }
 
@@ -1787,6 +1791,10 @@
     .top-bar-logo { max-height: 38px; }
     .top-bar { gap: 4px; padding: 10px 10px; }
     .top-bar .btn, .top-bar .btn-icon { width: 34px; height: 34px; }
+    /* Tighten the bottom-nav tabs on the narrowest phones so all 6 fit
+       comfortably with their labels readable. */
+    .mobile-nav-btn { font-size: 9.5px; padding: 5px 2px; }
+    .mobile-nav .mobile-nav-btn i { font-size: 20px; }
   }
 </style>
 </head>
