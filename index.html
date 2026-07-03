@@ -364,9 +364,32 @@
   }
   .act-item-body { flex: 1; min-width: 0; }
   .act-item-title {
+    /* The title is now a <button> that toggles the card's collapsed state.
+       Reset the button UA styling so it looks like the previous title, while
+       remaining tappable for the full width of the row. */
+    display: flex; align-items: baseline; gap: 6px;
+    width: 100%; padding: 0; margin: 0;
+    background: none; border: none; cursor: pointer;
+    font-family: inherit; text-align: left;
     font-weight: 600; color: var(--text); font-size: 14px;
     line-height: 1.35; word-break: break-word;
   }
+  .act-item-title:hover .act-item-title-text { color: var(--green); }
+  .act-item-chevron {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    width: 18px; height: 18px; color: var(--text-3);
+    transition: transform .18s ease;
+    align-self: center;
+  }
+  .act-item-chevron i { font-size: 16px; }
+  /* Expanded state: rotate chevron down. Default (no `.collapsed`) = expanded. */
+  .act-item:not(.collapsed) .act-item-chevron { transform: rotate(90deg); }
+  /* When collapsed, hide everything except the title row (title + actions). */
+  .act-item.collapsed .act-item-thumb,
+  .act-item.collapsed .act-item-desc,
+  .act-item.collapsed .act-item-meta { display: none; }
+  .act-item-title-text { flex: 1; min-width: 0; }
   .act-item-title-sep    { color: var(--text-3); margin: 0 2px; }
   .act-item-title-source {
     color: var(--green); text-decoration: none;
@@ -4384,6 +4407,44 @@ function actClassifyLocation(text) {
 function actCanEdit()   { return window._userRole === 'admin' || window._userRole === 'employee'; }
 function actCanDelete() { return window._userRole === 'admin'; }
 
+// ── Activity card collapse state ──
+// Each activity card is independently collapsible. Default = COLLAPSED for
+// every card — only the title (with source link) shows. Expanding a card is
+// what gets remembered; the set of expanded ids persists in localStorage so
+// the state survives page reloads until the user clears their browser data.
+// Format: { "activityId1": true, "activityId2": true, ... }
+const ACT_EXPAND_KEY = 'actExpandedCards_v1';
+function actLoadExpanded() {
+  try {
+    const raw = localStorage.getItem(ACT_EXPAND_KEY);
+    if (!raw) return {};
+    const obj = JSON.parse(raw);
+    return (obj && typeof obj === 'object') ? obj : {};
+  } catch (e) { return {}; }
+}
+function actSaveExpanded(obj) {
+  try { localStorage.setItem(ACT_EXPAND_KEY, JSON.stringify(obj)); }
+  catch (e) { /* quota / private-browsing / etc. — silently continue */ }
+}
+function actIsCardExpanded(id) {
+  const map = actLoadExpanded();
+  return !!map[id];
+}
+// Toggle the expanded state and update the DOM directly (no re-render) so
+// scroll position and focus are preserved. Also update the aria-expanded
+// attribute on the title button for screen readers.
+function actToggleCard(id) {
+  const map = actLoadExpanded();
+  if (map[id]) delete map[id]; else map[id] = true;
+  actSaveExpanded(map);
+  const item = document.querySelector(`.act-item[data-activity-id="${CSS.escape(id)}"]`);
+  if (!item) return;
+  item.classList.toggle('collapsed');
+  const btn = item.querySelector('.act-item-title');
+  if (btn) btn.setAttribute('aria-expanded', item.classList.contains('collapsed') ? 'false' : 'true');
+}
+window.actToggleCard = actToggleCard;
+
 // ── Manual sort ordering ──
 // Activities within a (date, location) group sort by their `sortOrder` field
 // (lower = earlier in the list). Activities WITHOUT a sortOrder fall back to
@@ -5042,9 +5103,6 @@ function activityItemHtml(a, idx, total) {
   const canEdit = actCanEdit();
   const canDel  = actCanDelete();
   const idEsc = jsArg(a.id);
-  // Up/Down arrows (only for editors). Disabled at the top/bottom of the
-  // sorted group. We render them BEFORE Edit/Delete so the natural left-to-
-  // right reading order is: reorder, modify, destroy.
   const sortBtns = (canEdit && typeof idx === 'number' && typeof total === 'number') ? `
     <button class="btn btn-ghost btn-icon" title="Move up"   onclick="moveActivity('${idEsc}', -1)" ${idx === 0 ? 'disabled' : ''}><i class="ti ti-chevron-up"></i></button>
     <button class="btn btn-ghost btn-icon" title="Move down" onclick="moveActivity('${idEsc}', 1)"  ${idx === total - 1 ? 'disabled' : ''}><i class="ti ti-chevron-down"></i></button>` : '';
@@ -5054,26 +5112,30 @@ function activityItemHtml(a, idx, total) {
       ${canEdit ? `<button class="btn btn-ghost btn-icon" title="Edit" onclick="editActivity('${idEsc}')"><i class="ti ti-pencil"></i></button>` : ''}
       ${canDel  ? `<button class="btn btn-ghost btn-icon" title="Delete" onclick="deleteActivity('${idEsc}')"><i class="ti ti-trash"></i></button>` : ''}
     </div>` : '';
-  const titleHtml = a.sourceUrl
-    ? `${esc(a.title || '(untitled)')} <span class="act-item-title-sep">—</span> <a class="act-item-title-source" href="${esc(a.sourceUrl)}" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link"></i> Source</a>`
-    : esc(a.title || '(untitled)');
+  // Title is the collapse toggle. It's the entire clickable row containing
+  // the chevron, the title text, and (if any) the source link. The source
+  // link stops click propagation so tapping "Source" opens the page instead
+  // of toggling the card.
+  const sourceLink = a.sourceUrl
+    ? ` <span class="act-item-title-sep">—</span> <a class="act-item-title-source" href="${esc(a.sourceUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"><i class="ti ti-external-link"></i> Source</a>`
+    : '';
+  const isExpanded = actIsCardExpanded(a.id);
   const meta = [];
   if (a.time) meta.push(`<span><i class="ti ti-clock"></i> ${esc(a.time)}</span>`);
-  // Photo as a banner at the TOP of the card if this activity has one.
-  // Full card-width, fixed height with object-fit:cover so the activity list
-  // stays visually consistent regardless of source-photo aspect ratio. Click
-  // to open the lightbox at full resolution. Same layout on mobile.
   const photoData = (window._activityPhotos || {})[a.id];
   const thumb = photoData
     ? `<button class="act-item-thumb" onclick="openActivityPhoto('${idEsc}')" aria-label="View photo">
          <img src="${esc(photoData)}" alt="">
        </button>`
     : '';
-  return `<div class="act-item${photoData ? ' act-item-has-photo' : ''}">
+  return `<div class="act-item${isExpanded ? '' : ' collapsed'}${photoData ? ' act-item-has-photo' : ''}" data-activity-id="${esc(a.id)}">
     ${thumb}
     <div class="act-item-content">
       <div class="act-item-body">
-        <div class="act-item-title">${titleHtml}</div>
+        <button type="button" class="act-item-title" onclick="actToggleCard('${idEsc}')" aria-expanded="${isExpanded ? 'true' : 'false'}">
+          <span class="act-item-chevron"><i class="ti ti-chevron-right"></i></span>
+          <span class="act-item-title-text">${esc(a.title || '(untitled)')}${sourceLink}</span>
+        </button>
         ${a.description ? `<div class="act-item-desc">${mdToHtml(a.description)}</div>` : ''}
         ${meta.length ? `<div class="act-item-meta">${meta.join('')}</div>` : ''}
       </div>
