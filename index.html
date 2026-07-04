@@ -329,6 +329,25 @@
 
   .act-day-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
   .act-day-title { font-family: var(--font-serif, Fraunces, serif); font-size: 26px; font-weight: 600; color: var(--text); margin: 0; }
+  .act-day-title-sep { color: var(--text-3); margin: 0 2px; font-weight: 400; }
+  .act-day-theme, .act-day-theme-btn {
+    /* Theme appears inline with the date, same serif font and weight so it
+       reads as a natural continuation ("Wed, Jul 22, 2026 — Magical Creatures"). */
+    font-family: inherit; font-size: inherit; font-weight: inherit; color: var(--text);
+    background: none; border: none; padding: 0; margin: 0;
+    display: inline;
+  }
+  .act-day-theme-btn { cursor: pointer; text-align: left; }
+  .act-day-theme-btn:hover { color: var(--green); text-decoration: underline; text-underline-offset: 3px; }
+  /* When no theme is set, admin sees a subtler "+ Add theme" button. */
+  .act-day-theme-add {
+    font-family: inherit; font-size: 14px; font-weight: 500;
+    color: var(--text-3); margin-left: 12px;
+    display: inline-flex; align-items: center; gap: 4px;
+    vertical-align: middle;
+  }
+  .act-day-theme-add:hover { color: var(--green); text-decoration: none; }
+  .act-day-theme-add i { font-size: 16px; }
   .act-day-meta { font-size: 13px; color: var(--text-3); }
   .act-day-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
@@ -2860,6 +2879,14 @@ window._changePassword = async (currentPassword, newPassword) => {
 window._setEmployeeActive = (uid, active) =>
   updateDoc(doc(db, 'users', uid), { active: active });
 
+// Save a single day's theme (empty string = clear). Uses setDoc with merge
+// so we don't have to read-modify-write the whole themes map ourselves.
+// Client-side display simply skips empty strings.
+window._setDayTheme = async (dateYmd, theme) => {
+  const val = String(theme || '').trim();
+  await setDoc(dayThemesRef, { themes: { [dateYmd]: val } }, { merge: true });
+};
+
 // Permanently remove an employee's access record.
 window._removeEmployee = (uid) => deleteDoc(doc(db, 'users', uid));
 
@@ -2883,6 +2910,7 @@ const campersRef        = collection(db, "campers");
 const adminRef          = collection(db, "admin");
 const activitiesRef     = collection(db, "activities");
 const activityPhotosRef = collection(db, "activityPhotos");
+const dayThemesRef      = doc(db, "dayThemes", "all");
 const settingsRef       = doc(db, "settings", "jotform");
 
 // Real-time listeners are only started AFTER a verified sign-in, so that once
@@ -3017,6 +3045,20 @@ function startDataListeners() {
       }
     }, 80);
   }, (err) => console.error('activityPhotos snapshot error', err)));
+
+  // Day themes: a single Firestore doc `dayThemes/all` that holds a map of
+  // date (YYYY-MM-DD) → theme string. One doc keeps writes simple (the whole
+  // theme list changes rarely) and only requires one snapshot listener. Cached
+  // in window._dayThemes for the activities module to read.
+  window._dayThemes = window._dayThemes || {};
+  _unsubscribers.push(onSnapshot(dayThemesRef, (snap) => {
+    const data = snap.exists() ? snap.data() : {};
+    window._dayThemes = (data && data.themes) || {};
+    const ap = document.getElementById('page-activities');
+    if (typeof window.renderActivities === 'function' && ap && ap.classList.contains('active')) {
+      window.renderActivities();
+    }
+  }, (err) => console.error('dayThemes snapshot error', err)));
 }
 
 function stopDataListeners() {
@@ -4664,10 +4706,23 @@ function renderActivityDay() {
     ? outdoor.map((a, i) => activityItemHtml(a, i, outdoor.length)).join('')
     : '<div class="act-empty">No outdoor activities for this day yet.</div>';
 
+  const theme = (window._dayThemes || {})[ymd] || '';
+  // Theme display: appended to the date with an em-dash separator. Editors
+  // can click it to rename via a small prompt; the whole title area becomes
+  // interactive for admins/employees. Non-editors just see the theme text.
+  let themeHtml = '';
+  if (theme) {
+    themeHtml = canEdit
+      ? ` <span class="act-day-title-sep">—</span> <button type="button" class="act-day-theme-btn" onclick="editDayTheme('${ymd}')" title="Rename theme">${esc(theme)}</button>`
+      : ` <span class="act-day-title-sep">—</span> <span class="act-day-theme">${esc(theme)}</span>`;
+  } else if (canEdit) {
+    themeHtml = ` <button type="button" class="act-day-theme-btn act-day-theme-add" onclick="editDayTheme('${ymd}')" title="Add theme"><i class="ti ti-plus"></i> Add theme</button>`;
+  }
+
   wrap.innerHTML = `
     <div class="act-day-header">
       <div>
-        <h2 class="act-day-title">${esc(actFmtFull(d))}</h2>
+        <h2 class="act-day-title">${esc(actFmtFull(d))}${themeHtml}</h2>
         <div class="act-day-meta">${esc((days_for(ymd)||{}).weekLabel || '')}</div>
       </div>
       ${headerActions}
@@ -5365,6 +5420,26 @@ async function deleteActivity(id) {
   }
 }
 window.deleteActivity = deleteActivity;
+
+// ── Day theme editing ──
+// Admins/employees click the theme text (or "+ Add theme" if none set) to
+// rename it. Uses a native prompt() for simplicity — no extra modal needed
+// for a single-string edit. Blank input clears the theme.
+async function editDayTheme(ymd) {
+  if (!actCanEdit()) { showToast('Permission denied', 'error'); return; }
+  const current = (window._dayThemes || {})[ymd] || '';
+  const next = prompt('Theme for this day (leave blank to clear):', current);
+  if (next === null) return; // user cancelled
+  const trimmed = String(next).trim();
+  if (trimmed === current) return; // no change
+  try {
+    await window._setDayTheme(ymd, trimmed);
+    showToast(trimmed ? 'Theme updated' : 'Theme cleared');
+  } catch (e) {
+    showToast('Could not save theme: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+window.editDayTheme = editDayTheme;
 
 // ── Import modal ──
 function openActivityImport() {
