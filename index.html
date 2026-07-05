@@ -1706,6 +1706,51 @@
 
   /* ── Finances ── */
   .fin-summary { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+
+  /* ── Materials checklist ── */
+  .mat-intro {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 16px; margin-bottom: 20px; padding: 16px 18px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  }
+  .mat-intro-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+  .mat-intro-desc  { font-size: 13px; color: var(--text-2); line-height: 1.5; max-width: 640px; }
+  .mat-intro .btn  { flex-shrink: 0; }
+  .mat-list  { display: flex; flex-direction: column; gap: 14px; }
+  .mat-empty { padding: 40px 20px; text-align: center; color: var(--text-3); font-style: italic; border: 1px dashed var(--border); border-radius: 12px; }
+  .mat-day-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 18px;
+  }
+  .mat-day-head {
+    display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  .mat-day-date  { font-family: var(--font-serif, Fraunces, serif); font-weight: 600; font-size: 18px; color: var(--text); }
+  .mat-day-theme { font-size: 14px; color: var(--text-2); font-weight: 500; }
+  .mat-day-count { font-size: 12px; color: var(--text-3); margin-left: auto; }
+  .mat-items { display: flex; flex-direction: column; gap: 4px; }
+  .mat-item  {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 6px 8px; border-radius: 6px; cursor: pointer;
+    transition: background .12s;
+  }
+  .mat-item:hover { background: var(--bg); }
+  .mat-item input[type="checkbox"] {
+    margin: 3px 0 0 0; width: 16px; height: 16px; flex-shrink: 0;
+    accent-color: var(--green);
+  }
+  .mat-item.checked .mat-item-label { text-decoration: line-through; color: var(--text-3); }
+  .mat-item-label { font-size: 14px; color: var(--text); flex: 1; }
+  .mat-item-src   { font-size: 11.5px; color: var(--text-3); margin-left: 6px; }
+  .mat-item-guessed { font-style: italic; }
+  .mat-item-guessed .mat-item-label::after {
+    content: '  guess';
+    font-size: 10px; font-weight: 600; color: var(--text-3);
+    background: var(--bg); padding: 1px 5px; border-radius: 3px;
+    margin-left: 6px; vertical-align: middle; font-style: normal;
+    letter-spacing: 0.03em; text-transform: uppercase;
+  }
   .fin-card {
     flex: 1; min-width: 120px; padding: 14px 16px;
     border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
@@ -2131,6 +2176,7 @@
           <button class="admin-tab active" data-atab="payments" onclick="showAdminTab('payments',this)"><i class="ti ti-cash"></i> Payments</button>
           <button class="admin-tab" data-atab="employees" onclick="showAdminTab('employees',this)"><i class="ti ti-id-badge-2"></i> Employees</button>
           <button class="admin-tab" data-atab="finances" onclick="showAdminTab('finances',this)"><i class="ti ti-report-money"></i> Finances</button>
+          <button class="admin-tab" data-atab="materials" onclick="showAdminTab('materials',this)"><i class="ti ti-checklist"></i> Materials</button>
         </div>
 
         <!-- Payments tab -->
@@ -2201,6 +2247,25 @@
               </thead>
               <tbody id="finTableBody"><tr><td colspan="7" class="fin-empty">Loading…</td></tr></tbody>
             </table>
+          </div>
+        </div>
+
+        <!-- Materials tab -->
+        <div class="admin-tab-panel" id="atab-materials" style="display:none">
+          <div class="mat-intro">
+            <div>
+              <div class="mat-intro-title">Materials Checklist</div>
+              <div class="mat-intro-desc">
+                Scans every activity in the system for a "Materials", "Materials needed", "What you will need", or similar section and pulls out the items.
+                Regenerates fresh each time — click again after adding activities to update.
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="regenerateMaterials()">
+              <i class="ti ti-refresh"></i> <span id="matGenLabel">Generate list</span>
+            </button>
+          </div>
+          <div id="matList" class="mat-list">
+            <div class="mat-empty">Click "Generate list" to scan your activities.</div>
           </div>
         </div>
       </div>
@@ -3610,7 +3675,7 @@ async function removeEmp(uid) {
 
 // ── Admin tabs ──
 function showAdminTab(name, btn) {
-  ['payments', 'employees', 'finances'].forEach(t => {
+  ['payments', 'employees', 'finances', 'materials'].forEach(t => {
     const panel = document.getElementById('atab-' + t);
     if (panel) panel.style.display = (t === name) ? '' : 'none';
   });
@@ -3619,7 +3684,284 @@ function showAdminTab(name, btn) {
   else { const b = document.querySelector('.admin-tab[data-atab="' + name + '"]'); if (b) b.classList.add('active'); }
   if (name === 'employees') renderEmployees();
   if (name === 'finances') renderFinances();
+  // Materials tab doesn't auto-render — the user clicks Generate explicitly.
+  // Regeneration is idempotent and always reflects the current activity state,
+  // so we let them trigger it deliberately rather than running it on every
+  // tab-switch (which could be surprising given it enumerates every activity).
 }
+
+// ── Materials checklist ──
+// Scans every activity's description for a "Materials Needed" style section,
+// extracts individual items, groups by date, and renders as a checkable list.
+// Runs entirely client-side; each click on "Generate list" recomputes from the
+// current activities cache — no persistent stored list.
+//
+// Extraction strategy:
+//   1. PRIMARY: look for a labeled section in the markdown description ("**Materials
+//      Needed:**", "## What you will need", etc.). Read the lines that follow up
+//      to the next section header or the end of the description. Split by
+//      bullet, number, or comma.
+//   2. FALLBACK: if no section was found, run a heuristic pass over the whole
+//      text looking for phrases like "you'll need X, Y" or "using X". This is
+//      noisy — items are flagged as "GUESS" in the UI so admins know to review.
+//
+// The parsing is deliberately conservative in the primary path (only lists
+// well-labeled sections) and permissive in the fallback (so we surface
+// something even when the activity author didn't format a materials section).
+
+const MATERIAL_SECTION_HEADERS = [
+  'materials needed', 'materials to bring', 'materials',
+  'what you will need', "what you'll need", 'what you need', 'you will need', "you'll need", 'you need',
+  'supplies needed', 'supplies',
+  'props bag', 'props', 'prop bag',
+  'equipment needed', 'equipment',
+  'ingredients',
+  'you need to bring', 'to bring',
+  'items needed', 'items',
+];
+
+// Split a text block into "material items" by looking at its shape and
+// choosing the best strategy (bullets, numbered, comma-separated on a single
+// line, or one item per line). Filters out empty/whitespace lines and lines
+// that look more like instructions than items.
+function splitMaterialsBlock(block) {
+  if (!block) return [];
+  const raw = String(block).replace(/\r/g, '').trim();
+  if (!raw) return [];
+  const rawLines = raw.split(/\n/).map(l => l.trim()).filter(Boolean);
+  const anyBullets = rawLines.some(l => /^(?:[-*+•]|\d+[.)])\s+/.test(l));
+  let items;
+  if (anyBullets) {
+    // Bullet/numbered list — strip the marker from each bulleted line, drop
+    // orphan non-bullet lines that appear between bullets (probably prose)
+    items = rawLines
+      .filter(l => /^(?:[-*+•]|\d+[.)])\s+/.test(l))
+      .map(l => l.replace(/^(?:[-*+•]|\d+[.)])\s+/, '').trim());
+  } else if (rawLines.length === 1) {
+    // Single line — split by comma or semicolon (typical inline list)
+    const solo = rawLines[0];
+    if (solo.includes(',') || solo.includes(';')) {
+      items = solo.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    } else {
+      items = [solo];
+    }
+  } else {
+    // Multi-line but no bullets — treat each non-empty line as an item
+    items = rawLines;
+  }
+  // Cleanup: strip surrounding markdown emphasis, trailing punctuation, drop
+  // items that are too short (< 2 chars), too long (> 160 chars — probably
+  // instructions), or that end in a question mark (also probably prose).
+  return items
+    .map(it => it
+      .replace(/^\*+|\*+$/g, '')
+      .replace(/^_+|_+$/g, '')
+      .replace(/[.!;:]+$/, '')
+      .trim())
+    .filter(it => it.length >= 2 && it.length <= 160 && !/[?]/.test(it));
+}
+
+// Strip inline markdown decoration from a line so we can compare against the
+// bare header vocabulary. Keeps content in place; just removes the syntax.
+function stripInlineMd(line) {
+  return String(line || '')
+    .replace(/^\s*#{1,6}\s+/, '')     // leading heading marker
+    .replace(/\*\*|__/g, '')           // bold
+    .replace(/(^|[^*])\*(?!\*)/g, '$1') // single-* italic (avoid stripping list-item * — those have space after)
+    .replace(/(^|[^_])_(?!_)/g, '$1')   // single-_ italic
+    .trim();
+}
+
+// Detect if a line looks like a fresh section header (any topic). We use this
+// to decide when to STOP collecting a materials block — the next section
+// header ends it.
+function looksLikeSectionHeader(line) {
+  if (!line) return false;
+  if (/^\s*#{1,6}\s+\S/.test(line)) return true;   // markdown heading
+  // Bold-only line ("**Something:**" or "**1. Foo (2 min)**")
+  if (/^\s*\*\*[^*\n]{2,80}\*\*\s*:?\s*$/.test(line)) return true;
+  // "**Something**: rest of line" — bold label + colon (also a header)
+  if (/^\s*\*\*[^*\n]{2,50}\*\*\s*:/.test(line)) return true;
+  return false;
+}
+
+// Find a "Materials Needed" style section in an activity's description.
+// Handles: bold labels, markdown headings, plain "Label:" lines, and items
+// that appear on the SAME line as the label ("Props Bag: chalk, cones, ...").
+// Returns { items: string[], found: boolean }.
+function extractMaterialsFromDescription(description) {
+  if (!description) return { items: [], found: false };
+  const lines = description.split('\n');
+  const headerAlternation = MATERIAL_SECTION_HEADERS
+    .map(h => h.replace(/'/g, "['’]").replace(/ /g, '\\s+'))
+    .join('|');
+  // Header must be either:
+  //   • followed by ":", "-", "–", or "—" (with optional inline items after), or
+  //   • end-of-line (bare header like `## Materials`)
+  // The second branch prevents accidental matches like "Materials Overview".
+  const headerRe = new RegExp(
+    '^(' + headerAlternation + ')(?:\\s*[:\\-–—]\\s*(.*))?\\s*$',
+    'i'
+  );
+  for (let i = 0; i < lines.length; i++) {
+    const stripped = stripInlineMd(lines[i]);
+    const m = stripped.match(headerRe);
+    if (!m) continue;
+    // Inline content after the label on this line (may be undefined if the
+    // header stood alone).
+    const inline = (m[2] || '').trim();
+    // If inline content is present, that IS the full list — don't gobble
+    // subsequent lines, since they're usually prose from the next section.
+    // Common example: `Props Bag: felt, sheet, cards` — the props are inline.
+    if (inline) {
+      return { items: splitMaterialsBlock(inline), found: true };
+    }
+    // No inline content — collect subsequent lines until we hit another
+    // section header or two consecutive blank lines (which typically signal
+    // a paragraph break to non-materials content).
+    let block = '';
+    let blanks = 0;
+    for (let j = i + 1; j < lines.length; j++) {
+      const next = lines[j];
+      if (/^\s*$/.test(next)) {
+        blanks++;
+        if (blanks >= 2) break;
+        block += '\n';
+        continue;
+      }
+      if (looksLikeSectionHeader(next)) break;
+      blanks = 0;
+      block += '\n' + next;
+    }
+    return { items: splitMaterialsBlock(block), found: true };
+  }
+  return { items: [], found: false };
+}
+
+// FALLBACK: when no section header matches, look through the whole description
+// for phrases that imply materials. Best-effort — the result is marked as a
+// GUESS in the UI so the admin knows to review. This is deliberately narrow
+// on cues (only ones that reliably introduce material lists) to keep noise
+// down. We deliberately avoid "with" because it produces bad matches like
+// "with your eyes closed".
+function fallbackGuessMaterials(description) {
+  if (!description) return [];
+  const items = new Set();
+  // Cue phrases that reliably precede material lists.
+  const cues = [
+    "you(?:'ll|\\s+will)?\\s+need",
+    "you\\s+need",
+    "take\\s+(?:some|a|an|the)?\\s*",   // "Take some blank paper, ..."
+    "bring\\s+(?:some|a|an|the)?\\s*",
+    "grab\\s+(?:some|a|an|the)?\\s*",
+    "gather\\s+(?:some|a|an|the)?\\s*",
+    "using\\s+(?:some|a|an|the)?\\s*",
+    "supplies\\s*[:\\-]",
+    "materials\\s*[:\\-]",
+  ];
+  const re = new RegExp('(?:' + cues.join('|') + ')\\s*([^.!?\\n]{4,200})', 'gi');
+  let m;
+  while ((m = re.exec(description)) !== null) {
+    const phrase = m[1];
+    // Split on comma / and / semicolon
+    const parts = phrase.split(/,|\band\b|;/i).map(s => s.trim());
+    for (let p of parts) {
+      // Trim trailing "outside", "inside", "for the activity" — location/purpose adjuncts
+      p = p.replace(/\s+(?:outside|outdoors|inside|indoors|for\s+the\s+.+)$/i, '').trim();
+      // Skip empty, too short, or starting with a verb / connector
+      if (p.length < 2 || p.length > 60) continue;
+      if (/^(?:to|for|the|a|an|be|do|is|are|was|will|from|into|on|at|by)\b/i.test(p)) continue;
+      // Skip anything that looks like a full sentence fragment (verbs mid-phrase)
+      if (/\b(?:should|would|could|make|take|bring|do|use|try|help|will|see)\b/i.test(p)) continue;
+      items.add(p.replace(/[.!?]+$/, '').trim());
+    }
+  }
+  return Array.from(items).slice(0, 20);
+}
+
+// Normalize an item for deduplication within a day: lowercase, strip
+// leading counts ("2 buckets" → "buckets"), collapse whitespace.
+function normalizeMaterialKey(item) {
+  return String(item || '')
+    .toLowerCase()
+    .replace(/^\s*\d+\s*(?:x\s+)?/, '')     // "2 " or "2x "
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Build the aggregated list per date.
+// Returns: Array<{ date, theme, items: [{label, guessed, sources: [{activityTitle}]}] }>
+function buildMaterialsPerDay() {
+  const byDate = {};
+  const themes = window._dayThemes || {};
+  (window._activities || []).forEach(a => {
+    if (!a || !a.date) return;
+    const { items: sectionItems, found } = extractMaterialsFromDescription(a.description || '');
+    let items = sectionItems;
+    let guessed = false;
+    if (!found) {
+      items = fallbackGuessMaterials(a.description || '');
+      guessed = items.length > 0;
+    }
+    if (!items.length) return;
+    if (!byDate[a.date]) byDate[a.date] = { date: a.date, itemsMap: {} };
+    for (const raw of items) {
+      const key = normalizeMaterialKey(raw);
+      if (!key) continue;
+      if (!byDate[a.date].itemsMap[key]) {
+        byDate[a.date].itemsMap[key] = { label: raw, guessed, sources: [] };
+      }
+      // A single "found" source wins over "guessed" for the flag
+      if (!guessed) byDate[a.date].itemsMap[key].guessed = false;
+      byDate[a.date].itemsMap[key].sources.push({ activityTitle: a.title || '(untitled)' });
+    }
+  });
+  return Object.values(byDate)
+    .map(d => ({
+      date: d.date,
+      theme: themes[d.date] || '',
+      items: Object.values(d.itemsMap).sort((a, b) => a.label.localeCompare(b.label))
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function regenerateMaterials() {
+  if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
+  const label = document.getElementById('matGenLabel');
+  if (label) label.textContent = 'Regenerate list';
+  const list = document.getElementById('matList');
+  const perDay = buildMaterialsPerDay();
+  if (!perDay.length) {
+    list.innerHTML = '<div class="mat-empty">No activities have material sections yet.<br>Add a "Materials Needed" section to your activities, then generate again.</div>';
+    return;
+  }
+  const html = perDay.map(day => {
+    const dObj = new Date(day.date + 'T12:00:00');
+    const dateStr = dObj.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
+    const themeHtml = day.theme ? `<span class="mat-day-theme">— ${esc(day.theme)}</span>` : '';
+    const itemsHtml = day.items.map((it, i) => {
+      const id = `mat-${day.date}-${i}`;
+      const sourceHint = it.sources.length === 1
+        ? esc(it.sources[0].activityTitle)
+        : `${it.sources.length} activities`;
+      return `<label class="mat-item${it.guessed ? ' mat-item-guessed' : ''}" for="${id}"
+                onclick="event.currentTarget.classList.toggle('checked', event.target.checked !== undefined ? event.target.checked : !event.currentTarget.classList.contains('checked'))">
+        <input type="checkbox" id="${id}">
+        <span class="mat-item-label">${esc(it.label)}<span class="mat-item-src"> · ${sourceHint}</span></span>
+      </label>`;
+    }).join('');
+    return `<div class="mat-day-card">
+      <div class="mat-day-head">
+        <span class="mat-day-date">${esc(dateStr)}</span>
+        ${themeHtml}
+        <span class="mat-day-count">${day.items.length} item${day.items.length === 1 ? '' : 's'}</span>
+      </div>
+      <div class="mat-items">${itemsHtml}</div>
+    </div>`;
+  }).join('');
+  list.innerHTML = html;
+}
+window.regenerateMaterials = regenerateMaterials;
 
 // ── Finances ──
 const FIN_CATEGORIES = {
