@@ -382,6 +382,50 @@
     display: flex; gap: 10px; align-items: flex-start;
   }
   .act-item-body { flex: 1; min-width: 0; }
+  .act-item-title-row {
+    display: flex; align-items: flex-start; gap: 8px;
+    width: 100%;
+  }
+  /* Native checkbox is hidden; we render a custom box for cross-platform
+     consistent styling. The check mark uses a Tabler icon we swap in via CSS. */
+  .act-item-check {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0; cursor: pointer;
+    /* Bigger tap target for phones — 32px square around the visible box. */
+    width: 32px; height: 32px;
+    margin: -4px -4px 0 -4px;   /* offset padding so visual alignment stays tight */
+  }
+  .act-item-check input {
+    /* Keep the input in the DOM for accessibility (focus, screen readers)
+       but hide it visually — we'll style the sibling span as the box. */
+    position: absolute; opacity: 0; pointer-events: none;
+    width: 1px; height: 1px; margin: -1px;
+  }
+  .act-item-check-box {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px;
+    border: 1.5px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg);
+    color: transparent;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  .act-item-check-box i { font-size: 14px; font-weight: bold; }
+  .act-item-check:hover .act-item-check-box { border-color: var(--green); }
+  .act-item-check input:checked + .act-item-check-box {
+    background: var(--green); border-color: var(--green); color: #fff;
+  }
+  .act-item-check input:focus-visible + .act-item-check-box {
+    outline: 2px solid var(--green); outline-offset: 2px;
+  }
+  .act-item-check input:disabled + .act-item-check-box {
+    opacity: 0.55; cursor: not-allowed;
+  }
+  .act-item-check input:disabled ~ * { cursor: not-allowed; }
+  /* Completed state — visually indicate the whole card is done. */
+  .act-item.completed .act-item-title-text { text-decoration: line-through; color: var(--text-3); }
+  .act-item.completed { opacity: 0.72; }
+  .act-item.completed .act-item-title-source { text-decoration: line-through; }
   .act-item-title {
     /* The title is now a <button> that toggles the card's collapsed state.
        Reset the button UA styling so it looks like the previous title, while
@@ -5167,14 +5211,11 @@ function activityItemHtml(a, idx, total) {
       ${canEdit ? `<button class="btn btn-ghost btn-icon" title="Edit" onclick="editActivity('${idEsc}')"><i class="ti ti-pencil"></i></button>` : ''}
       ${canDel  ? `<button class="btn btn-ghost btn-icon" title="Delete" onclick="deleteActivity('${idEsc}')"><i class="ti ti-trash"></i></button>` : ''}
     </div>` : '';
-  // Title is the collapse toggle. It's the entire clickable row containing
-  // the chevron, the title text, and (if any) the source link. The source
-  // link stops click propagation so tapping "Source" opens the page instead
-  // of toggling the card.
   const sourceLink = a.sourceUrl
     ? ` <span class="act-item-title-sep">—</span> <a class="act-item-title-source" href="${esc(a.sourceUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()"><i class="ti ti-external-link"></i> Source</a>`
     : '';
   const isExpanded = actIsCardExpanded(a.id);
+  const isCompleted = !!a.completed;
   const meta = [];
   if (a.time) meta.push(`<span><i class="ti ti-clock"></i> ${esc(a.time)}</span>`);
   const photoData = (window._activityPhotos || {})[a.id];
@@ -5183,14 +5224,29 @@ function activityItemHtml(a, idx, total) {
          <img src="${esc(photoData)}" alt="">
        </button>`
     : '';
-  return `<div class="act-item${isExpanded ? '' : ' collapsed'}${photoData ? ' act-item-has-photo' : ''}" data-activity-id="${esc(a.id)}">
+  // Completion checkbox: on the left of the title, before the collapse chevron.
+  // Uses a native <input type="checkbox"> for accessibility (keyboard toggling,
+  // screen reader announcements). Clicks stop propagation so tapping the box
+  // doesn't also trigger the title's expand/collapse handler. Any active user
+  // (admin OR employee) may check/uncheck — this is operational camp-day state,
+  // not planning data.
+  const checkbox = `<label class="act-item-check" onclick="event.stopPropagation()">
+      <input type="checkbox" ${isCompleted ? 'checked' : ''} ${canEdit ? '' : 'disabled'}
+             aria-label="Mark activity done"
+             onchange="toggleActivityCompleted('${idEsc}', this.checked)">
+      <span class="act-item-check-box"><i class="ti ti-check"></i></span>
+    </label>`;
+  return `<div class="act-item${isExpanded ? '' : ' collapsed'}${photoData ? ' act-item-has-photo' : ''}${isCompleted ? ' completed' : ''}" data-activity-id="${esc(a.id)}">
     ${thumb}
     <div class="act-item-content">
       <div class="act-item-body">
-        <button type="button" class="act-item-title" onclick="actToggleCard('${idEsc}')" aria-expanded="${isExpanded ? 'true' : 'false'}">
-          <span class="act-item-chevron"><i class="ti ti-chevron-right"></i></span>
-          <span class="act-item-title-text">${esc(a.title || '(untitled)')}${sourceLink}</span>
-        </button>
+        <div class="act-item-title-row">
+          ${checkbox}
+          <button type="button" class="act-item-title" onclick="actToggleCard('${idEsc}')" aria-expanded="${isExpanded ? 'true' : 'false'}">
+            <span class="act-item-chevron"><i class="ti ti-chevron-right"></i></span>
+            <span class="act-item-title-text">${esc(a.title || '(untitled)')}${sourceLink}</span>
+          </button>
+        </div>
         ${a.description ? `<div class="act-item-desc">${mdToHtml(a.description)}</div>` : ''}
         ${meta.length ? `<div class="act-item-meta">${meta.join('')}</div>` : ''}
       </div>
@@ -5198,6 +5254,32 @@ function activityItemHtml(a, idx, total) {
     </div>
   </div>`;
 }
+
+// Toggle the completion state and write it to Firestore. The snapshot listener
+// on the activities collection will re-render every open browser with the new
+// state, giving facilitators shared visibility across devices. We do the write
+// straight through without optimistic UI — Firestore round-trips are fast and
+// keeping the checkbox as the source of truth avoids the flicker of an
+// optimistic update that then gets reverted on failure.
+async function toggleActivityCompleted(id, checked) {
+  if (!actCanEdit()) { showToast('Sign in to check off activities', 'error'); return; }
+  try {
+    await window._updateDoc(window._doc(window._db, 'activities', id), {
+      completed: !!checked,
+      completedAt: checked ? window._serverTimestamp() : null,
+      completedBy: checked ? (window._userEmail || '').toLowerCase() : null,
+    });
+  } catch (e) {
+    showToast('Could not update: ' + (e.code || e.message || 'error'), 'error');
+    // Roll back the checkbox visually since the write failed
+    const item = document.querySelector(`.act-item[data-activity-id="${CSS.escape(id)}"]`);
+    if (item) {
+      const cb = item.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = !checked;
+    }
+  }
+}
+window.toggleActivityCompleted = toggleActivityCompleted;
 
 // ── Photo lightbox ──
 // Click any thumb to open a full-screen overlay; close on background click or Esc.
