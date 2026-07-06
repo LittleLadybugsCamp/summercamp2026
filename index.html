@@ -1765,6 +1765,22 @@
   .fin-amt.income { color: #2E7D43; font-weight: 600; }
   .fin-amt.expense { color: #B23B2E; font-weight: 600; }
   .txn-receipt-hint { font-size: 12px; color: var(--text-2); margin-top: 6px; }
+  /* "Current attachment" strip shown at the top of the receipt input when
+     editing an entry with an existing file. Compact so it doesn't dominate. */
+  .txn-existing-receipt { margin-bottom: 10px; }
+  .txn-existing-receipt-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .txn-existing-receipt-row .btn { flex-shrink: 0; }
+  .txn-existing-receipt-name { flex: 1; color: var(--text); word-break: break-all; }
+  .txn-existing-receipt-hint {
+    font-size: 11.5px; color: var(--text-3); margin-top: 6px; padding: 0 4px;
+  }
+  .txn-existing-receipt-removed { background: #FDECEA; border-color: #F3C9C3; color: #9A2A1E; }
+  .txn-existing-receipt-removed i { color: #9A2A1E; }
   .fin-receipt-link { color: var(--green); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
   .fin-receipt-link:hover { text-decoration: underline; }
   .fin-locked { color: var(--text-3); font-size: 13px; cursor: default; }
@@ -2330,6 +2346,9 @@
       </div>
       <div class="form-group">
         <label class="form-label">Receipt <span style="color:var(--text-3);font-weight:400">(optional — photo or PDF)</span></label>
+        <!-- When editing an entry that already has a receipt, this block shows
+             its filename with View / Remove / Replace controls. Filled by JS. -->
+        <div id="txnExistingReceipt" class="txn-existing-receipt" style="display:none"></div>
         <input type="file" id="txnReceipt" accept="image/*,application/pdf" onchange="onReceiptPick()">
         <div class="txn-receipt-hint" id="txnReceiptHint" style="display:none"></div>
       </div>
@@ -3985,6 +4004,13 @@ const FIN_CATEGORIES = {
 let _finances = [];
 let _finFilter = 'all'; // 'all' | 'income' | 'expense'
 let _txnType = 'expense';
+// When set, submitTxn updates instead of inserts. Cleared on modal close.
+let _txnEditingId = null;
+// Tracks intent for the receipt on an existing entry being edited:
+//   'unchanged' → keep whatever's already attached (or none)
+//   'remove'    → delete the receipt doc on save
+//   'new'       → a fresh file has been picked in the input, overwrite on save
+let _txnReceiptIntent = 'unchanged';
 let _txnReceipt = null; // { dataUri, name } staged for the entry being added
 
 function finMoney(n) {
@@ -4134,7 +4160,10 @@ async function renderFinances(refetch = true) {
         <td>${escapeHtml(t.description || '')}</td>
         <td class="fin-amt ${t.type}">${t.type === 'expense' ? '−' : ''}${finMoney(t.amount)}</td>
         <td>${receipt}</td>
-        <td style="text-align:right"><button class="btn btn-ghost btn-icon" title="Delete entry" onclick="deleteTxn('${escapeHtml(t.id)}')"><i class="ti ti-trash"></i></button></td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn btn-ghost btn-icon" title="Edit entry" onclick="openEditTxn('${escapeHtml(t.id)}')"><i class="ti ti-pencil"></i></button>
+          <button class="btn btn-ghost btn-icon" title="Delete entry" onclick="deleteTxn('${escapeHtml(t.id)}')"><i class="ti ti-trash"></i></button>
+        </td>
       </tr>`;
     }).join('');
   } catch (e) {
@@ -4152,18 +4181,18 @@ function setFinFilter(value, btn) {
 
 function openAddTxn(type) {
   _txnType = (type === 'income') ? 'income' : 'expense';
+  _txnEditingId = null;
   _txnReceipt = null;
+  _txnReceiptIntent = 'unchanged';
   document.getElementById('txnModalTitle').textContent = (_txnType === 'income') ? 'Add income' : 'Add expense';
-  const sel = document.getElementById('txnCategory');
-  sel.innerHTML = FIN_CATEGORIES[_txnType].map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  populateTxnCategoryOptions();
   // default date = today (local)
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   document.getElementById('txnDate').value = local;
   document.getElementById('txnAmount').value = '';
   document.getElementById('txnDesc').value = '';
-  const rc = document.getElementById('txnReceipt'); if (rc) rc.value = '';
-  const hint = document.getElementById('txnReceiptHint'); hint.style.display = 'none'; hint.textContent = '';
+  clearTxnReceiptUi();
   // PDF-import row: only useful for expenses (receipts)
   const importRow = document.getElementById('txnImportRow');
   if (importRow) importRow.style.display = (_txnType === 'expense') ? 'flex' : 'none';
@@ -4175,9 +4204,103 @@ function openAddTxn(type) {
   setTimeout(() => document.getElementById('txnAmount').focus(), 60);
 }
 
+// Open the modal in EDIT mode for an existing finances entry. Pre-fills every
+// field and, if there's an attached receipt, shows its filename with View /
+// Remove / Replace controls. Invoice-derived income rows can't be edited here
+// (their source of truth is the Payments tab) — this function should not be
+// called for those; the row builder omits the edit button for them.
+function openEditTxn(id) {
+  const t = _finances.find(x => x.id === id);
+  if (!t) { showToast('Entry not found', 'error'); return; }
+  if (t.__isInvoiceIncome) { showToast('Invoice income is edited from the Payments tab', 'error'); return; }
+  _txnType = (t.type === 'income') ? 'income' : 'expense';
+  _txnEditingId = id;
+  _txnReceipt = null;
+  _txnReceiptIntent = 'unchanged';
+  document.getElementById('txnModalTitle').textContent = (_txnType === 'income') ? 'Edit income' : 'Edit expense';
+  populateTxnCategoryOptions(t.category || '');
+  document.getElementById('txnDate').value = t.date || '';
+  document.getElementById('txnAmount').value = (typeof t.amount === 'number') ? t.amount.toFixed(2) : (t.amount || '');
+  document.getElementById('txnDesc').value = t.description || '';
+  clearTxnReceiptUi();
+  // Show the current receipt block if there is one attached.
+  if (t.hasReceipt) {
+    renderExistingReceiptRow(id, t.receiptName || 'attached file');
+  }
+  // PDF-import row: only useful when creating an expense from scratch. On edit
+  // we hide it — replacing the receipt via the file input is cleaner.
+  const importRow = document.getElementById('txnImportRow');
+  if (importRow) importRow.style.display = 'none';
+  const err = document.getElementById('txnError'); err.style.display = 'none'; err.textContent = '';
+  const btn = document.getElementById('txnSaveBtn'); btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Save changes';
+  document.getElementById('txnModal').classList.add('open');
+  setTimeout(() => document.getElementById('txnAmount').focus(), 60);
+}
+window.openEditTxn = openEditTxn;
+
+// Populate the category dropdown for the current _txnType, optionally
+// pre-selecting a value (used in edit mode). If the entry's category isn't in
+// the default list (e.g. old data or custom category), it's added so we don't
+// silently swap it to something else.
+function populateTxnCategoryOptions(selected) {
+  const sel = document.getElementById('txnCategory');
+  const list = FIN_CATEGORIES[_txnType].slice();
+  if (selected && !list.includes(selected)) list.unshift(selected);
+  sel.innerHTML = list.map(c =>
+    `<option value="${escapeHtml(c)}"${c === selected ? ' selected' : ''}>${escapeHtml(c)}</option>`
+  ).join('');
+}
+
+// Reset the receipt controls to a "no file, no existing receipt" state.
+function clearTxnReceiptUi() {
+  const rc = document.getElementById('txnReceipt'); if (rc) rc.value = '';
+  const hint = document.getElementById('txnReceiptHint'); if (hint) { hint.style.display = 'none'; hint.textContent = ''; }
+  const existing = document.getElementById('txnExistingReceipt');
+  if (existing) { existing.innerHTML = ''; existing.style.display = 'none'; }
+}
+
+// Render the "current receipt" row when editing an entry that already has an
+// attachment. Provides View (opens in a new tab) and Remove (marks for deletion
+// on save) buttons; picking a new file in the input below implicitly replaces.
+function renderExistingReceiptRow(id, name) {
+  const el = document.getElementById('txnExistingReceipt');
+  if (!el) return;
+  el.style.display = '';
+  el.innerHTML = `
+    <div class="txn-existing-receipt-row">
+      <i class="ti ti-paperclip"></i>
+      <span class="txn-existing-receipt-name">${escapeHtml(name)}</span>
+      <button type="button" class="btn btn-sm" onclick="viewReceipt('${escapeHtml(id)}')" title="Open receipt">View</button>
+      <button type="button" class="btn btn-sm" onclick="markReceiptForRemoval()" title="Remove attachment on save"><i class="ti ti-trash"></i> Remove</button>
+    </div>
+    <div class="txn-existing-receipt-hint">Pick a file below to <b>replace</b>, or Remove to detach.</div>`;
+}
+
+function markReceiptForRemoval() {
+  _txnReceiptIntent = 'remove';
+  const el = document.getElementById('txnExistingReceipt');
+  if (el) {
+    el.innerHTML = `<div class="txn-existing-receipt-row txn-existing-receipt-removed">
+      <i class="ti ti-file-off"></i>
+      <span class="txn-existing-receipt-name">Attachment will be removed on save.</span>
+      <button type="button" class="btn btn-sm" onclick="undoReceiptRemoval()">Undo</button>
+    </div>`;
+  }
+}
+window.markReceiptForRemoval = markReceiptForRemoval;
+
+function undoReceiptRemoval() {
+  _txnReceiptIntent = 'unchanged';
+  const t = _finances.find(x => x.id === _txnEditingId);
+  if (t && t.hasReceipt) renderExistingReceiptRow(_txnEditingId, t.receiptName || 'attached file');
+}
+window.undoReceiptRemoval = undoReceiptRemoval;
+
 function closeTxnModal() {
   document.getElementById('txnModal').classList.remove('open');
   _txnReceipt = null;
+  _txnEditingId = null;
+  _txnReceiptIntent = 'unchanged';
 }
 
 function onReceiptPick() {
@@ -4186,6 +4309,11 @@ function onReceiptPick() {
   // A manually chosen receipt supersedes anything staged from a PDF import.
   if (f) {
     _txnReceipt = null;
+    _txnReceiptIntent = 'new'; // implicit replace when editing
+    // If this was an edit-mode "existing receipt" row, hide it — the new
+    // file's hint below shows what will be attached instead.
+    const existing = document.getElementById('txnExistingReceipt');
+    if (existing) existing.style.display = 'none';
     const importHint = document.getElementById('txnImportHint'); if (importHint) importHint.textContent = '';
   }
   if (!f) { hint.style.display = 'none'; return; }
@@ -4290,6 +4418,7 @@ async function submitTxn() {
   const fileEl = document.getElementById('txnReceipt');
   const err = document.getElementById('txnError'); err.style.display = 'none';
   const btn = document.getElementById('txnSaveBtn');
+  const isEdit = !!_txnEditingId;
   function fail(m) { err.textContent = m; err.style.display = ''; }
   if (!dateV) { fail('Please choose a date.'); return; }
   if (!(amountV > 0)) { fail('Please enter an amount greater than zero.'); return; }
@@ -4297,35 +4426,77 @@ async function submitTxn() {
 
   btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Saving…';
   try {
-    let receipt = null;
+    // Prepare the new receipt (if any). Only read the file if the user picked
+    // one — on edit, an unchanged receipt intent means we leave the receipt
+    // doc completely alone.
+    let newReceipt = null;
     if (fileEl && fileEl.files && fileEl.files[0]) {
-      receipt = await fileToReceipt(fileEl.files[0]);
+      newReceipt = await fileToReceipt(fileEl.files[0]);
     } else if (_txnReceipt) {
-      // Staged from a PDF import (already a {dataUri, name})
-      receipt = _txnReceipt;
+      newReceipt = _txnReceipt; // from PDF import (create mode only)
     }
-    const data = {
-      type: _txnType,
-      date: dateV,
-      amount: Math.round(amountV * 100) / 100,
-      category: category,
-      description: desc,
-      hasReceipt: !!receipt,
-      receiptName: receipt ? receipt.name : null,
-      createdAt: window._serverTimestamp(),
-      createdBy: window._userEmail || ''
-    };
-    const ref = await window._addDoc(window._collection(window._db, 'finances'), data);
-    if (receipt) {
-      await window._setDoc(window._doc(window._db, 'receipts', ref.id), { dataUri: receipt.dataUri, name: receipt.name });
+
+    if (isEdit) {
+      // ── EDIT PATH ──
+      // Compute the target hasReceipt/receiptName based on the intent + any
+      // newly-picked file.
+      const original = _finances.find(x => x.id === _txnEditingId) || {};
+      let hasReceipt, receiptName;
+      if (newReceipt) {
+        hasReceipt = true; receiptName = newReceipt.name;
+      } else if (_txnReceiptIntent === 'remove') {
+        hasReceipt = false; receiptName = null;
+      } else {
+        // 'unchanged'
+        hasReceipt = !!original.hasReceipt;
+        receiptName = original.receiptName || null;
+      }
+      const update = {
+        // type is fixed on edit — you can't turn income into expense
+        date: dateV,
+        amount: Math.round(amountV * 100) / 100,
+        category,
+        description: desc,
+        hasReceipt,
+        receiptName,
+        updatedAt: window._serverTimestamp(),
+        updatedBy: window._userEmail || '',
+      };
+      await window._updateDoc(window._doc(window._db, 'finances', _txnEditingId), update);
+      // Then reconcile the receipt companion doc.
+      if (newReceipt) {
+        await window._setDoc(window._doc(window._db, 'receipts', _txnEditingId), { dataUri: newReceipt.dataUri, name: newReceipt.name });
+      } else if (_txnReceiptIntent === 'remove' && original.hasReceipt) {
+        try { await window._deleteDoc(window._doc(window._db, 'receipts', _txnEditingId)); }
+        catch (e) { console.warn('Receipt delete failed (may not exist):', e); }
+      }
+      showToast('Entry updated');
+    } else {
+      // ── CREATE PATH ──
+      const data = {
+        type: _txnType,
+        date: dateV,
+        amount: Math.round(amountV * 100) / 100,
+        category,
+        description: desc,
+        hasReceipt: !!newReceipt,
+        receiptName: newReceipt ? newReceipt.name : null,
+        createdAt: window._serverTimestamp(),
+        createdBy: window._userEmail || ''
+      };
+      const ref = await window._addDoc(window._collection(window._db, 'finances'), data);
+      if (newReceipt) {
+        await window._setDoc(window._doc(window._db, 'receipts', ref.id), { dataUri: newReceipt.dataUri, name: newReceipt.name });
+      }
+      showToast((_txnType === 'income' ? 'Income' : 'Expense') + ' added');
     }
-    showToast((_txnType === 'income' ? 'Income' : 'Expense') + ' added');
     closeTxnModal();
     renderFinances();
   } catch (e) {
     console.error(e);
     fail(e.message || (e.code || 'Could not save — please try again.'));
-    btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Save entry';
+    btn.disabled = false;
+    btn.innerHTML = isEdit ? '<i class="ti ti-check"></i> Save changes' : '<i class="ti ti-check"></i> Save entry';
   }
 }
 
