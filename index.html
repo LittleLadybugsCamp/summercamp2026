@@ -1276,6 +1276,42 @@
   .sidebar-signout:hover, .sidebar-changepw:hover { background: var(--bg); color: var(--text); }
   .form-hint { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
 
+  /* ── Mobile account menu ── */
+  /* User icon button injected into every .top-bar via JS. Hidden on desktop
+     (where the sidebar-user block handles account actions); appears at the
+     far right of the top-bar on mobile. */
+  .mobile-user-btn { display: none; }
+  /* Popover that opens when the user icon is tapped. Fixed at the top-right
+     so it's positioned relative to viewport (avoids clipping by any
+     ancestor overflow). Small backdrop below to catch outside clicks. */
+  .mobile-user-menu {
+    position: fixed; top: 60px; right: 12px;
+    z-index: 1100;
+    min-width: 220px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12), 0 2px 6px rgba(0,0,0,.06);
+  }
+  .mobile-user-menu .mumu-head {
+    padding: 8px 12px 6px;
+    border-bottom: 1px solid var(--border); margin-bottom: 4px;
+  }
+  .mobile-user-menu .mumu-name { font-size: 13px; font-weight: 600; color: var(--text); word-break: break-word; }
+  .mobile-user-menu .mumu-role { font-size: 11px; color: var(--text-3); text-transform: capitalize; margin-top: 2px; }
+  .mobile-user-menu .mumu-item {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 9px 12px;
+    background: transparent; border: none; border-radius: 6px;
+    cursor: pointer; font-family: inherit; font-size: 13.5px;
+    color: var(--text); text-align: left;
+  }
+  .mobile-user-menu .mumu-item:hover { background: var(--bg); }
+  .mobile-user-menu .mumu-item i { font-size: 16px; color: var(--text-2); }
+  /* Invisible backdrop that catches clicks outside the popover — closes it. */
+  .mobile-user-menu-backdrop {
+    position: fixed; inset: 0; z-index: 1099; background: transparent;
+  }
+
   /* ── Toast ── */
   .toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
   .toast {
@@ -1494,6 +1530,10 @@
 
     /* ── Top bar ── */
     .top-bar { padding: 11px 14px; gap: 6px; flex-wrap: nowrap; }
+    /* Show the injected mobile account button on mobile only. margin-left:auto
+       pushes it to the far right regardless of what other content sits in the
+       top-bar (heading, logo, search icon, etc.). */
+    .mobile-user-btn { display: inline-flex; margin-left: auto; }
     .page-heading { font-size: 34px; }
     .top-bar-heading { padding: 14px 14px 10px !important; }
     .week-btn { flex: 1 1 calc(50% - 4px); max-width: none; padding: 8px 12px; }
@@ -1527,6 +1567,10 @@
 
     /* ── Stats grid ── */
     .stats-grid { grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 14px; }
+    /* When there are 3 stat cards (Dashboard: Total, Weekly, Daily), the
+       third one lands as a lone card in an otherwise half-empty row. Span
+       both columns so it fills the width instead of looking orphaned. */
+    .stats-grid > .stat-card:nth-child(3):last-child { grid-column: 1 / -1; }
     .stat-card { padding: 12px 14px; }
     .stat-val { font-size: 22px; }
     .stat-label { font-size: 11px; }
@@ -2471,6 +2515,19 @@
       </button>
     </div>
   </nav>
+</div>
+
+
+<!-- Mobile account menu — floating popover triggered by the user icon in the
+     top bar on phone-sized screens. Mirrors the sidebar-user block that lives
+     in the desktop sidebar (which is hidden on mobile). -->
+<div id="mobileUserMenu" class="mobile-user-menu" style="display:none">
+  <div class="mumu-head">
+    <div class="mumu-name" id="mumuName"></div>
+    <div class="mumu-role" id="mumuRole"></div>
+  </div>
+  <button class="mumu-item" onclick="closeMobileUserMenu(); openChangePasswordModal();"><i class="ti ti-key"></i> Change password</button>
+  <button class="mumu-item" onclick="closeMobileUserMenu(); doSignOut();"><i class="ti ti-logout"></i> Sign out</button>
 </div>
 
 
@@ -3508,6 +3565,69 @@ async function doSignOut() {
 // The user re-enters their current password (Firebase requires this for any
 // password update), types a new one twice, and the modal updates it in place.
 // No email round-trip needed.
+// ── Mobile account menu ──
+// On mobile the sidebar (which normally holds user info + Change password +
+// Sign out) is hidden. This menu is the mobile-only replacement: a small
+// popover that opens when the user taps the account icon injected into the
+// top bar of the current page.
+
+// Inject the account icon into every .top-bar on the page. Called once at
+// startup — before then it's a no-op (nothing to click yet). If the app ever
+// adds more .top-bars dynamically, call this again from that place.
+function injectMobileUserButton() {
+  document.querySelectorAll('.top-bar').forEach(bar => {
+    if (bar.querySelector('.mobile-user-btn')) return;   // already there
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-icon mobile-user-btn';
+    btn.setAttribute('aria-label', 'Account menu');
+    btn.setAttribute('type', 'button');
+    btn.innerHTML = '<i class="ti ti-user"></i>';
+    btn.addEventListener('click', (e) => { e.stopPropagation(); toggleMobileUserMenu(); });
+    bar.appendChild(btn);
+  });
+}
+window.injectMobileUserButton = injectMobileUserButton;
+
+function toggleMobileUserMenu() {
+  const menu = document.getElementById('mobileUserMenu');
+  if (!menu) return;
+  const isOpen = menu.style.display !== 'none';
+  if (isOpen) { closeMobileUserMenu(); return; }
+  // Populate header from live user state
+  const nameEl = document.getElementById('mumuName');
+  const roleEl = document.getElementById('mumuRole');
+  if (nameEl) nameEl.textContent = window._userEmail || '(signed out)';
+  if (roleEl) roleEl.textContent = window._userRole || '';
+  menu.style.display = '';
+  // Add an invisible full-viewport backdrop that closes the menu on any
+  // outside tap. Cheaper and more reliable than a document-level click
+  // listener with propagation guards.
+  const backdrop = document.createElement('div');
+  backdrop.className = 'mobile-user-menu-backdrop';
+  backdrop.id = 'mobileUserMenuBackdrop';
+  backdrop.addEventListener('click', closeMobileUserMenu);
+  document.body.appendChild(backdrop);
+}
+window.toggleMobileUserMenu = toggleMobileUserMenu;
+
+function closeMobileUserMenu() {
+  const menu = document.getElementById('mobileUserMenu');
+  if (menu) menu.style.display = 'none';
+  const backdrop = document.getElementById('mobileUserMenuBackdrop');
+  if (backdrop) backdrop.remove();
+}
+window.closeMobileUserMenu = closeMobileUserMenu;
+
+// Inject the buttons as soon as the DOM is ready — before that there are no
+// .top-bars to inject into. On the sign-in screen the top bars aren't yet in
+// the DOM; that's fine, they'll be there by the time this fires because the
+// top-bars are static HTML elements defined at page load.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', injectMobileUserButton);
+} else {
+  injectMobileUserButton();
+}
+
 function openChangePasswordModal() {
   if (!window._userEmail) { showToast('Please sign in first', 'error'); return; }
   const m = document.getElementById('changePasswordModal');
@@ -5937,6 +6057,7 @@ document.addEventListener('keydown', (e) => {
   const importEl  = document.getElementById('activityImportOverlay');
   const addEditEl = document.getElementById('activityModal');
   const empEl     = document.getElementById('empModal');
+  const mumu      = document.getElementById('mobileUserMenu');
   // Close the topmost open modal. Import > Add/Edit > employee modal — they
   // aren't nested but we keep a stable order for the rare case a second one
   // is triggered before the first fully closes.
@@ -5952,6 +6073,12 @@ document.addEventListener('keydown', (e) => {
   }
   if (empEl && empEl.classList.contains('open')) {
     closeEmpModal();
+    e.stopPropagation();
+    return;
+  }
+  // Mobile account menu is not a full modal but Esc should still dismiss it.
+  if (mumu && mumu.style.display !== 'none') {
+    closeMobileUserMenu();
     e.stopPropagation();
   }
 });
