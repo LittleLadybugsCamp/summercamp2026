@@ -2914,7 +2914,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import {
   getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, onSnapshot,
-  addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDoc, getDocs
+  addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDoc, getDocs, getDocsFromServer
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
@@ -3031,16 +3031,25 @@ window._setMaterialChecked = async (key, checked) => {
 window._removeEmployee = (uid) => deleteDoc(doc(db, 'users', uid));
 
 // Fetch all user/role records (admin-only read per the security rules).
+// Fetch all user/role records (admin-only read per the security rules).
+// Use getDocsFromServer explicitly so we bypass Firestore's persistent local
+// cache. The users collection has no realtime listener, so cross-device
+// changes (e.g. an admin on another computer deletes an employee) would
+// otherwise stay hidden here until the cache next expired. Cost is one extra
+// network request per Employees-tab open, which is trivial for a handful of
+// employees.
 window._fetchUsers = async function() {
-  const snap = await getDocs(collection(db, 'users'));
+  const snap = await getDocsFromServer(collection(db, 'users'));
   const out = [];
   snap.forEach(d => out.push({ id: d.id, ...d.data() }));
   return out;
 };
 
 // Fetch all finance entries (admin-only read per the security rules).
+// Same reasoning as _fetchUsers: force server fetch so changes made on
+// another device show up immediately.
 window._fetchFinances = async function() {
-  const snap = await getDocs(collection(db, 'finances'));
+  const snap = await getDocsFromServer(collection(db, 'finances'));
   const out = [];
   snap.forEach(d => out.push({ id: d.id, ...d.data() }));
   return out;
