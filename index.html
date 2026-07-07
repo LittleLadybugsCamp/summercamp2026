@@ -5317,8 +5317,14 @@ function renderActivityDay() {
   const indoor  = sortActivitiesByOrder(dayActs.filter(a => a.location === 'indoor'));
   const outdoor = sortActivitiesByOrder(dayActs.filter(a => a.location === 'outdoor'));
   const canEdit = actCanEdit();
+  // Add-activity and Import are ADMIN-ONLY. Staff members (role='employee')
+  // can still edit individual cards, check off completion, and reorder — but
+  // adding brand-new activities or importing bulk plans is planning work,
+  // scoped to admins. actCanDelete() happens to already be admin-only, so we
+  // reuse it here.
+  const canAddActivities = actCanDelete();
 
-  const headerActions = canEdit ? `
+  const headerActions = canAddActivities ? `
     <div class="act-day-actions">
       <button class="btn btn-sm" onclick="openActivityModal('indoor')"><i class="ti ti-plus"></i> Add activity</button>
       <button class="btn btn-sm" onclick="openActivityImport()"><i class="ti ti-file-import"></i> Import</button>
@@ -5891,7 +5897,9 @@ window.closeActivityPhoto = closeActivityPhoto;
 
 // ── Add / Edit modal ──
 function openActivityModal(defaultLoc) {
-  if (!actCanEdit()) { showToast('Sign in as admin or employee to add activities', 'error'); return; }
+  // Adding a new activity is admin-only. Editing an existing card still allows
+  // employees (that's a separate path — editActivity — which stays as-is).
+  if (!actCanDelete()) { showToast('Only admins can add activities', 'error'); return; }
   _actEditingId = null;
   _actModalPhoto = null;
   document.getElementById('activityModalTitle').textContent = 'Add activity';
@@ -6113,7 +6121,7 @@ window.editDayTheme = editDayTheme;
 
 // ── Import modal ──
 function openActivityImport() {
-  if (!actCanEdit()) { showToast('Sign in as admin or employee to add activities', 'error'); return; }
+  if (!actCanDelete()) { showToast('Only admins can import activities', 'error'); return; }
   _actImportPending = [];
   document.getElementById('actImportPreview').style.display = 'none';
   document.getElementById('actImportList').innerHTML = '';
