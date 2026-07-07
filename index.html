@@ -1678,11 +1678,20 @@
   .emp-pw-box {
     display: flex; align-items: center; gap: 8px; margin-top: 6px;
     background: var(--bg); border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px;
+    cursor: pointer; transition: background .12s, border-color .12s;
   }
+  .emp-pw-box:hover { background: var(--surface); border-color: var(--green); }
   .emp-pw-box code {
     flex: 1; font-family: ui-monospace, Menlo, Consolas, monospace;
     font-size: 16px; font-weight: 600; letter-spacing: .5px; color: var(--text); word-break: break-all;
   }
+  .emp-pw-copy {
+    flex-shrink: 0; background: var(--green); color: #fff;
+    border: 1px solid var(--green); font-weight: 600;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .emp-pw-copy:hover { background: #386937; border-color: #386937; }
+  .emp-pw-copy i { font-size: 15px; }
   .emp-note { font-size: 12px; color: var(--text-3); margin-top: 10px; line-height: 1.5; }
   @media (max-width: 560px) {
     .emp-row { flex-wrap: wrap; }
@@ -2281,7 +2290,7 @@
   </main>
 
   <!-- Add / manage employee -->
-  <div class="modal-overlay" id="empModal" onclick="if(event.target===this)closeEmpModal()">
+  <div class="modal-overlay" id="empModal">
     <div class="modal" style="max-width:420px">
       <div class="modal-header">
         <span class="modal-title"><i class="ti ti-user-plus" style="margin-right:6px"></i>Add employee</span>
@@ -2304,11 +2313,14 @@
       <div id="empResultStep" style="display:none">
         <div class="emp-success"><i class="ti ti-circle-check"></i> Login created for <strong id="empResultName"></strong>.</div>
         <div class="form-label" style="margin-top:10px">Temporary password — give this to them:</div>
-        <div class="emp-pw-box">
+        <div class="emp-pw-box" onclick="copyEmpPw()" title="Click anywhere here to copy">
           <code id="empResultPw"></code>
-          <button class="btn btn-ghost btn-icon" onclick="copyEmpPw()" aria-label="Copy password"><i class="ti ti-copy"></i></button>
+          <button class="btn btn-sm emp-pw-copy" onclick="event.stopPropagation(); copyEmpPw()"><i class="ti ti-copy"></i> Copy</button>
         </div>
-        <div class="emp-note">They sign in with their email and this password. They can change it later, and you can send a reset link anytime from the list.</div>
+        <div class="emp-note">
+          <strong>Copy this before you close the dialog.</strong> It's only shown once — for security, we can't display it again.
+          They sign in with their email and this password. They can change it later, and you can send a reset link anytime from the list.
+        </div>
         <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:12px" onclick="closeEmpModal()">Done</button>
       </div>
     </div>
@@ -3674,12 +3686,45 @@ async function submitNewEmployee() {
 }
 
 function copyEmpPw() {
-  const pw = document.getElementById('empResultPw').textContent;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(pw).then(() => showToast('Password copied')).catch(() => showToast('Copy failed — select it manually', 'error'));
-  } else {
-    showToast('Select the password to copy it', 'error');
-  }
+  const codeEl = document.getElementById('empResultPw');
+  const pw = codeEl ? codeEl.textContent : '';
+  if (!pw) return;
+  // Give visible feedback on the button itself in addition to the toast —
+  // the toast alone is easy to miss, and the whole point of this button is
+  // "am I sure I got it?".
+  const btn = document.querySelector('.emp-pw-copy');
+  const flashSuccess = () => {
+    if (!btn) return;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
+    btn.disabled = true;
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1600);
+  };
+  const doCopy = async () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(pw);
+        showToast('Password copied to clipboard');
+        flashSuccess();
+        return;
+      } catch (e) { /* fall through to legacy fallback */ }
+    }
+    // Fallback: legacy execCommand approach (works even without HTTPS or
+    // in older Safari versions where the async Clipboard API is unavailable).
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = pw;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) { showToast('Password copied to clipboard'); flashSuccess(); return; }
+    } catch (e) { /* ignore */ }
+    showToast('Copy failed — please select the password manually', 'error');
+  };
+  doCopy();
 }
 
 async function resetEmpPassword(uid) {
@@ -5864,18 +5909,20 @@ function closeActivityModal() {
 }
 window.closeActivityModal = closeActivityModal;
 
-// Esc key closes the Add/Edit modal or the Import modal — whichever is open.
-// The modals deliberately no longer close on outside-click (clicking the
-// background) because a stray click on an unrelated part of the page used
-// to wipe out in-progress edits. Esc and the X button are the only exits.
+// Esc key closes the Add/Edit modal, the Import modal, or the employee-add
+// modal — whichever is open. The modals deliberately no longer close on
+// outside-click (clicking the background) because a stray click on an
+// unrelated part of the page used to wipe out in-progress edits, or worse,
+// dismiss the one-time-shown employee temporary password. Esc and the X
+// button are the only exits.
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  const importEl   = document.getElementById('activityImportOverlay');
-  const addEditEl  = document.getElementById('activityModal');
-  // Close the topmost open modal first. The import modal is opened from inside
-  // the activity page (not nested inside the Add/Edit modal), so they should
-  // never both be open at once — but if they ever are, we close in reverse
-  // open order: import first, then Add/Edit.
+  const importEl  = document.getElementById('activityImportOverlay');
+  const addEditEl = document.getElementById('activityModal');
+  const empEl     = document.getElementById('empModal');
+  // Close the topmost open modal. Import > Add/Edit > employee modal — they
+  // aren't nested but we keep a stable order for the rare case a second one
+  // is triggered before the first fully closes.
   if (importEl && importEl.classList.contains('open')) {
     closeActivityImport();
     e.stopPropagation();
@@ -5883,6 +5930,11 @@ document.addEventListener('keydown', (e) => {
   }
   if (addEditEl && addEditEl.classList.contains('open')) {
     closeActivityModal();
+    e.stopPropagation();
+    return;
+  }
+  if (empEl && empEl.classList.contains('open')) {
+    closeEmpModal();
     e.stopPropagation();
   }
 });
