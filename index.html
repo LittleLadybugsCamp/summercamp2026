@@ -4941,6 +4941,51 @@ function weekLabel(weekStart) {
 function camperKey(c) {
   return (c.first||'').toLowerCase().trim() + '|' + (c.last||'').toLowerCase().trim();
 }
+
+// Collapse duplicate registration documents that represent the SAME enrollment.
+// Returns a new array with one entry per unique enrollment, keeping the "best"
+// duplicate — the most recently updated, then most recently created, then the
+// one with the most campDays filled in (a proxy for the most complete record).
+// Used as a render-time safety net so the UI never shows a camper twice for one
+// week even if stray dupes exist in the database. The real fix (dedup at
+// import) prevents new ones.
+//
+// IMPORTANT: this uses an IDENTITY key (name + parent email + week + type),
+// NOT the submissionId-based key. Two documents for the same real child+week
+// can have different submissionIds (e.g. one from a JotForm sync, one from a
+// CSV file import, or two JotForm submissions for the same kid). Using identity
+// catches all of those. The tradeoff: two genuinely different children with the
+// same name AND same parent email AND same week+type would merge — but that's a
+// single family registering the same child twice, which IS a duplicate.
+function registrationIdentityKey(c) {
+  const fl = (c.first || '').toLowerCase().trim();
+  const ll = (c.last || '').toLowerCase().trim();
+  const em = (c.email || '').toLowerCase().trim();
+  const wk = c.weekStart || '';
+  const type = c.type || '';
+  return `${fl}|${ll}|${em}|${wk}|${type}`;
+}
+window.registrationIdentityKey = registrationIdentityKey;
+
+function dedupeRegistrations(list) {
+  const best = new Map();
+  const tsOf = (c) => {
+    const u = c.updatedAt && c.updatedAt.seconds ? c.updatedAt.seconds : 0;
+    const cr = c.createdAt && c.createdAt.seconds ? c.createdAt.seconds : 0;
+    return Math.max(u, cr);
+  };
+  for (const c of list) {
+    const key = registrationIdentityKey(c);
+    const cur = best.get(key);
+    if (!cur) { best.set(key, c); continue; }
+    // Tie-break: newer timestamp wins; if equal, more campDays wins.
+    const a = tsOf(c), b = tsOf(cur);
+    if (a > b) best.set(key, c);
+    else if (a === b && (c.campDays?.length || 0) > (cur.campDays?.length || 0)) best.set(key, c);
+  }
+  return Array.from(best.values());
+}
+window.dedupeRegistrations = dedupeRegistrations;
 // Memoized per campers-array reference. The campers snapshot replaces
 // window.campers with a fresh array on every change, so a reference check
 // auto-invalidates the cache exactly when the data changes — while letting
@@ -4963,6 +5008,13 @@ function groupCampers(includeRefunded = false) {
     }
     groups.get(k).registrations.push(c);
   });
+  // Collapse duplicate registration docs within each camper group so every
+  // downstream consumer (roster cards, week counts, stats, detail view) sees
+  // each real enrollment once. This is the single choke point that fixes
+  // duplicate-driven over-counting everywhere at once.
+  for (const g of groups.values()) {
+    g.registrations = dedupeRegistrations(g.registrations);
+  }
   const result = [...groups.values()].sort((a,b) => (a.last||'').localeCompare(b.last||''));
   _grpCache[ck] = result;
   return result;
@@ -5007,7 +5059,7 @@ function renderStats() {
 function dashboardWeekData() {
   const campers = (window.campers || []).filter(c => !c.refunded);
   return WEEKS.map(wk => {
-    const weekCampers = campers.filter(c => c.weekStart === wk.start);
+    const weekCampers = dedupeRegistrations(campers.filter(c => c.weekStart === wk.start));
     let weekly = 0, daily = 0, pre = 0, post = 0;
     weekCampers.forEach(c => {
       if (c.type === 'daily') daily++;
@@ -7031,6 +7083,11 @@ function rWeekly() {
 
   // All registrations for this week
   let wkCampers = window.campers.filter(c => c.weekStart === weeklyWk && !c.refunded);
+  // SAFETY NET: collapse any duplicate registrations for the same child+week+
+  // type that may exist in the data (e.g. from older imports before dedup was
+  // enforced). Keep the most recently updated one. This ensures each camper
+  // shows once per week even if stray duplicate docs remain in Firestore.
+  wkCampers = dedupeRegistrations(wkCampers);
   const totalThisWeek = wkCampers.length;
   const weeklyCount = wkCampers.filter(c => c.type === 'weekly').length;
   const dailyCount  = wkCampers.filter(c => c.type === 'daily').length;
@@ -7296,8 +7353,8 @@ function doPrint() {
   targetDate.setDate(targetDate.getDate() + dayIdx);
   const subtitle = targetDate.toLocaleDateString('en-CA', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
   const dateLine = weekLabel(weeklyWk);
-  const campers = window.campers
-    .filter(c => c.weekStart === weeklyWk && !c.refunded && (c.campDays || []).includes(dayIdx))
+  const campers = dedupeRegistrations(window.campers
+    .filter(c => c.weekStart === weeklyWk && !c.refunded && (c.campDays || []).includes(dayIdx)))
     .sort((a,b) => ((a.last||'')+(a.first||'')).localeCompare((b.last||'')+(b.first||'')));
 
   const rowsHtml = campers.length
@@ -7414,6 +7471,9 @@ function openDetail(key) {
     regs = window.campers.filter(c => camperKey(c) === camperKey(single));
   }
   if (!regs.length) return;
+  // Collapse duplicate registration docs so the detail view shows each week
+  // once (not "3 weeks registered" when it's one week duplicated 3×).
+  regs = dedupeRegistrations(regs);
   const c = regs[0]; // representative for shared info
   // Sort registrations chronologically by weekStart
   regs.sort((a,b) => (a.weekStart||'').localeCompare(b.weekStart||''));
@@ -8211,8 +8271,60 @@ function parseDailyRegistration(text) {
   return result;
 }
 
+// Stable dedup key for a registration: identifies a unique (person, week, type)
+// tuple. Two registrations sharing this key are the SAME enrollment and must
+// not both exist. Prefer the JotForm submissionId when present (most reliable),
+// but always include weekStart+type so a single submission spanning multiple
+// weeks still produces distinct enrollments. Falls back to name when there's
+// no submissionId (manual adds, legacy data).
+function registrationDedupKey(data) {
+  const wk = data.weekStart || '';
+  const type = data.type || '';
+  const sid = data.submissionId || '';
+  if (sid) return `sid:${sid}|${wk}|${type}`;
+  const fl = (data.first || '').toLowerCase().trim();
+  const ll = (data.last || '').toLowerCase().trim();
+  // Include the primary parent email in the name-fallback key. Without it, two
+  // DIFFERENT families that happen to have same-named children (e.g. two
+  // "Emma Smith"s) would collide and one would be wrongly hidden/merged. The
+  // email is the natural family discriminator. Falls back gracefully to just
+  // name+week+type when no email is present.
+  const em = (data.email || '').toLowerCase().trim();
+  return `name:${fl}|${ll}|${em}|${wk}|${type}`;
+}
+window.registrationDedupKey = registrationDedupKey;
+
+// Deterministic Firestore document ID for a JotForm-sourced registration.
+// Using a stable ID means re-importing the same submission overwrites the
+// existing doc instead of creating a duplicate. Sanitized to the character
+// set Firestore allows in document IDs (no slashes).
+function registrationDocId(data) {
+  const sid = data.submissionId || '';
+  if (!sid) return null; // no stable id → fall back to addDoc (manual entries)
+  const wk = (data.weekStart || '').replace(/[^0-9A-Za-z_-]/g, '');
+  const type = (data.type || '').replace(/[^0-9A-Za-z_-]/g, '');
+  return `jf_${sid}_${wk}_${type}`;
+}
+window.registrationDocId = registrationDocId;
+
 function buildImportRows(csvRows) {
   importRows = [];
+  // Track dedup keys we've already added in THIS batch, so two identical
+  // registrations within one sync (e.g. duplicate JotForm submissions) don't
+  // both slip through the "exists" check — window.campers doesn't yet contain
+  // rows we're about to add, so without this an in-batch duplicate would be
+  // invisible to the per-row existence test.
+  const batchKeys = new Set();
+  // Pre-seed with keys already in the database so cross-sync duplicates are
+  // caught too. We add BOTH the submissionId-aware key AND the identity key
+  // (name+email+week+type) for every existing camper, so an incoming JotForm
+  // submission is recognized as a duplicate of an existing CSV-imported camper
+  // (and vice versa) even though their submissionId-based keys differ.
+  const addBothKeys = (c) => {
+    batchKeys.add(registrationDedupKey(c));
+    if (typeof registrationIdentityKey === 'function') batchKeys.add(registrationIdentityKey(c));
+  };
+  (window.campers || []).forEach(addBothKeys);
   // Each CSV row may register for multiple weeks → create one camper entry per week
   csvRows.forEach(row => {
     // Skip submissions the admin has explicitly dismissed in a prior sync
@@ -8289,29 +8401,33 @@ function buildImportRows(csvRows) {
       const postDays = hasPost ? [0,1,2,3,4] : [];
 
       const fl = first.toLowerCase(), ll = last.toLowerCase();
-      // An incoming submission with no first name shouldn't accidentally match
-      // a previous phantom (also with no first name) — that would silently skip
-      // every subsequent registration with a missing-name field.
-      const existingMatch = !!fl && window.campers.some(c =>
-        (c.first||'').toLowerCase() === fl && (c.last||'').toLowerCase() === ll && c.weekStart === wk.start
-      );
+      // Build the would-be registration data first so we can compute its
+      // dedup key. An entry "exists" if its key is already in the database OR
+      // already queued earlier in this same batch.
+      const weeklyData = {
+        first, last, age: null,
+        parent, email, phone, address,
+        parent2, email2, phone2, address2,
+        ec1Name, ec1Phone, ec1Rel, ec2Name, ec2Phone, ec2Rel,
+        pickup, allergies,
+        medical: medFull,
+        healthCard,
+        payMethod,
+        notes, type: 'weekly', weekStart: wk.start,
+        submissionId,
+        regDate: row.__regDate || '',
+        campDays, preDays, postDays
+      };
+      const weeklyKey = registrationDedupKey(weeklyData);
+      const weeklyIdentity = registrationIdentityKey(weeklyData);
+      const existingMatch = batchKeys.has(weeklyKey) || batchKeys.has(weeklyIdentity);
+      if (!existingMatch) { batchKeys.add(weeklyKey); batchKeys.add(weeklyIdentity); }
 
       importRows.push({
         csvName: fullName, weekLabel: wk.label, weekStart: wk.start,
         exists: existingMatch,
         submissionId,
-        data: {
-          first, last, age: null,
-          parent, email, phone, address,
-          parent2, email2, phone2, address2,
-          ec1Name, ec1Phone, ec1Rel, ec2Name, ec2Phone, ec2Rel,
-          pickup, allergies,
-          medical: medFull,
-          healthCard,
-          payMethod,
-          notes, type: 'weekly', weekStart: wk.start,
-          regDate: row.__regDate || '',
-          campDays, preDays, postDays}
+        data: weeklyData
       });
     });
 
@@ -8343,9 +8459,11 @@ function buildImportRows(csvRows) {
         const campDays = [...days].sort((a,b)=>a-b);
         const preDays  = wantPre  ? campDays.slice() : [];
         const postDays = wantPost ? campDays.slice() : [];
-        const fl = first.toLowerCase(), ll = last.toLowerCase();
-        const existingMatch = !!fl && window.campers.some(c =>
-          (c.first||'').toLowerCase() === fl && (c.last||'').toLowerCase() === ll && c.weekStart === week.start);
+        const dailyData = { ...commonData, type: 'daily', weekStart: week.start, submissionId, campDays, preDays, postDays };
+        const dailyKey = registrationDedupKey(dailyData);
+        const dailyIdentity = registrationIdentityKey(dailyData);
+        const existingMatch = batchKeys.has(dailyKey) || batchKeys.has(dailyIdentity);
+        if (!existingMatch) { batchKeys.add(dailyKey); batchKeys.add(dailyIdentity); }
         importRows.push({
           csvName: fullName,
           weekLabel: week.label,
@@ -8357,7 +8475,7 @@ function buildImportRows(csvRows) {
           wantPre, wantPost,
           rawDaily: parsed.raw,
           unmatched: parsed.unmatched,
-          data: { ...commonData, type: 'daily', weekStart: week.start, campDays, preDays, postDays }
+          data: dailyData
         });
       });
 
@@ -8532,15 +8650,34 @@ async function doImport() {
   document.getElementById('importProgress').style.display = 'block';
   let done = 0;
   const newKeys = new Set();
+  // Guard against the same dedup key appearing twice in this loop (belt-and-
+  // suspenders — buildImportRows already flags in-batch dupes as exists, but
+  // if that ever regresses this stops a double-write).
+  const writtenKeys = new Set();
   for(const row of toImport) {
     try {
-      const ref = await window._addDoc(window._collection(window._db, 'campers'), {
+      const key = registrationDedupKey(row.data);
+      if (writtenKeys.has(key)) { done++; continue; }
+      writtenKeys.add(key);
+      const payload = {
         ...row.data,
         createdAt: window._serverTimestamp(),
         updatedAt: window._serverTimestamp()
-      });
+      };
+      // Prefer a deterministic doc ID derived from the JotForm submission so a
+      // re-sync of the same submission OVERWRITES rather than duplicating.
+      // Manual entries (no submissionId) fall back to a random-id addDoc.
+      const detId = registrationDocId(row.data);
+      let refId;
+      if (detId) {
+        await window._setDoc(window._doc(window._db, 'campers', detId), payload, { merge: true });
+        refId = detId;
+      } else {
+        const ref = await window._addDoc(window._collection(window._db, 'campers'), payload);
+        refId = ref.id;
+      }
       // Mirror in memory so buildInvoiceData finds them immediately
-      mirrorCamperInsert(ref.id, row.data);
+      mirrorCamperInsert(refId, row.data);
       newKeys.add(camperKey(row.data));
     } catch(e) {
       console.error('Import error for', row.csvName, e);
@@ -9023,7 +9160,10 @@ function fmtDailyDate(weekStart, dayIdx) {
 // Daily registrations  → one row per selected day (daily pricing: $55 camp, $10 pre, $10 post).
 // Only attended items appear. Totals math is identical for both: subtotal → 13% HST → grand.
 function buildInvoiceData(key) {
-  const regs = window.campers.filter(c => camperKey(c) === key);
+  // Dedupe first: duplicate registration documents for the same enrollment
+  // would otherwise each add their own line item(s), inflating the invoice
+  // total (e.g. a camper duplicated 3× would be charged 3× the real amount).
+  const regs = dedupeRegistrations(window.campers.filter(c => camperKey(c) === key));
   if (!regs.length) return null;
   // Chronological order
   regs.sort((a,b) => (a.weekStart||'').localeCompare(b.weekStart||''));
