@@ -2740,6 +2740,26 @@
   </div>
 </div>
 
+<!-- Activity booklet print -->
+<div class="modal-overlay" id="activityPrintOverlay">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-printer" style="margin-right:6px"></i>Print activity booklet</div>
+      <button class="btn btn-ghost btn-icon" onclick="closeActivityPrint()" aria-label="Close"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="activityPrintWeekSel">Week</label>
+      <select id="activityPrintWeekSel"></select>
+    </div>
+    <div class="form-hint" style="margin-bottom:14px">
+      Generates a printable booklet — one page per activity for the whole week, with the camp logo, the activity title, its photo, and the full description. Use your browser's "Save as PDF" option in the print dialog.
+    </div>
+    <button class="btn btn-primary" onclick="doActivityPrint()" style="width:100%;justify-content:center">
+      <i class="ti ti-printer"></i> Generate booklet
+    </button>
+  </div>
+</div>
+
 <!-- Day Popup -->
 <div class="day-popup-overlay" id="dayPopupOverlay" onclick="if(event.target===this)closeDayPopup()">
   <div class="day-popup">
@@ -5543,8 +5563,9 @@ function renderActivityDay() {
 
   const headerActions = canAddActivities ? `
     <div class="act-day-actions">
-      <button class="btn btn-sm" onclick="openActivityModal('indoor')"><i class="ti ti-plus"></i> Add activity</button>
-      <button class="btn btn-sm" onclick="openActivityImport()"><i class="ti ti-file-import"></i> Import</button>
+      <button class="btn btn-sm btn-icon" onclick="openActivityModal('indoor')" title="Add activity" aria-label="Add activity"><i class="ti ti-plus"></i></button>
+      <button class="btn btn-sm btn-icon" onclick="openActivityImport()" title="Import activities" aria-label="Import activities"><i class="ti ti-file-import"></i></button>
+      <button class="btn btn-sm btn-icon" onclick="openActivityPrint()" title="Print week booklet" aria-label="Print week booklet"><i class="ti ti-printer"></i></button>
     </div>` : '';
 
   const indoorRows = indoor.length
@@ -6155,6 +6176,7 @@ document.addEventListener('keydown', (e) => {
   const addEditEl = document.getElementById('activityModal');
   const empEl     = document.getElementById('empModal');
   const emailEl   = document.getElementById('emailListOverlay');
+  const actPrintEl = document.getElementById('activityPrintOverlay');
   const mumu      = document.getElementById('mobileUserMenu');
   // Close the topmost open modal. Import > Add/Edit > employee modal — they
   // aren't nested but we keep a stable order for the rare case a second one
@@ -6176,6 +6198,11 @@ document.addEventListener('keydown', (e) => {
   }
   if (emailEl && emailEl.classList.contains('open')) {
     closeEmailList();
+    e.stopPropagation();
+    return;
+  }
+  if (actPrintEl && actPrintEl.classList.contains('open')) {
+    closeActivityPrint();
     e.stopPropagation();
     return;
   }
@@ -7341,10 +7368,246 @@ async function copyEmailList() {
 }
 window.copyEmailList = copyEmailList;
 
+// ── Activity booklet print ──
+// Opens a modal with a week picker, then generates a print-window booklet:
+// one page per activity for the selected week, styled to match the camp's
+// printable template (bordered frame, logo + wordmark header, centered title,
+// centered photo, full description verbatim).
+function openActivityPrint() {
+  if (!actCanDelete()) { showToast('Only admins can print', 'error'); return; }
+  const sel = document.getElementById('activityPrintWeekSel');
+  if (!sel) return;
+  sel.innerHTML = '';
+  if (typeof WEEKS !== 'undefined' && WEEKS.length) {
+    WEEKS.forEach((wk, i) => {
+      const opt = document.createElement('option');
+      opt.value = wk.start;
+      opt.textContent = `Week ${i + 1} — ${weekLabel(wk.start)}`;
+      sel.appendChild(opt);
+    });
+  }
+  // Default to the week currently being viewed on the Activities page.
+  if (_actActiveWeek) sel.value = _actActiveWeek;
+  document.getElementById('activityPrintOverlay').classList.add('open');
+}
+window.openActivityPrint = openActivityPrint;
+
+function closeActivityPrint() {
+  document.getElementById('activityPrintOverlay').classList.remove('open');
+}
+window.closeActivityPrint = closeActivityPrint;
+
+// Collect every activity for a given week (all 5 weekdays, both indoor and
+// outdoor), sorted the same way they appear on screen: by day, then by the
+// manual sort order within each day+location. Indoor activities come before
+// outdoor for a given day.
+function activitiesForWeek(weekStart) {
+  const wk = (typeof WEEKS !== 'undefined') ? WEEKS.find(w => w.start === weekStart) : null;
+  if (!wk) return [];
+  const baseStr = wk.mondayDate || wk.start;
+  const base = new Date(baseStr + 'T00:00:00');
+  const holidays = wk.holidayDays || [];
+  const out = [];
+  for (let i = 0; i < 5; i++) {
+    if (holidays.includes(i)) continue;
+    const d = new Date(base);
+    d.setDate(d.getDate() + i);
+    const ymd = d.getFullYear() + '-' +
+                String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                String(d.getDate()).padStart(2, '0');
+    const dayActs = (window._activities || []).filter(a => a.date === ymd);
+    const indoor  = sortActivitiesByOrder(dayActs.filter(a => a.location === 'indoor'));
+    const outdoor = sortActivitiesByOrder(dayActs.filter(a => a.location === 'outdoor'));
+    indoor.concat(outdoor).forEach(a => out.push({ activity: a, ymd, dayIndex: i }));
+  }
+  return out;
+}
+
+function doActivityPrint() {
+  const sel = document.getElementById('activityPrintWeekSel');
+  if (!sel) return;
+  const weekStart = sel.value;
+  const items = activitiesForWeek(weekStart);
+  if (!items.length) {
+    showToast('No activities found for that week', 'error');
+    return;
+  }
+  // Grab the camp logo data URI from the sidebar image so the booklet header
+  // matches the site branding. Falls back to no logo if unavailable.
+  const logoEl = document.querySelector('.sidebar-logo-img');
+  const logoSrc = logoEl ? logoEl.src : '';
+
+  const wkLabel = weekLabel(weekStart);
+
+  // Build one page per activity.
+  const pages = items.map(({ activity, ymd }) => {
+    const a = activity;
+    const photoData = (window._activityPhotos || {})[a.id] || '';
+    const dateObj = new Date(ymd + 'T12:00:00');
+    const dateStr = dateObj.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+    const locationLabel = a.location === 'outdoor' ? 'Outdoor' : 'Indoor';
+    const descHtml = a.description ? mdToHtml(a.description) : '';
+    const photoBlock = photoData
+      ? `<div class="ab-photo-wrap"><img class="ab-photo" src="${photoData}" alt=""></div>`
+      : '';
+    const timeBlock = a.time ? `<div class="ab-meta">${esc(a.time)}</div>` : '';
+    return `
+      <div class="ab-page">
+        <div class="ab-frame">
+          <div class="ab-header">
+            ${logoSrc ? `<img class="ab-logo" src="${logoSrc}" alt="">` : ''}
+            <span class="ab-wordmark">LITTLE LADYBUGS CAMP</span>
+          </div>
+          <div class="ab-daymeta">${esc(dateStr)} · ${esc(locationLabel)}</div>
+          <h1 class="ab-title">${esc(a.title || 'Untitled activity')}</h1>
+          ${timeBlock}
+          ${photoBlock}
+          <div class="ab-desc">${descHtml}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    showToast('Please allow pop-ups to print', 'error');
+    return;
+  }
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Little Ladybugs Camp — ${esc(wkLabel)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: 'Nunito', 'Segoe UI', sans-serif;
+      color: #1a1a1a;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .ab-page {
+      width: 100%;
+      min-height: 100vh;
+      padding: 24px;
+      page-break-after: always;
+      display: flex;
+    }
+    .ab-page:last-child { page-break-after: auto; }
+    .ab-frame {
+      border: 2.5px solid #5b3d8c;
+      border-radius: 4px;
+      padding: 30px 42px 48px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .ab-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+    .ab-logo { height: 58px; width: auto; }
+    .ab-wordmark {
+      font-family: 'Baloo 2', sans-serif;
+      font-weight: 700;
+      font-size: 20px;
+      letter-spacing: 0.02em;
+      color: #1a1a1a;
+    }
+    .ab-daymeta {
+      font-family: 'Nunito', sans-serif;
+      font-size: 12px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 4px 0 2px;
+    }
+    .ab-title {
+      font-family: 'Baloo 2', sans-serif;
+      font-weight: 600;
+      font-size: 34px;
+      margin: 6px 0 4px;
+      color: #1a1a1a;
+    }
+    .ab-meta {
+      font-family: 'Nunito', sans-serif;
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 6px;
+    }
+    .ab-photo-wrap { margin: 18px 0 8px; }
+    .ab-photo {
+      max-width: 320px;
+      max-height: 340px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+    .ab-desc {
+      font-family: 'Nunito', sans-serif;
+      font-size: 16px;
+      line-height: 1.55;
+      text-align: left;
+      width: 100%;
+      max-width: 620px;
+      margin-top: 18px;
+    }
+    /* Description internal formatting from mdToHtml */
+    .ab-desc h1, .ab-desc h2, .ab-desc h3 {
+      font-family: 'Baloo 2', sans-serif;
+      text-align: center;
+      font-weight: 600;
+      margin: 14px 0 8px;
+    }
+    .ab-desc h1 { font-size: 22px; }
+    .ab-desc h2 { font-size: 20px; }
+    .ab-desc h3 { font-size: 18px; }
+    .ab-desc ul, .ab-desc ol { padding-left: 26px; margin: 8px 0; }
+    .ab-desc li { margin: 4px 0; }
+    .ab-desc p { margin: 8px 0; }
+    .ab-desc strong { font-weight: 700; }
+    .ab-desc code {
+      background: #f2f0f7;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 0.92em;
+    }
+    .ab-desc img { max-width: 100%; }
+    @media print {
+      .ab-page { padding: 0; min-height: auto; }
+      @page { margin: 12mm; }
+    }
+  </style>
+</head>
+<body>
+  ${pages}
+  <${'script'}>
+    // Give the web fonts and images a moment to load, then open the print
+    // dialog automatically.
+    window.addEventListener('load', function () {
+      setTimeout(function () { window.print(); }, 600);
+    });
+  <\/script>
+</body>
+</html>`);
+  win.document.close();
+  closeActivityPrint();
+}
+window.doActivityPrint = doActivityPrint;
+
 function doPrint() {
   if (!weeklyWk) return;
 
   const title = 'Little Ladybugs Camp';
+
   const dayIdx = parseInt(document.getElementById('printDaySelect').value, 10);
   const week = (typeof WEEKS !== 'undefined') ? WEEKS.find(w => w.start === weeklyWk) : null;
   const mondayStr = (week && week.mondayDate) ? week.mondayDate : weeklyWk;
