@@ -1276,6 +1276,23 @@
   .sidebar-signout:hover, .sidebar-changepw:hover { background: var(--bg); color: var(--text); }
   .form-hint { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
 
+  /* ── Parent email list modal ── */
+  .email-list-count {
+    font-weight: 500; font-size: 11px; color: var(--text-3);
+    background: var(--bg); padding: 2px 8px; border-radius: 10px;
+    margin-left: 6px;
+  }
+  #emailListText {
+    width: 100%; box-sizing: border-box; resize: vertical;
+    padding: 10px 12px; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 13px; line-height: 1.5;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); word-break: break-all;
+  }
+  #emailListText:focus { outline: 2px solid var(--green); outline-offset: 0; }
+  .email-list-actions { display: flex; gap: 10px; margin-top: 12px; }
+  .email-list-actions .btn { flex: 1; justify-content: center; }
+
   /* ── Mobile account menu ── */
   /* User icon button injected into every .top-bar via JS. Hidden on desktop
      (where the sidebar-user block handles account actions); appears at the
@@ -2150,6 +2167,9 @@
         <button class="btn btn-icon" onclick="toggleSearch('weeklySearchBar','weeklySearchInput')" aria-label="Search">
           <i class="ti ti-search"></i>
         </button>
+        <button class="btn btn-icon" onclick="openEmailList()" aria-label="Copy parent emails" title="Copy parent emails">
+          <i class="ti ti-mail"></i>
+        </button>
         <button class="btn btn-icon" onclick="openPrint()" aria-label="Print">
           <i class="ti ti-printer"></i>
         </button>
@@ -2692,6 +2712,31 @@
     <button class="btn btn-primary" onclick="doPrint()" style="width:100%">
       <i class="ti ti-printer"></i> Print
     </button>
+  </div>
+</div>
+
+<!-- Parent email list -->
+<div class="modal-overlay" id="emailListOverlay">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-mail" style="margin-right:6px"></i>Copy parent emails</div>
+      <button class="btn btn-ghost btn-icon" onclick="closeEmailList()" aria-label="Close"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="emailListWeekSel">Week</label>
+      <select id="emailListWeekSel" onchange="refreshEmailList()"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="emailListText">
+        Emails <span id="emailListCount" class="email-list-count"></span>
+      </label>
+      <textarea id="emailListText" readonly rows="8" onclick="this.select()"></textarea>
+      <div class="form-hint">Primary parent email only, comma-separated. Paste into your email client's To or BCC field. Tap the text box to select all.</div>
+    </div>
+    <div class="email-list-actions">
+      <button class="btn btn-primary" onclick="copyEmailList()" id="emailListCopyBtn"><i class="ti ti-copy"></i> Copy</button>
+      <button class="btn" onclick="closeEmailList()">Close</button>
+    </div>
   </div>
 </div>
 
@@ -6057,6 +6102,7 @@ document.addEventListener('keydown', (e) => {
   const importEl  = document.getElementById('activityImportOverlay');
   const addEditEl = document.getElementById('activityModal');
   const empEl     = document.getElementById('empModal');
+  const emailEl   = document.getElementById('emailListOverlay');
   const mumu      = document.getElementById('mobileUserMenu');
   // Close the topmost open modal. Import > Add/Edit > employee modal — they
   // aren't nested but we keep a stable order for the rare case a second one
@@ -6073,6 +6119,11 @@ document.addEventListener('keydown', (e) => {
   }
   if (empEl && empEl.classList.contains('open')) {
     closeEmpModal();
+    e.stopPropagation();
+    return;
+  }
+  if (emailEl && emailEl.classList.contains('open')) {
+    closeEmailList();
     e.stopPropagation();
     return;
   }
@@ -7135,6 +7186,103 @@ function openPrint() {
 function closePrintModal() {
   document.getElementById('printOverlay').classList.remove('open');
 }
+
+// ── Parent email list ──
+// Opens a modal with a week picker and a textarea of comma-separated,
+// deduplicated parent emails ready to copy into an email client. Both primary
+// and secondary parent emails are included. Case-insensitive dedup.
+function openEmailList() {
+  const sel = document.getElementById('emailListWeekSel');
+  if (!sel) return;
+  // Populate the week dropdown once (or if it's empty)
+  sel.innerHTML = '';
+  if (typeof WEEKS !== 'undefined' && WEEKS.length) {
+    WEEKS.forEach((wk, i) => {
+      const opt = document.createElement('option');
+      opt.value = wk.start;
+      opt.textContent = `Week ${i + 1} — ${weekLabel(wk.start)}`;
+      sel.appendChild(opt);
+    });
+  }
+  const allOpt = document.createElement('option');
+  allOpt.value = '__all__';
+  allOpt.textContent = 'All weeks combined';
+  sel.appendChild(allOpt);
+  // Default to the currently-selected week on the page, if any.
+  if (weeklyWk) sel.value = weeklyWk;
+  refreshEmailList();
+  document.getElementById('emailListOverlay').classList.add('open');
+}
+window.openEmailList = openEmailList;
+
+function closeEmailList() {
+  document.getElementById('emailListOverlay').classList.remove('open');
+}
+window.closeEmailList = closeEmailList;
+
+// Rebuild the textarea contents from the currently-selected week option.
+function refreshEmailList() {
+  const sel = document.getElementById('emailListWeekSel');
+  const textEl = document.getElementById('emailListText');
+  const countEl = document.getElementById('emailListCount');
+  if (!sel || !textEl) return;
+  const val = sel.value;
+  // Pick campers to include: single week (weekStart match) OR all weeks.
+  const roster = (window.campers || []).filter(c => !c.refunded && (
+    val === '__all__' ? true : c.weekStart === val
+  ));
+  // Extract every non-empty PRIMARY parent email, dedup case-insensitively
+  // while preserving the first-seen casing (nicer for humans). Secondary
+  // parent email is intentionally excluded — only the main contact.
+  const seen = new Set();
+  const emails = [];
+  roster.forEach(c => {
+    const trimmed = String(c.email || '').trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    emails.push(trimmed);
+  });
+  textEl.value = emails.join(', ');
+  if (countEl) countEl.textContent = emails.length
+    ? `${emails.length} unique`
+    : 'none found';
+}
+window.refreshEmailList = refreshEmailList;
+
+// Copy the textarea contents to the clipboard. Shows visible feedback on the
+// button itself (in addition to the toast) since users often miss the toast.
+async function copyEmailList() {
+  const textEl = document.getElementById('emailListText');
+  const btn = document.getElementById('emailListCopyBtn');
+  if (!textEl || !textEl.value.trim()) { showToast('No emails to copy', 'error'); return; }
+  const flashSuccess = () => {
+    if (!btn) return;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
+    btn.disabled = true;
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1600);
+  };
+  // Prefer the async Clipboard API; fall back to legacy execCommand for older
+  // Safari or non-HTTPS contexts.
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(textEl.value);
+      showToast('Emails copied to clipboard');
+      flashSuccess();
+      return;
+    } catch (e) { /* fall through */ }
+  }
+  try {
+    textEl.focus();
+    textEl.select();
+    const ok = document.execCommand('copy');
+    if (ok) { showToast('Emails copied to clipboard'); flashSuccess(); return; }
+  } catch (e) { /* ignore */ }
+  showToast('Copy failed — please select and copy manually', 'error');
+}
+window.copyEmailList = copyEmailList;
 
 function doPrint() {
   if (!weeklyWk) return;
