@@ -7451,18 +7451,32 @@ function doActivityPrint() {
       ? `<div class="ab-photo-wrap"><img class="ab-photo" src="${photoData}" alt=""></div>`
       : '';
     const timeBlock = a.time ? `<div class="ab-meta">${esc(a.time)}</div>` : '';
+    // Guard against a title that was accidentally stored doubled ("Foo Foo").
+    let titleText = String(a.title || 'Untitled activity').trim();
+    const half = titleText.length / 2;
+    if (titleText.length % 2 === 1) {
+      const a1 = titleText.slice(0, Math.floor(half)).trim();
+      const b1 = titleText.slice(Math.ceil(half)).trim();
+      if (a1 && a1.toLowerCase() === b1.toLowerCase()) titleText = a1;
+    } else {
+      const a1 = titleText.slice(0, half).trim();
+      const b1 = titleText.slice(half).trim();
+      if (a1 && a1.toLowerCase() === b1.toLowerCase()) titleText = a1;
+    }
+    // Everything inside .ab-fit is what we measure & scale down to fit one page.
     return `
       <div class="ab-page">
         <div class="ab-frame">
-          <div class="ab-header">
-            ${logoSrc ? `<img class="ab-logo" src="${logoSrc}" alt="">` : ''}
-            <span class="ab-wordmark">LITTLE LADYBUGS CAMP</span>
+          <div class="ab-fit">
+            <div class="ab-header">
+              ${logoSrc ? `<img class="ab-logo" src="${logoSrc}" alt="">` : ''}
+            </div>
+            <div class="ab-daymeta">${esc(dateStr)} · ${esc(locationLabel)}</div>
+            <h1 class="ab-title">${esc(titleText)}</h1>
+            ${timeBlock}
+            ${photoBlock}
+            <div class="ab-desc">${descHtml}</div>
           </div>
-          <div class="ab-daymeta">${esc(dateStr)} · ${esc(locationLabel)}</div>
-          <h1 class="ab-title">${esc(a.title || 'Untitled activity')}</h1>
-          ${timeBlock}
-          ${photoBlock}
-          <div class="ab-desc">${descHtml}</div>
         </div>
       </div>`;
   }).join('');
@@ -7482,26 +7496,45 @@ function doActivityPrint() {
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
+    html, body { margin: 0; padding: 0; background: #fff; }
     body {
       font-family: 'Nunito', 'Segoe UI', sans-serif;
       color: #1a1a1a;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
+    /* Each activity is a fixed US-Letter page (8.5in x 11in). Keeping an
+       explicit, fixed size (rather than min-height:100vh) is what lets us
+       measure overflow reliably and scale content to fit exactly one sheet. */
     .ab-page {
-      width: 100%;
-      min-height: 100vh;
-      padding: 24px;
+      width: 8.5in;
+      height: 11in;
+      padding: 0.4in;
+      margin: 0 auto;
       page-break-after: always;
-      display: flex;
+      break-after: page;
+      /* Prevent a page from ever splitting across two printed sheets. */
+      page-break-inside: avoid;
+      break-inside: avoid;
+      overflow: hidden;
     }
-    .ab-page:last-child { page-break-after: auto; }
+    .ab-page:last-child { page-break-after: auto; break-after: auto; }
     .ab-frame {
       border: 2.5px solid #5b3d8c;
       border-radius: 4px;
-      padding: 30px 42px 48px;
       width: 100%;
+      height: 100%;
+      padding: 0.35in 0.5in;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
+    }
+    /* This wrapper holds all content and is what the fit-scaler shrinks via a
+       CSS transform when the content is taller than the frame. */
+    .ab-fit {
+      width: 100%;
+      transform-origin: top center;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -7511,17 +7544,9 @@ function doActivityPrint() {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 12px;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
-    .ab-logo { height: 58px; width: auto; }
-    .ab-wordmark {
-      font-family: 'Baloo 2', sans-serif;
-      font-weight: 700;
-      font-size: 20px;
-      letter-spacing: 0.02em;
-      color: #1a1a1a;
-    }
+    .ab-logo { height: 64px; width: auto; }
     .ab-daymeta {
       font-family: 'Nunito', sans-serif;
       font-size: 12px;
@@ -7533,7 +7558,8 @@ function doActivityPrint() {
     .ab-title {
       font-family: 'Baloo 2', sans-serif;
       font-weight: 600;
-      font-size: 34px;
+      font-size: 32px;
+      line-height: 1.15;
       margin: 6px 0 4px;
       color: #1a1a1a;
     }
@@ -7543,36 +7569,40 @@ function doActivityPrint() {
       color: #666;
       margin-bottom: 6px;
     }
-    .ab-photo-wrap { margin: 18px 0 8px; }
+    .ab-photo-wrap { margin: 14px 0 8px; text-align: center; }
+    /* display:block + object-fit:contain avoids the horizontal "slicing"
+       artifact some print engines produce with inline images inside flex. */
     .ab-photo {
-      max-width: 320px;
-      max-height: 340px;
+      display: block;
+      max-width: 3.2in;
+      max-height: 3.2in;
       width: auto;
       height: auto;
       object-fit: contain;
+      margin: 0 auto;
     }
     .ab-desc {
       font-family: 'Nunito', sans-serif;
-      font-size: 16px;
-      line-height: 1.55;
+      font-size: 15px;
+      line-height: 1.5;
       text-align: left;
       width: 100%;
-      max-width: 620px;
-      margin-top: 18px;
+      max-width: 6.2in;
+      margin-top: 14px;
     }
     /* Description internal formatting from mdToHtml */
     .ab-desc h1, .ab-desc h2, .ab-desc h3 {
       font-family: 'Baloo 2', sans-serif;
       text-align: center;
       font-weight: 600;
-      margin: 14px 0 8px;
+      margin: 12px 0 6px;
     }
-    .ab-desc h1 { font-size: 22px; }
-    .ab-desc h2 { font-size: 20px; }
-    .ab-desc h3 { font-size: 18px; }
-    .ab-desc ul, .ab-desc ol { padding-left: 26px; margin: 8px 0; }
-    .ab-desc li { margin: 4px 0; }
-    .ab-desc p { margin: 8px 0; }
+    .ab-desc h1 { font-size: 21px; }
+    .ab-desc h2 { font-size: 19px; }
+    .ab-desc h3 { font-size: 17px; }
+    .ab-desc ul, .ab-desc ol { padding-left: 24px; margin: 6px 0; }
+    .ab-desc li { margin: 3px 0; }
+    .ab-desc p { margin: 6px 0; }
     .ab-desc strong { font-weight: 700; }
     .ab-desc code {
       background: #f2f0f7;
@@ -7582,18 +7612,70 @@ function doActivityPrint() {
     }
     .ab-desc img { max-width: 100%; }
     @media print {
-      .ab-page { padding: 0; min-height: auto; }
-      @page { margin: 12mm; }
+      @page { size: letter; margin: 0; }
+      html, body { width: 8.5in; }
+      .ab-page { margin: 0; }
     }
   </style>
 </head>
 <body>
   ${pages}
   <${'script'}>
-    // Give the web fonts and images a moment to load, then open the print
-    // dialog automatically.
+    // Fit-to-page: after fonts + images load, measure each activity's content
+    // against its fixed-size frame. If the content is taller than the frame,
+    // scale it down with a CSS transform until it fits. This keeps every
+    // activity on exactly ONE US-Letter sheet — no mid-activity page breaks,
+    // no content bleeding past the purple frame.
+    function fitPages() {
+      var frames = document.querySelectorAll('.ab-frame');
+      frames.forEach(function (frame) {
+        var fit = frame.querySelector('.ab-fit');
+        if (!fit) return;
+        // Available height inside the frame (minus its vertical padding).
+        var cs = window.getComputedStyle(frame);
+        var padTop = parseFloat(cs.paddingTop) || 0;
+        var padBot = parseFloat(cs.paddingBottom) || 0;
+        var avail = frame.clientHeight - padTop - padBot;
+        // Reset any prior scale, then measure natural content height.
+        fit.style.transform = 'scale(1)';
+        var natural = fit.scrollHeight;
+        if (natural > avail && natural > 0) {
+          // Scale down just enough to fit, with a small safety margin.
+          var scale = Math.max(0.4, (avail / natural) * 0.99);
+          fit.style.transform = 'scale(' + scale + ')';
+          // Because transform doesn't change layout box height, and the frame
+          // uses flex centering, the scaled content stays top-aligned and
+          // centered horizontally — which is what we want.
+        }
+      });
+    }
+
+    function whenImagesReady(cb) {
+      var imgs = Array.prototype.slice.call(document.images);
+      var pending = imgs.filter(function (im) { return !im.complete; }).length;
+      if (pending === 0) { cb(); return; }
+      imgs.forEach(function (im) {
+        if (im.complete) return;
+        im.addEventListener('load', done);
+        im.addEventListener('error', done);
+      });
+      function done() { pending--; if (pending <= 0) cb(); }
+      // Safety timeout in case an image never fires load/error.
+      setTimeout(cb, 3000);
+    }
+
     window.addEventListener('load', function () {
-      setTimeout(function () { window.print(); }, 600);
+      // Give web fonts a beat to swap in (they affect measured height), then
+      // wait for images, fit every page, and open the print dialog.
+      setTimeout(function () {
+        whenImagesReady(function () {
+          // One more tick so font swap + image layout settle before measuring.
+          setTimeout(function () {
+            fitPages();
+            setTimeout(function () { window.print(); }, 250);
+          }, 150);
+        });
+      }, 300);
     });
   <\/script>
 </body>
