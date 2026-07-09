@@ -762,6 +762,21 @@
   .badge-pre { background: var(--blue-light); color: var(--blue); }
   .badge-post { background: var(--purple-light); color: var(--purple); }
   .badge-allergy { background: var(--coral-light); color: var(--coral); }
+  /* Consent badges — always visible on camper quick cards. Green check when
+     consent is given, muted with an X when it isn't. */
+  .badge-consent-yes { background: var(--green-light); color: var(--green); }
+  .badge-consent-no  { background: var(--surface2); color: var(--text-3); border: 1px solid var(--border); }
+  /* Consent checkbox rows in the camper detail panel */
+  .consent-row {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--text);
+    padding: 6px 0; cursor: pointer; user-select: none;
+  }
+  .consent-row input[type="checkbox"] {
+    width: 17px; height: 17px; accent-color: var(--green);
+    cursor: pointer; margin: 0;
+  }
+  .consent-row i { font-size: 15px; }
   .week-info { font-size: 11.5px; color: var(--text-3); margin-bottom: 7px; display: flex; align-items: center; gap: 4px; font-weight: 500; }
   .day-pills { display: flex; gap: 4px; }
   .dp {
@@ -7076,6 +7091,8 @@ function renderRoster() {
     const hasAllergy = g.registrations.some(r => r.allergies);
     const hasPre  = g.registrations.some(r => r.preDays?.length);
     const hasPost = g.registrations.some(r => r.postDays?.length);
+    const okSplash = g.registrations.some(r => r.consentSplash);
+    const okPhoto  = g.registrations.some(r => r.consentPhoto);
     return `<div class="camper-card" onclick="openDetail('${firstReg.id}')">
       <div class="card-header">
         <div class="avatar" style="background:${bg};color:${fg}">${esc(ini)}</div>
@@ -7088,9 +7105,11 @@ function renderRoster() {
         <span class="badge" style="background:var(--surface2);color:var(--text-2);border:1px solid var(--border)"><i class="ti ti-calendar-event" style="font-size:10px"></i> ${wkCount} ${wkCount===1?'week':'weeks'}</span>
         ${hasWeekly?'<span class="badge badge-weekly">Weekly</span>':''}
         ${hasDaily?'<span class="badge badge-daily">Daily</span>':''}
-        ${hasPre?'<span class="badge badge-pre"><i class="ti ti-sunrise" style="font-size:10px"></i> Pre-care</span>':''}
-        ${hasPost?'<span class="badge badge-post"><i class="ti ti-sunset" style="font-size:10px"></i> Post-care</span>':''}
+        ${hasPre?'<span class="badge badge-pre"><i class="ti ti-sunrise" style="font-size:10px"></i> Pre</span>':''}
+        ${hasPost?'<span class="badge badge-post"><i class="ti ti-sunset" style="font-size:10px"></i> Post</span>':''}
         ${hasAllergy?'<span class="badge badge-allergy"><i class="ti ti-alert-triangle" style="font-size:10px"></i> Allergy</span>':''}
+        <span class="badge ${okSplash?'badge-consent-yes':'badge-consent-no'}"><i class="ti ${okSplash?'ti-check':'ti-x'}" style="font-size:10px"></i> Splash pad</span>
+        <span class="badge ${okPhoto?'badge-consent-yes':'badge-consent-no'}"><i class="ti ${okPhoto?'ti-check':'ti-x'}" style="font-size:10px"></i> Photo</span>
       </div>
     </div>`;
   }).join('');
@@ -7451,18 +7470,15 @@ function doActivityPrint() {
       ? `<div class="ab-photo-wrap"><img class="ab-photo" src="${photoData}" alt=""></div>`
       : '';
     const timeBlock = a.time ? `<div class="ab-meta">${esc(a.time)}</div>` : '';
-    // Guard against a title that was accidentally stored doubled ("Foo Foo").
+    // Guard against a title that was accidentally stored doubled ("Foo Bar
+    // Foo Bar" → "Foo Bar"). Only collapse when the repeated phrase is
+    // MULTI-WORD: single-word repeats like "Cha Cha" or "Night Night" are
+    // usually intentional activity names, not data corruption.
     let titleText = String(a.title || 'Untitled activity').trim();
     const half = titleText.length / 2;
-    if (titleText.length % 2 === 1) {
-      const a1 = titleText.slice(0, Math.floor(half)).trim();
-      const b1 = titleText.slice(Math.ceil(half)).trim();
-      if (a1 && a1.toLowerCase() === b1.toLowerCase()) titleText = a1;
-    } else {
-      const a1 = titleText.slice(0, half).trim();
-      const b1 = titleText.slice(half).trim();
-      if (a1 && a1.toLowerCase() === b1.toLowerCase()) titleText = a1;
-    }
+    const a1 = titleText.slice(0, Math.floor(half)).trim();
+    const b1 = titleText.slice(Math.ceil(half)).trim();
+    if (a1 && a1.includes(' ') && a1.toLowerCase() === b1.toLowerCase()) titleText = a1;
     // Everything inside .ab-fit is what we measure & scale down to fit one page.
     return `
       <div class="ab-page">
@@ -7870,6 +7886,20 @@ function openDetail(key) {
     </div>
 
     <div class="detail-section">
+      <div class="detail-section-title">Consent</div>
+      <label class="consent-row">
+        <input type="checkbox" ${regs.some(r=>r.consentSplash)?'checked':''}
+               onchange="toggleConsent('${jsArg(camperKey(c))}','consentSplash',this.checked,this)">
+        <i class="ti ti-ripple" style="color:var(--blue)"></i> Splash Pad
+      </label>
+      <label class="consent-row">
+        <input type="checkbox" ${regs.some(r=>r.consentPhoto)?'checked':''}
+               onchange="toggleConsent('${jsArg(camperKey(c))}','consentPhoto',this.checked,this)">
+        <i class="ti ti-camera" style="color:var(--purple)"></i> Photo
+      </label>
+    </div>
+
+    <div class="detail-section">
       <div class="detail-section-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <span>Weeks &amp; schedule</span>
         <button class="btn btn-sm btn-ghost" onclick="closeDetail();openModal('${c.id}','addweek')"><i class="ti ti-plus"></i> Add a week</button>
@@ -7917,6 +7947,36 @@ function openDetail(key) {
 function closeDetail() {
   document.getElementById('detailOverlay').classList.remove('open');
 }
+
+// ── Consent toggles ──
+// Consent (splash pad / photo) is per-CHILD, but camper data lives on
+// per-registration docs (one per week). To keep every view consistent, a
+// toggle writes the flag to EVERY registration doc for that camper. Reads use
+// .some() so partially-written legacy data still shows as consented if any
+// doc has the flag.
+async function toggleConsent(key, field, checked, cbEl) {
+  if (field !== 'consentSplash' && field !== 'consentPhoto') return;
+  const regs = window.campers.filter(c => camperKey(c) === key);
+  if (!regs.length) { showToast('Camper not found', 'error'); return; }
+  // Optimistically mirror in memory so the roster cards re-render correctly
+  // right away (the Firestore snapshot will confirm shortly after).
+  const prev = regs.map(r => r[field]);
+  regs.forEach(r => { r[field] = !!checked; });
+  if (typeof renderRoster === 'function') { try { renderRoster(); } catch (e) {} }
+  try {
+    await Promise.all(regs.map(r =>
+      window._updateDoc(window._doc(window._db, 'campers', r.id), { [field]: !!checked })
+    ));
+    showToast('Consent updated');
+  } catch (e) {
+    // Revert memory + checkbox on failure
+    regs.forEach((r, i) => { r[field] = prev[i]; });
+    if (cbEl) cbEl.checked = !checked;
+    if (typeof renderRoster === 'function') { try { renderRoster(); } catch (e2) {} }
+    showToast('Could not update: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+window.toggleConsent = toggleConsent;
 
 // ── Modal helpers ──
 let modalSelectedWeeks = new Set();
