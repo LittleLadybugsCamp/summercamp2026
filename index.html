@@ -161,6 +161,121 @@
     border-radius: 0 3px 3px 0;
   }
 
+  /* ── Desktop floating top nav ─────────────────────────────────────── */
+  /* Hidden by default (mobile uses the bottom nav). On desktop it replaces
+     the sidebar entirely. Two visual states:
+       • "locked"  (page scrolled to very top): full-width flush bar with a
+         bottom border — anchored to the top edge.
+       • "floating" (page scrolled): detaches into a centered rounded pill
+         with a shadow and translucent blurred background.
+     The .nav-scrolled class is toggled by a scroll listener. */
+  .top-nav { display: none; }
+
+  @media (min-width: 769px) {
+    aside.sidebar { display: none; }
+    main.main-content { margin-left: 0; padding-top: 72px; }
+
+    .top-nav {
+      display: block;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 900;
+      padding: 0;
+      transition: padding .28s ease;
+      pointer-events: none; /* the inner bar re-enables; lets clicks pass around the pill */
+    }
+    .top-nav-inner {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      max-width: none;
+      margin: 0;
+      padding: 8px 22px;
+      background: var(--surface);
+      border: 1px solid transparent;
+      border-bottom-color: var(--border);
+      border-radius: 0;
+      box-shadow: none;
+      transition: max-width .28s ease, margin .28s ease, padding .28s ease,
+                  border-radius .28s ease, box-shadow .28s ease,
+                  background .28s ease, border-color .28s ease;
+    }
+    /* Floating state — a Feldera-style detached pill */
+    .top-nav.nav-scrolled { padding: 10px 20px 0; }
+    .top-nav.nav-scrolled .top-nav-inner {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 7px 14px;
+      background: var(--surface);
+      background: color-mix(in srgb, var(--surface) 86%, transparent);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      box-shadow: 0 8px 28px rgba(0,0,0,.10), 0 2px 8px rgba(0,0,0,.05);
+    }
+
+    /* Invisible spacer mirroring the account button's width so the centered
+       pill sits at the true horizontal center of the bar. */
+    .top-nav-spacer { width: 38px; flex-shrink: 0; }
+
+    /* Pill link group, centered */
+    .top-nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      margin: 0 auto;
+      background: var(--bg);
+      border: 1px solid var(--border-light, var(--border));
+      border-radius: 999px;
+      padding: 4px;
+    }
+    /* Neutralize the sidebar's .nav-item styling inside the top nav */
+    .top-nav .nav-item {
+      width: auto;
+      margin: 0;
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 13.5px;
+      display: flex; align-items: center; gap: 7px;
+      white-space: nowrap;
+    }
+    .top-nav .nav-item::before { display: none; }
+    .top-nav .nav-item:hover { background: rgba(255,255,255,0.7); }
+    .top-nav .nav-item.active {
+      background: var(--surface);
+      color: var(--green);
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+    .top-nav .nav-item.active i { color: var(--green); }
+
+    /* Account button, far right */
+    .top-nav-user {
+      flex-shrink: 0;
+      width: 38px; height: 38px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      cursor: pointer;
+      color: var(--text-2);
+      font-size: 17px;
+      transition: background .15s ease, color .15s ease;
+    }
+    .top-nav-user:hover { background: var(--surface2, var(--bg)); color: var(--text); }
+
+    /* The account popover opens below the nav on desktop */
+    .mobile-user-menu { top: 66px; right: 24px; }
+  }
+
+  @media (min-width: 769px) and (max-width: 980px) {
+    /* Mid-size screens: drop nav labels to icons so the pill fits */
+    .top-nav .nav-item span { display: none; }
+    .top-nav .nav-item { padding: 8px 12px; }
+    .top-nav .nav-item i { font-size: 18px; }
+  }
+
   .sidebar-footer {
     padding: 12px 10px 20px;
     border-top: 1px solid var(--border-light);
@@ -2083,6 +2198,41 @@
     </div>
   </aside>
 
+  <!-- Desktop top nav — replaces the sidebar on wide screens. Floats as a
+       rounded pill when the page is scrolled, and locks flush to the top
+       edge when scrolled back to the top. Items share the .nav-item class +
+       data-page attributes so showPage()'s active-state logic covers them
+       with no extra wiring. -->
+  <header class="top-nav" id="topNav">
+    <div class="top-nav-inner">
+      <span class="top-nav-spacer" aria-hidden="true"></span>
+      <nav class="top-nav-links">
+        <button class="nav-item" data-page="dashboard" onclick="showPage('dashboard',this)">
+          <i class="ti ti-layout-dashboard"></i><span>Dashboard</span>
+        </button>
+        <button class="nav-item active" data-page="roster" onclick="showPage('roster',this)">
+          <i class="ti ti-users"></i><span>Campers</span>
+        </button>
+        <button class="nav-item" data-page="activities" onclick="showPage('activities',this)">
+          <i class="ti ti-tent"></i><span>Activities</span>
+        </button>
+        <button class="nav-item" data-page="weekly" onclick="showPage('weekly',this)">
+          <i class="ti ti-calendar-event"></i><span>Weekly</span>
+        </button>
+        <button class="nav-item" data-page="calendar" onclick="showPage('calendar',this)">
+          <i class="ti ti-calendar-week"></i><span>Calendar</span>
+        </button>
+        <button class="nav-item" data-page="admin" id="adminNavItemTop" onclick="requestAdmin(this)">
+          <i class="ti ti-lock"></i><span>Admin</span>
+        </button>
+      </nav>
+      <button class="top-nav-user" id="topNavUserBtn" aria-label="Account menu" title="Account"
+              onclick="event.stopPropagation(); toggleMobileUserMenu()">
+        <i class="ti ti-user"></i>
+      </button>
+    </div>
+  </header>
+
   <!-- Main -->
   <main class="main-content">
     <!-- Dashboard page -->
@@ -3585,7 +3735,7 @@ function hideLogin() {
 function applyRoleUI() {
   const isAdmin = window._userRole === 'admin';
   // Employees don't see the Admin page at all
-  ['adminNavItem', 'adminNavItemMobile'].forEach(id => {
+  ['adminNavItem', 'adminNavItemMobile', 'adminNavItemTop'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdmin ? '' : 'none';
   });
@@ -9537,6 +9687,24 @@ const topBarLogo = document.getElementById('topBarLogo');
 if (sidebarLogo && topBarLogo) topBarLogo.src = sidebarLogo.src;
 const loginLogo = document.getElementById('loginLogo');
 if (sidebarLogo && loginLogo) loginLogo.src = sidebarLogo.src;
+
+// ── Desktop top nav: locked ↔ floating on scroll ──
+// At the very top of the page the nav sits flush ("locked"); as soon as the
+// user scrolls it detaches into a floating pill. rAF-throttled so rapid
+// scroll events don't thrash the DOM.
+(function () {
+  const nav = document.getElementById('topNav');
+  if (!nav) return;
+  let ticking = false;
+  function update() {
+    ticking = false;
+    nav.classList.toggle('nav-scrolled', window.scrollY > 8);
+  }
+  window.addEventListener('scroll', () => {
+    if (!ticking) { ticking = true; requestAnimationFrame(update); }
+  }, { passive: true });
+  update();
+})();
 
 // ════════════════════ INVOICE GENERATION ════════════════════
 // Template week names + pricing
