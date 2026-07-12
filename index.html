@@ -2506,9 +2506,14 @@
                 Auto-refreshes as activities change. Checkbox state is shared across devices.
               </div>
             </div>
-            <button class="btn btn-primary" onclick="regenerateMaterials()">
-              <i class="ti ti-refresh"></i> <span id="matGenLabel">Refresh</span>
-            </button>
+            <div style="display:flex;gap:8px;flex-shrink:0">
+              <button class="btn" onclick="clearMaterialChecks()" title="Uncheck everything and remove leftover items from old versions">
+                <i class="ti ti-eraser"></i> Clear checkmarks
+              </button>
+              <button class="btn btn-primary" onclick="regenerateMaterials()">
+                <i class="ti ti-refresh"></i> <span id="matGenLabel">Refresh</span>
+              </button>
+            </div>
           </div>
           <div id="matList" class="mat-list">
             <div class="mat-empty">Loading…</div>
@@ -4159,15 +4164,19 @@ function showAdminTab(name, btn) {
 // well-labeled sections) and permissive in the fallback (so we surface
 // something even when the activity author didn't format a materials section).
 
+// Section headers that introduce a materials list. Kept deliberately specific:
+// generic single words like "items" or "to bring" are omitted because they
+// match non-materials prose ("items to explore", "things to bring to circle")
+// and pollute the checklist. Every header here explicitly signals supplies.
 const MATERIAL_SECTION_HEADERS = [
   'materials needed', 'materials to bring', 'materials',
-  'what you will need', "what you'll need", 'what you need', 'you will need', "you'll need", 'you need',
+  'what you will need', "what you'll need", 'what you need',
+  'you will need', "you'll need",
   'supplies needed', 'supplies',
-  'props bag', 'props', 'prop bag',
+  'props bag', 'prop bag',
   'equipment needed', 'equipment',
   'ingredients',
-  'you need to bring', 'to bring',
-  'items needed', 'items',
+  'items needed',
 ];
 
 // Split a text block into "material items" by looking at its shape and
@@ -4225,6 +4234,21 @@ function stripInlineMd(line) {
 // Detect if a line looks like a fresh section header (any topic). We use this
 // to decide when to STOP collecting a materials block — the next section
 // header ends it.
+// Known section labels that END a materials list. These are the headers your
+// activity descriptions use to move on to non-materials content. Matched
+// case-insensitively, with or without a trailing colon.
+const NON_MATERIAL_SECTION_LABELS = [
+  'instructions', 'instruction', 'steps', 'step', 'directions', 'method',
+  'how to', 'how to play', 'how it works', 'the activity', 'activity',
+  'setup', 'set up', 'set-up', 'prep', 'preparation',
+  'notes', 'note', 'tips', 'tip', 'variations', 'variation', 'extension', 'extensions',
+  'goal', 'goals', 'objective', 'objectives', 'purpose', 'theme',
+  'discussion', 'debrief', 'reflection', 'wrap up', 'wrap-up', 'closing',
+  'give points for the following', 'points', 'scoring', 'judging', 'criteria',
+  'what to look for', 'evaluation', 'assessment', 'rules', 'safety',
+  'warm up', 'warm-up', 'intro', 'introduction', 'chant', 'song',
+];
+
 function looksLikeSectionHeader(line) {
   if (!line) return false;
   if (/^\s*#{1,6}\s+\S/.test(line)) return true;   // markdown heading
@@ -4232,6 +4256,22 @@ function looksLikeSectionHeader(line) {
   if (/^\s*\*\*[^*\n]{2,80}\*\*\s*:?\s*$/.test(line)) return true;
   // "**Something**: rest of line" — bold label + colon (also a header)
   if (/^\s*\*\*[^*\n]{2,50}\*\*\s*:/.test(line)) return true;
+  // Plain-text label line: a short line that is JUST a label, optionally
+  // ending in a colon — e.g. "Instructions:", "Steps", "Give points for the
+  // following:". This is the key fix: activities write "Instructions:" as
+  // plain text (no #, no **), so without this the materials extractor would
+  // run straight past it and swallow every instruction line as a "material".
+  const cleaned = stripInlineMd(line).trim();
+  // Strip a trailing colon for comparison.
+  const label = cleaned.replace(/[:：]\s*$/, '').trim().toLowerCase();
+  if (NON_MATERIAL_SECTION_LABELS.includes(label)) return true;
+  // Generic: any SHORT line (<= 6 words) that ends in a colon and has no
+  // other sentence punctuation is almost certainly a section label, not a
+  // material item. e.g. "Setup:", "For each team:", "You will also need:".
+  if (/:$/.test(cleaned) && !/[.!?]/.test(cleaned)) {
+    const wordCount = cleaned.replace(/:$/, '').trim().split(/\s+/).length;
+    if (wordCount <= 6) return true;
+  }
   return false;
 }
 
@@ -4349,6 +4389,25 @@ async function toggleMaterialChecked(fullKey, checked, labelEl) {
   }
 }
 window.toggleMaterialChecked = toggleMaterialChecked;
+
+// Wipe ALL saved checkbox state. Useful for clearing leftover keys from older
+// versions of the materials extractor (which pulled in items that are no
+// longer generated) and for starting a fresh prep cycle. Overwrites the whole
+// doc with an empty map rather than deleting individual keys.
+async function clearMaterialChecks() {
+  if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
+  if (!confirm('Uncheck every material and remove any leftover items saved from older versions?\n\nThis clears all checkmarks across every day. The list itself regenerates from your activities.')) return;
+  try {
+    // Overwrite (not merge) with an empty items map to drop every stale key.
+    await window._setDoc(window._doc(window._db, 'materialsChecked', 'all'), { items: {} });
+    window._materialsChecked = {};
+    regenerateMaterials();
+    showToast('Checkmarks cleared');
+  } catch (e) {
+    showToast('Could not clear: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+window.clearMaterialChecks = clearMaterialChecks;
 
 function regenerateMaterials() {
   if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
