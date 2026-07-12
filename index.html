@@ -8250,9 +8250,9 @@ function openDetail(key) {
       <button class="btn" style="flex:1;justify-content:center" onclick="closeDetail();openModal('${c.id}','personal')">
         <i class="ti ti-edit"></i> Edit details
       </button>
-      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openInvoice('${c.id}')">
+      ${window._userRole === 'admin' ? `<button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openInvoice('${c.id}')">
         <i class="ti ti-file-invoice"></i> Print invoice
-      </button>
+      </button>` : ''}
     </div>
     <div style="text-align:right;margin-top:8px">
       ${c.refunded
@@ -10295,6 +10295,7 @@ function invoiceFooterText(payMethod, hasDaily) {
 }
 
 function openInvoice(keyOrId) {
+  if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
   // Accept either a group key ("first|last") or a single camper id
   let key = keyOrId;
   if (keyOrId && !keyOrId.includes('|')) {
