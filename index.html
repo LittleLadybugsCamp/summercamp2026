@@ -2312,6 +2312,9 @@
         <button class="btn btn-icon" onclick="toggleSearch('campersSearchBar','campersSearchInput')" aria-label="Search">
           <i class="ti ti-search"></i>
         </button>
+        <button class="btn btn-icon" onclick="openPhoneList()" aria-label="Copy parent phone list" title="Copy parent phone list">
+          <i class="ti ti-phone"></i>
+        </button>
       </div>
       <div class="search-reveal" id="campersSearchBar" style="display:none">
         <div class="search-wrap">
@@ -2909,6 +2912,27 @@
     <div class="email-list-actions">
       <button class="btn btn-primary" onclick="copyEmailList()" id="emailListCopyBtn"><i class="ti ti-copy"></i> Copy</button>
       <button class="btn" onclick="closeEmailList()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Parent phone list -->
+<div class="modal-overlay" id="phoneListOverlay">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-phone" style="margin-right:6px"></i>Copy parent phone list</div>
+      <button class="btn btn-ghost btn-icon" onclick="closePhoneList()" aria-label="Close"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="phoneListText">
+        Parents <span id="phoneListCount" class="email-list-count"></span>
+      </label>
+      <textarea id="phoneListText" readonly rows="10" onclick="this.select()"></textarea>
+      <div class="form-hint">All registered campers, both parents where listed. Each line: parent name, phone, and the camper in parentheses (1 = primary parent, 2 = secondary). Missing phones are grouped at the bottom. Tap the text box to select all.</div>
+    </div>
+    <div class="email-list-actions">
+      <button class="btn btn-primary" onclick="copyPhoneList()" id="phoneListCopyBtn"><i class="ti ti-copy"></i> Copy</button>
+      <button class="btn" onclick="closePhoneList()">Close</button>
     </div>
   </div>
 </div>
@@ -6403,6 +6427,7 @@ document.addEventListener('keydown', (e) => {
   const addEditEl = document.getElementById('activityModal');
   const empEl     = document.getElementById('empModal');
   const emailEl   = document.getElementById('emailListOverlay');
+  const phoneEl   = document.getElementById('phoneListOverlay');
   const actPrintEl = document.getElementById('activityPrintOverlay');
   const mumu      = document.getElementById('mobileUserMenu');
   // Close the topmost open modal. Import > Add/Edit > employee modal — they
@@ -6425,6 +6450,11 @@ document.addEventListener('keydown', (e) => {
   }
   if (emailEl && emailEl.classList.contains('open')) {
     closeEmailList();
+    e.stopPropagation();
+    return;
+  }
+  if (phoneEl && phoneEl.classList.contains('open')) {
+    closePhoneList();
     e.stopPropagation();
     return;
   }
@@ -7598,6 +7628,101 @@ async function copyEmailList() {
   showToast('Copy failed — please select and copy manually', 'error');
 }
 window.copyEmailList = copyEmailList;
+
+// ── Parent phone list ──
+// Builds a copyable list of every registered camper (deduplicated to one per
+// child, across all weeks) in the format:
+//   Parent Name — Phone (Camper First Last)
+// Uses the primary parent (`parent`) and primary phone (`phone`). Campers with
+// no phone on file are still listed (at the bottom) so nobody is silently
+// dropped. Refunded registrations are excluded.
+function openPhoneList() {
+  const textEl = document.getElementById('phoneListText');
+  const countEl = document.getElementById('phoneListCount');
+  if (!textEl) return;
+  // Deduplicate: one record per child, across all weeks. Keep the most
+  // complete record — the one with the most parent/phone fields filled in — so
+  // we don't lose a secondary parent that only exists on one registration.
+  const active = (window.campers || []).filter(c => !c.refunded);
+  const fieldScore = (c) => ['parent', 'phone', 'parent2', 'phone2']
+    .reduce((n, f) => n + (c[f] && String(c[f]).trim() ? 1 : 0), 0);
+  const byChild = new Map();
+  active.forEach(c => {
+    const k = camperKey(c);
+    if (!k || k === '|') return;
+    const existing = byChild.get(k);
+    if (!existing || fieldScore(c) > fieldScore(existing)) byChild.set(k, c);
+  });
+  // Build lines. Each camper emits up to TWO lines — one per parent:
+  //   Primary parent   — phone (Camper First Last 1)
+  //   Secondary parent — phone (Camper First Last 2)
+  // The "2" line is only emitted when a secondary parent name or phone exists.
+  // Lines missing a phone go to a separate bucket listed at the bottom.
+  const withPhone = [];
+  const noPhone = [];
+  Array.from(byChild.values())
+    .sort((a, b) => ((a.last || '') + (a.first || '')).localeCompare((b.last || '') + (b.first || '')))
+    .forEach(c => {
+      const camperName = `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim();
+      const p1name = (c.parent && String(c.parent).trim()) || '';
+      const p1phone = (c.phone && String(c.phone).trim()) || '';
+      const p2name = (c.parent2 && String(c.parent2).trim()) || '';
+      const p2phone = (c.phone2 && String(c.phone2).trim()) || '';
+
+      // Primary parent — always emitted (every camper has a primary).
+      const label1 = p1name || '(no parent name)';
+      if (p1phone) withPhone.push(`${label1} — ${p1phone} (${camperName} 1)`);
+      else         noPhone.push(`${label1} — (no phone) (${camperName} 1)`);
+
+      // Secondary parent — only if there's a name or phone for them.
+      if (p2name || p2phone) {
+        const label2 = p2name || '(no parent name)';
+        if (p2phone) withPhone.push(`${label2} — ${p2phone} (${camperName} 2)`);
+        else         noPhone.push(`${label2} — (no phone) (${camperName} 2)`);
+      }
+    });
+  let out = withPhone.join('\n');
+  if (noPhone.length) {
+    out += (out ? '\n\n' : '') + '— No phone on file —\n' + noPhone.join('\n');
+  }
+  textEl.value = out;
+  const totalLines = withPhone.length + noPhone.length;
+  if (countEl) {
+    countEl.textContent = totalLines
+      ? `${totalLines} contact${totalLines === 1 ? '' : 's'}${noPhone.length ? ` · ${noPhone.length} missing phone` : ''}`
+      : 'none found';
+  }
+  document.getElementById('phoneListOverlay').classList.add('open');
+}
+window.openPhoneList = openPhoneList;
+
+function closePhoneList() {
+  document.getElementById('phoneListOverlay').classList.remove('open');
+}
+window.closePhoneList = closePhoneList;
+
+async function copyPhoneList() {
+  const textEl = document.getElementById('phoneListText');
+  const btn = document.getElementById('phoneListCopyBtn');
+  if (!textEl || !textEl.value.trim()) { showToast('Nothing to copy', 'error'); return; }
+  const flashSuccess = () => {
+    if (!btn) return;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
+    btn.disabled = true;
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1600);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(textEl.value); showToast('Phone list copied'); flashSuccess(); return; }
+    catch (e) { /* fall through */ }
+  }
+  try {
+    textEl.focus(); textEl.select();
+    if (document.execCommand('copy')) { showToast('Phone list copied'); flashSuccess(); return; }
+  } catch (e) { /* ignore */ }
+  showToast('Copy failed — select and copy manually', 'error');
+}
+window.copyPhoneList = copyPhoneList;
 
 // ── Activity booklet print ──
 // Opens a modal with a week picker, then generates a print-window booklet:
@@ -8979,13 +9104,25 @@ function buildImportRows(csvRows) {
 
     const parent  = row['Parent/guardian name'] || '';
     const email   = row['Email address'] || '';
-    const phone   = row['Phone number'] || '';
+    // Phone label has varied across JotForm form revisions ("Phone number",
+    // "Phone Number", "Phone", "Cell phone", "Contact number"…) and a trailing
+    // space or capitalization change silently broke the exact-match lookup,
+    // dropping phone on newer submissions. rowFind() matches known variants
+    // first, then falls back to any primary phone-like column.
+    const phone   = rowFind(row, [
+      'Phone number', 'Phone Number', 'Phone', 'Cell phone', 'Cell Phone',
+      'Mobile number', 'Mobile', 'Contact number', 'Contact Number',
+      'Parent/guardian phone', 'Parent phone number', 'Parent phone'
+    ], { includes: ['phone', 'mobile', 'cell'], exclude: ['secondary', 'emergency', 'contact #', 'contact 1', 'contact 2', 'contact#'] }) || '';
     const address = row['Mailing address'] || '';
 
     const has2nd = (row["Do you want to add a second parent/guardian's contact info?"] || '').toLowerCase() === 'yes';
     const parent2  = has2nd ? (row['Secondary parent/guardian name'] || '') : '';
     const email2   = has2nd ? (row['Secondary parent email address'] || '') : '';
-    const phone2   = has2nd ? (row['Secondary phone number'] || '') : '';
+    const phone2   = has2nd ? (rowFind(row, [
+      'Secondary phone number', 'Secondary Phone Number', 'Secondary phone',
+      'Second phone number', 'Secondary parent phone', 'Secondary cell phone'
+    ], { includes: ['secondary phone', 'second phone', 'secondary parent phone', 'secondary cell'] }) || '') : '';
     const address2 = has2nd ? (row['Secondary parent mailing address'] || '') : '';
 
     const hasEC = (row["By default the parent(s)/guardian(s) provided above will added as emergency contacts. Do you wish to add other people as emergency contacts?"] || '').toLowerCase() === 'yes';
@@ -9433,6 +9570,46 @@ async function fetchJotformSubmissions(apiKey, formId, sinceStr) {
 }
 
 // Convert one submission's answers into a flat row object matching the CSV column names
+// Resilient column lookup for imported rows. JotForm question labels drift
+// between form revisions (capitalization, trailing spaces, slight rewording),
+// which silently broke exact-match lookups like row['Phone number']. rowFind
+// tries, in order:
+//   1. Exact match on any of the provided candidate labels.
+//   2. Case/space-insensitive match on those candidates.
+//   3. Fuzzy fallback: the first column whose normalized name CONTAINS any of
+//      opts.includes AND none of opts.exclude (so a primary "Phone number"
+//      isn't satisfied by "Secondary phone number" or an emergency-contact
+//      phone). Matrix columns (containing ">>") are skipped.
+// Returns the trimmed value, or '' if nothing matches.
+function rowFind(row, candidates, opts) {
+  opts = opts || {};
+  const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  // 1. Exact
+  for (const c of candidates) {
+    if (row[c] != null && String(row[c]).trim() !== '') return String(row[c]).trim();
+  }
+  // 2. Normalized exact
+  const wantNorm = candidates.map(norm);
+  for (const key in row) {
+    if (wantNorm.includes(norm(key)) && String(row[key]).trim() !== '') {
+      return String(row[key]).trim();
+    }
+  }
+  // 3. Fuzzy contains/exclude
+  const inc = (opts.includes || []).map(norm);
+  const exc = (opts.exclude || []).map(norm);
+  if (inc.length) {
+    for (const key in row) {
+      if (key.includes('>>')) continue; // skip matrix cells
+      const nk = norm(key);
+      if (!inc.some(t => nk.includes(t))) continue;
+      if (exc.some(t => nk.includes(t))) continue;
+      if (String(row[key]).trim() !== '') return String(row[key]).trim();
+    }
+  }
+  return '';
+}
+
 function jotformAnswerToRow(answers) {
   const row = {};
   for (const key in answers) {
@@ -9470,7 +9647,11 @@ function jotformAnswerToRow(answers) {
         row[label] = value.join(', ');
       }
     } else if (typeof value === 'object') {
-      if ('first' in value || 'last' in value) {
+      if (a.type === 'control_phone' || 'full' in value || (('area' in value || 'phone' in value) && !('city' in value) && !('addr_line1' in value))) {
+        // JotForm phone widget (control_phone) returns {full, area, phone}.
+        // Prefer the pre-formatted `full`; else join area + phone.
+        row[label] = String(value.full || [value.area, value.phone].filter(Boolean).join(' ')).trim();
+      } else if ('first' in value || 'last' in value) {
         row[label] = [value.prefix, value.first, value.middle, value.last, value.suffix].filter(Boolean).join(' ').trim();
       } else if ('addr_line1' in value || 'city' in value || 'postal' in value || 'state' in value) {
         row[label] = [value.addr_line1, value.addr_line2, value.city, value.state, value.postal, value.country].filter(Boolean).join(' ').trim();
