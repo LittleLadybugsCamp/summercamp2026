@@ -8276,12 +8276,12 @@ function openDetail(key) {
     <div class="detail-section">
       <div class="detail-section-title">Consent</div>
       <label class="consent-row">
-        <input type="checkbox" ${regs.some(r=>r.consentSplash)?'checked':''} ${window._userRole==='admin'?'':'disabled'}
+        <input type="checkbox" ${regs.some(r=>r.consentSplash)?'checked':''}
                onchange="toggleConsent('${jsArg(camperKey(c))}','consentSplash',this.checked,this)">
         <i class="ti ti-ripple" style="color:var(--blue)"></i> Splash Pad
       </label>
       <label class="consent-row">
-        <input type="checkbox" ${regs.some(r=>r.consentPhoto)?'checked':''} ${window._userRole==='admin'?'':'disabled'}
+        <input type="checkbox" ${regs.some(r=>r.consentPhoto)?'checked':''}
                onchange="toggleConsent('${jsArg(camperKey(c))}','consentPhoto',this.checked,this)">
         <i class="ti ti-camera" style="color:var(--purple)"></i> Photo
       </label>
@@ -8343,7 +8343,8 @@ function closeDetail() {
 // .some() so partially-written legacy data still shows as consented if any
 // doc has the flag.
 async function toggleConsent(key, field, checked, cbEl) {
-  if (window._userRole !== 'admin') { if (cbEl) cbEl.checked = !checked; showToast('Admin only', 'error'); return; }
+  // Consent (splash pad / photo) is toggleable by both admins and employees —
+  // it's day-to-day operational info that front-desk staff need to update.
   if (field !== 'consentSplash' && field !== 'consentPhoto') return;
   const regs = window.campers.filter(c => camperKey(c) === key);
   if (!regs.length) { showToast('Camper not found', 'error'); return; }
