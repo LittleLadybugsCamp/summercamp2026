@@ -1024,7 +1024,41 @@
   .care-day.dis { opacity: .35; cursor: not-allowed; }
   .care-label { font-size: 12px; color: var(--text-2); font-weight: 500; margin-bottom: 6px; margin-top: 10px; display: flex; align-items: center; gap: 5px; }
   .modal-footer { display: flex; gap: 8px; justify-content: space-between; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-light); }
-  .modal-footer-right { display: flex; gap: 8px; }
+  .modal-footer-right { display: flex; gap: 8px; align-items: center; }
+  .import-update-toggle {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--text-2); cursor: pointer;
+    user-select: none; margin-right: 4px; white-space: nowrap;
+  }
+  .import-update-toggle input { width: 15px; height: 15px; accent-color: var(--green); cursor: pointer; }
+  /* Per-row "Update" checkbox — only visible when the master toggle is on. */
+  .import-update-row {
+    display: none; align-items: center; gap: 4px;
+    font-size: 12px; color: var(--green); font-weight: 600;
+    cursor: pointer; user-select: none; margin-left: 4px;
+  }
+  .import-update-row input { width: 15px; height: 15px; accent-color: var(--green); cursor: pointer; }
+  /* Phone-status badges on existing import rows */
+  .import-phone-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 10px;
+    white-space: nowrap; margin-left: 4px;
+  }
+  .import-phone-badge i { font-size: 12px; }
+  .import-phone-missing { background: #FEF3C7; color: #92400E; }   /* amber — will add phone */
+  .import-phone-ok      { background: var(--green-light); color: var(--green); }
+  .import-phone-none    { background: var(--surface2); color: var(--text-3); }
+  /* Select all/none/missing helper row */
+  #importSelectHelper {
+    display: none; align-items: center; gap: 8px;
+    margin-top: 8px; padding: 6px 2px;
+  }
+  .import-sel-btn {
+    font-size: 12px; font-weight: 600; color: var(--green);
+    background: var(--green-light); border: none; border-radius: 8px;
+    padding: 4px 10px; cursor: pointer;
+  }
+  .import-sel-btn:hover { filter: brightness(0.96); }
 
   /* ── Calendar header ── */
   .cal-header {
@@ -2998,6 +3032,12 @@
         <span style="font-size:12px;color:var(--text-3)" id="importPreviewSub"></span>
       </div>
       <div class="import-preview" id="importPreviewList"></div>
+      <div id="importSelectHelper" style="display:none">
+        <span style="font-size:12px;color:var(--text-2)">Select:</span>
+        <button class="import-sel-btn" onclick="importSelectMissingPhone()">Only missing phone</button>
+        <button class="import-sel-btn" onclick="importSelectAll(true)">All</button>
+        <button class="import-sel-btn" onclick="importSelectAll(false)">None</button>
+      </div>
       <div class="import-progress" id="importProgress" style="display:none">
         <span id="importProgressLabel">Importing…</span>
         <div class="progress-bar"><div class="progress-fill" id="importProgressFill" style="width:0%"></div></div>
@@ -3006,6 +3046,10 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeImport()">Cancel</button>
       <div class="modal-footer-right">
+        <label class="import-update-toggle" title="Overwrite records that already exist, to fill in changed or missing fields like phone numbers">
+          <input type="checkbox" id="importUpdateExisting" onchange="onImportUpdateMasterToggle()">
+          Update existing records
+        </label>
         <button class="btn btn-primary" id="importBtn" onclick="doImport()" style="display:none">
           <i class="ti ti-upload"></i> Import all
         </button>
@@ -8883,6 +8927,9 @@ function rCalMonth() {
 
 // ── Import CSV ──
 let importRows = [];
+// Indices (into importRows) of existing rows the admin has chosen to update.
+// Only consulted when the "Update existing records" master toggle is on.
+let _importUpdateSel = new Set();
 
 function openImport() {
   jotformSyncActive = false;
@@ -8892,6 +8939,11 @@ function openImport() {
   document.getElementById('importPreview').style.display = 'none';
   document.getElementById('importBtn').style.display = 'none';
   document.getElementById('importDrop').style.display = 'block';
+  const upd = document.getElementById('importUpdateExisting');
+  if (upd) upd.checked = false;
+  _importUpdateSel = new Set();
+  const selHelper = document.getElementById('importSelectHelper');
+  if (selHelper) selHelper.style.display = 'none';
   importRows = [];
 }
 function closeImport() {
@@ -9319,13 +9371,31 @@ function buildImportRows(csvRows) {
   if (reviewCount) subParts.push(reviewCount + ' need review');
   document.getElementById('importPreviewSub').textContent = subParts.join(' · ');
 
-  document.getElementById('importPreviewList').innerHTML = importRows.map(r => {
+  document.getElementById('importPreviewList').innerHTML = importRows.map((r, idx) => {
     // "Dismiss" lets the admin tell the app to permanently skip this exact
     // submission (e.g. "Test Test", or a daily-review row already handled
     // manually). Only shown when we have a JotForm submission ID to record.
     const dismissBtn = r.submissionId
       ? '<button class="import-dismiss" onclick="onDismissJotformRow(\'' + jsArg(r.submissionId) + '\')" title="Skip this submission permanently">Dismiss</button>'
       : '';
+    // When "Update existing" is on, each already-existing row gets a checkbox
+    // so the admin picks EXACTLY which records to overwrite. Selected indices
+    // are tracked in _importUpdateSel. New rows never show this (they always
+    // import). data-update-row lets us restyle the row when selected.
+    const updateChk = (r.exists && r.data)
+      ? '<label class="import-update-row" title="Update this record"><input type="checkbox" class="import-row-chk" data-idx="' + idx + '" ' + (_importUpdateSel.has(idx) ? 'checked' : '') + ' onchange="onToggleImportRow(' + idx + ', this.checked)"><span>Update</span></label>'
+      : '';
+    // Phone-status badge on existing rows: shows whether an update would fill
+    // in a missing phone, or whether a phone is already on file.
+    let phoneBadge = '';
+    if (r.exists && r.data) {
+      const d = importRowDiff(r);
+      if (d.found) {
+        if (d.phoneFills) phoneBadge = '<span class="import-phone-badge import-phone-missing" title="No phone stored — this update adds ' + esc(d.phoneNow) + '"><i class="ti ti-phone-plus"></i> adds phone</span>';
+        else if (d.phoneWas) phoneBadge = '<span class="import-phone-badge import-phone-ok" title="Phone already on file: ' + esc(d.phoneWas) + '"><i class="ti ti-phone-check"></i> has phone</span>';
+        else phoneBadge = '<span class="import-phone-badge import-phone-none" title="No phone in the stored record or the CSV"><i class="ti ti-phone-off"></i> no phone</span>';
+      }
+    }
     if (r.needsReview) {
       // Catch-all (no rawDaily): the submission didn't match the daily branch
       // OR the weekly branch — most likely cause is a JotForm field label that
@@ -9374,6 +9444,8 @@ function buildImportRows(csvRows) {
         + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
         + '<div class="import-row-weeks">' + esc(r.weekLabel) + ' <span style="opacity:.6">· Daily</span></div>'
         + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
+        + (r.exists ? phoneBadge : '')
+        + (r.exists ? updateChk : '')
         + (r.exists ? dismissBtn : '')
         + '<div style="flex-basis:100%;margin-top:5px;font-size:12px;color:var(--text-2)">'
         +   '<strong>' + esc(dayNames) + '</strong>' + esc(careStr)
@@ -9385,13 +9457,144 @@ function buildImportRows(csvRows) {
       + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
       + '<div class="import-row-weeks">' + r.weekLabel + '</div>'
       + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
+      + (r.exists ? phoneBadge : '')
+      + (r.exists ? updateChk : '')
       + (r.exists ? dismissBtn : '')
       + '</div>';
   }).join('');
   document.getElementById('importPreview').style.display = 'block';
-  document.getElementById('importBtn').style.display = newCount > 0 ? 'flex' : 'none';
-  document.getElementById('importDrop').style.display = 'none';
+  refreshImportPreviewCounts();
 }
+
+// Recomputes the summary line and Import button. The count of records that
+// will actually be updated is driven by the per-row checkboxes (_importUpdateSel),
+// not just the master toggle — so the admin can pick exactly which existing
+// records to overwrite.
+function refreshImportPreviewCounts() {
+  const updateExisting = !!document.getElementById('importUpdateExisting')?.checked;
+  const newCount = importRows.filter(r => r.data && !r.exists).length;
+  const existCount = importRows.filter(r => r.data && r.exists).length;
+  const reviewCount = importRows.filter(r => r.needsReview).length;
+  // Only existing rows that are BOTH selected and still valid count as updates.
+  const selectedUpdates = updateExisting
+    ? importRows.filter((r, i) => r.data && r.exists && _importUpdateSel.has(i)).length
+    : 0;
+  const sub = document.getElementById('importPreviewSub');
+  if (sub) {
+    let parts = [newCount + ' new'];
+    if (updateExisting) {
+      const missingPhone = importRows.filter(r => r.data && r.exists && importRowDiff(r).phoneFills).length;
+      parts.push(selectedUpdates + ' selected to update');
+      if (missingPhone) parts.push(missingPhone + ' missing phone');
+    } else {
+      parts.push(existCount + ' already exist (will skip)');
+    }
+    if (reviewCount) parts.push(reviewCount + ' need review');
+    sub.textContent = parts.join(' · ');
+  }
+  // Show/hide the per-row Update checkboxes based on the master toggle.
+  document.querySelectorAll('.import-update-row').forEach(el => {
+    el.style.display = updateExisting ? 'inline-flex' : 'none';
+  });
+  const btn = document.getElementById('importBtn');
+  if (btn) {
+    const willWrite = newCount + selectedUpdates;
+    btn.style.display = willWrite > 0 ? 'flex' : 'none';
+    const label = (updateExisting && selectedUpdates > 0)
+      ? `<i class="ti ti-upload"></i> Import & update (${willWrite})`
+      : `<i class="ti ti-upload"></i> Import all`;
+    btn.innerHTML = label;
+  }
+  const drop = document.getElementById('importDrop');
+  if (drop) drop.style.display = 'none';
+}
+window.refreshImportPreviewCounts = refreshImportPreviewCounts;
+
+// Master toggle changed. On turning ON, default-select only the existing rows
+// where an update would actually FILL IN A MISSING PHONE — that's the common
+// case (backfilling the phone bug) and avoids overwriting records that don't
+// need it. The admin can still hand-pick others. On turning OFF, clear all.
+function onImportUpdateMasterToggle() {
+  const on = !!document.getElementById('importUpdateExisting')?.checked;
+  _importUpdateSel = new Set();
+  if (on) {
+    importRows.forEach((r, i) => {
+      if (!r.data || !r.exists) return;
+      const d = importRowDiff(r);
+      if (d.phoneFills) _importUpdateSel.add(i); // only rows that add a phone
+    });
+  }
+  document.querySelectorAll('.import-row-chk').forEach(cb => {
+    const idx = parseInt(cb.getAttribute('data-idx'), 10);
+    cb.checked = _importUpdateSel.has(idx);
+  });
+  // Toggle visibility of the "select all/none" helper row.
+  const helper = document.getElementById('importSelectHelper');
+  if (helper) helper.style.display = on ? 'flex' : 'none';
+  refreshImportPreviewCounts();
+}
+window.onImportUpdateMasterToggle = onImportUpdateMasterToggle;
+
+// Select all / none of the existing rows (respects update mode being on).
+function importSelectAll(all) {
+  _importUpdateSel = new Set();
+  if (all) {
+    importRows.forEach((r, i) => { if (r.data && r.exists) _importUpdateSel.add(i); });
+  }
+  document.querySelectorAll('.import-row-chk').forEach(cb => {
+    const idx = parseInt(cb.getAttribute('data-idx'), 10);
+    cb.checked = _importUpdateSel.has(idx);
+  });
+  refreshImportPreviewCounts();
+}
+window.importSelectAll = importSelectAll;
+
+// Select only the rows that would add a missing phone.
+function importSelectMissingPhone() {
+  _importUpdateSel = new Set();
+  importRows.forEach((r, i) => {
+    if (!r.data || !r.exists) return;
+    if (importRowDiff(r).phoneFills) _importUpdateSel.add(i);
+  });
+  document.querySelectorAll('.import-row-chk').forEach(cb => {
+    const idx = parseInt(cb.getAttribute('data-idx'), 10);
+    cb.checked = _importUpdateSel.has(idx);
+  });
+  refreshImportPreviewCounts();
+}
+window.importSelectMissingPhone = importSelectMissingPhone;
+
+// A single row's Update checkbox toggled.
+function onToggleImportRow(idx, checked) {
+  if (checked) _importUpdateSel.add(idx);
+  else _importUpdateSel.delete(idx);
+  refreshImportPreviewCounts();
+}
+window.onToggleImportRow = onToggleImportRow;
+
+// For an existing import row, compare against the live camper record and
+// report what an update would actually change. Used to (a) badge each row so
+// the admin can see which records are missing a phone, and (b) auto-select
+// only the rows that would meaningfully change (e.g. blank phone → filled).
+// Returns { found, phoneWas, phoneNow, phoneFills, anyChange }.
+function importRowDiff(row) {
+  const out = { found: false, phoneWas: '', phoneNow: '', phoneFills: false, anyChange: false };
+  if (!row || !row.data) return out;
+  const idKey = registrationIdentityKey(row.data);
+  const existing = (window.campers || []).find(c => registrationIdentityKey(c) === idKey);
+  if (!existing) return out;
+  out.found = true;
+  const norm = v => String(v == null ? '' : v).trim();
+  out.phoneWas = norm(existing.phone);
+  out.phoneNow = norm(row.data.phone);
+  // "Fills" = stored is blank but the incoming CSV has a value.
+  out.phoneFills = !out.phoneWas && !!out.phoneNow;
+  // Detect any field that differs (so we can show "no change" when identical).
+  const fields = ['first','last','parent','phone','email','address','parent2','phone2','email2','address2','medical','allergies','healthCard'];
+  out.anyChange = fields.some(f => norm(existing[f]) !== norm(row.data[f] == null ? '' : row.data[f]));
+  return out;
+}
+window.importRowDiff = importRowDiff;
 
 // Helper: keep window.campers in sync with a just-written camper doc
 // without creating duplicates if the Firestore snapshot has already landed.
@@ -9402,41 +9605,68 @@ function mirrorCamperInsert(id, data) {
 }
 
 async function doImport() {
-  const toImport = importRows.filter(r => r.data && !r.exists);
+  const updateExisting = !!document.getElementById('importUpdateExisting')?.checked;
+  // New rows always import. Existing rows import only when "Update existing" is
+  // on AND that specific row is checked in _importUpdateSel.
+  const toImport = importRows.filter((r, i) =>
+    r.data && (!r.exists || (updateExisting && _importUpdateSel.has(i))));
   if(!toImport.length) return;
   document.getElementById('importBtn').style.display = 'none';
   document.getElementById('importProgress').style.display = 'block';
-  let done = 0;
+  let done = 0, updatedCount = 0;
   const newKeys = new Set();
-  // Guard against the same dedup key appearing twice in this loop (belt-and-
-  // suspenders — buildImportRows already flags in-batch dupes as exists, but
-  // if that ever regresses this stops a double-write).
   const writtenKeys = new Set();
   for(const row of toImport) {
     try {
       const key = registrationDedupKey(row.data);
       if (writtenKeys.has(key)) { done++; continue; }
       writtenKeys.add(key);
-      const payload = {
-        ...row.data,
-        createdAt: window._serverTimestamp(),
-        updatedAt: window._serverTimestamp()
-      };
-      // Prefer a deterministic doc ID derived from the JotForm submission so a
-      // re-sync of the same submission OVERWRITES rather than duplicating.
-      // Manual entries (no submissionId) fall back to a random-id addDoc.
-      const detId = registrationDocId(row.data);
-      let refId;
-      if (detId) {
-        await window._setDoc(window._doc(window._db, 'campers', detId), payload, { merge: true });
-        refId = detId;
-      } else {
-        const ref = await window._addDoc(window._collection(window._db, 'campers'), payload);
-        refId = ref.id;
+      const isUpdate = !!row.exists;
+
+      // Find the existing document ID for updates. Records imported before
+      // deterministic IDs existed have RANDOM ids, so we can't assume the
+      // deterministic ID matches — look up the live camper by identity key
+      // first. If found, update THAT doc (preserving its id + createdAt).
+      let targetId = null;
+      if (isUpdate) {
+        const idKey = registrationIdentityKey(row.data);
+        const existing = (window.campers || []).find(c =>
+          registrationIdentityKey(c) === idKey);
+        if (existing) targetId = existing.id;
       }
-      // Mirror in memory so buildInvoiceData finds them immediately
-      mirrorCamperInsert(refId, row.data);
-      newKeys.add(camperKey(row.data));
+
+      if (isUpdate && targetId) {
+        // Update in place. merge:true fills in changed/missing fields (e.g.
+        // phone) without wiping fields the app set that aren't in the import
+        // (like consent flags). Do NOT touch createdAt.
+        await window._updateDoc(window._doc(window._db, 'campers', targetId), {
+          ...row.data,
+          updatedAt: window._serverTimestamp()
+        });
+        // reflect in memory
+        const mem = (window.campers || []).find(c => c.id === targetId);
+        if (mem) Object.assign(mem, row.data);
+        updatedCount++;
+      } else {
+        // Brand-new record (or an "update" whose original doc vanished).
+        const payload = {
+          ...row.data,
+          createdAt: window._serverTimestamp(),
+          updatedAt: window._serverTimestamp()
+        };
+        const detId = registrationDocId(row.data);
+        let refId;
+        if (detId) {
+          await window._setDoc(window._doc(window._db, 'campers', detId), payload, { merge: true });
+          refId = detId;
+        } else {
+          const ref = await window._addDoc(window._collection(window._db, 'campers'), payload);
+          refId = ref.id;
+        }
+        mirrorCamperInsert(refId, row.data);
+        // Only NEW campers get an auto-invoice (updates already have one).
+        if (!isUpdate) newKeys.add(camperKey(row.data));
+      }
     } catch(e) {
       console.error('Import error for', row.csvName, e);
     }
@@ -9446,7 +9676,7 @@ async function doImport() {
     document.getElementById('importProgressLabel').textContent = 'Importing ' + done + ' of ' + toImport.length + '…';
   }
 
-  // Auto-generate one invoice per new unique camper
+  // Auto-generate one invoice per NEW unique camper (updates are skipped)
   let invoiceCount = 0;
   for (const key of newKeys) {
     try {
@@ -9454,8 +9684,9 @@ async function doImport() {
     } catch(e) { console.error('Auto-invoice error for', key, e); }
   }
   const invoiceSuffix = invoiceCount ? `, ${invoiceCount} invoice${invoiceCount===1?'':'s'} generated` : '';
-  document.getElementById('importProgressLabel').textContent = `Done! ${done} campers imported${invoiceSuffix}.`;
-  showToast(`${done} campers imported${invoiceSuffix}.`);
+  const updateSuffix = updatedCount ? `, ${updatedCount} updated` : '';
+  document.getElementById('importProgressLabel').textContent = `Done! ${done} processed${updateSuffix}${invoiceSuffix}.`;
+  showToast(`${done} processed${updateSuffix}${invoiceSuffix}.`);
   if (jotformSyncActive) {
     persistJotformConfig({ lastSync: window._jfMaxCreated || '' });
     updateJotformBadge(0);
