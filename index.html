@@ -2346,7 +2346,7 @@
         <button class="btn btn-icon" onclick="toggleSearch('campersSearchBar','campersSearchInput')" aria-label="Search">
           <i class="ti ti-search"></i>
         </button>
-        <button class="btn btn-icon" onclick="openPhoneList()" aria-label="Copy parent phone list" title="Copy parent phone list">
+        <button class="btn btn-icon admin-only-btn" onclick="openPhoneList()" aria-label="Copy parent phone list" title="Copy parent phone list">
           <i class="ti ti-phone"></i>
         </button>
       </div>
@@ -2372,7 +2372,7 @@
         <button class="btn btn-icon" onclick="toggleSearch('weeklySearchBar','weeklySearchInput')" aria-label="Search">
           <i class="ti ti-search"></i>
         </button>
-        <button class="btn btn-icon" onclick="openEmailList()" aria-label="Copy parent emails" title="Copy parent emails">
+        <button class="btn btn-icon admin-only-btn" onclick="openEmailList()" aria-label="Copy parent emails" title="Copy parent emails">
           <i class="ti ti-mail"></i>
         </button>
         <button class="btn btn-icon" onclick="openPrint()" aria-label="Print">
@@ -3820,6 +3820,11 @@ function applyRoleUI() {
       document.getElementById('page-admin').classList.contains('active')) {
     showPage('roster');
   }
+  // Admin-only toolbar buttons (parent phone list, parent email list, etc.) —
+  // employees only get search and their account menu.
+  document.querySelectorAll('.admin-only-btn').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
   // Sidebar user panel
   const su = document.getElementById('sidebarUser');
   const nameEl = document.getElementById('suName');
@@ -7581,6 +7586,7 @@ function closePrintModal() {
 // deduplicated parent emails ready to copy into an email client. Both primary
 // and secondary parent emails are included. Case-insensitive dedup.
 function openEmailList() {
+  if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
   const sel = document.getElementById('emailListWeekSel');
   if (!sel) return;
   // Populate the week dropdown once (or if it's empty)
@@ -7681,6 +7687,7 @@ window.copyEmailList = copyEmailList;
 // no phone on file are still listed (at the bottom) so nobody is silently
 // dropped. Refunded registrations are excluded.
 function openPhoneList() {
+  if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
   const textEl = document.getElementById('phoneListText');
   const countEl = document.getElementById('phoneListCount');
   if (!textEl) return;
