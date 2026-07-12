@@ -2444,7 +2444,7 @@
             <button onclick="closeImportMenu();openInvoiceImport()"><i class="ti ti-file-invoice"></i> Past invoices (PDF)</button>
           </div>
         </div>
-        <button class="btn btn-primary" onclick="openModal()">
+        <button class="btn btn-primary admin-only-btn" onclick="openModal()">
           <i class="ti ti-plus"></i> <span class="btn-label">Add camper</span>
         </button>
       </div>
@@ -8246,19 +8246,19 @@ function openDetail(key) {
     </div>
     ${c.allergies?`<div class="allergy-alert"><i class="ti ti-alert-triangle"></i><strong>Allergy:</strong> ${esc(c.allergies)}</div>`:''}
     ${c.refunded?`<div class="refund-banner"><i class="ti ti-receipt-refund"></i> This camper has been marked as refunded and is hidden from the roster.</div>`:''}
-    <div style="display:flex;gap:8px;margin-top:14px">
+    ${window._userRole === 'admin' ? `<div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn" style="flex:1;justify-content:center" onclick="closeDetail();openModal('${c.id}','personal')">
         <i class="ti ti-edit"></i> Edit details
       </button>
-      ${window._userRole === 'admin' ? `<button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openInvoice('${c.id}')">
+      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openInvoice('${c.id}')">
         <i class="ti ti-file-invoice"></i> Print invoice
-      </button>` : ''}
-    </div>
-    <div style="text-align:right;margin-top:8px">
+      </button>
+    </div>` : ''}
+    ${window._userRole === 'admin' ? `<div style="text-align:right;margin-top:8px">
       ${c.refunded
         ? `<button class="btn-link-subtle" onclick="restoreCamper('${jsArg(camperKey(c))}')"><i class="ti ti-rotate"></i> Restore camper to roster</button>`
         : `<button class="btn-link-subtle" onclick="openRefundModal('${c.id}')"><i class="ti ti-receipt-refund"></i> Mark as refunded</button>`}
-    </div>
+    </div>` : ''}
     <div class="detail-section" style="margin-top:16px">
       <div class="detail-section-title">Contact</div>
       ${c.parent?`<div class="detail-row"><i class="ti ti-user"></i><span>${esc(c.parent)}</span></div>`:''}
@@ -8276,12 +8276,12 @@ function openDetail(key) {
     <div class="detail-section">
       <div class="detail-section-title">Consent</div>
       <label class="consent-row">
-        <input type="checkbox" ${regs.some(r=>r.consentSplash)?'checked':''}
+        <input type="checkbox" ${regs.some(r=>r.consentSplash)?'checked':''} ${window._userRole==='admin'?'':'disabled'}
                onchange="toggleConsent('${jsArg(camperKey(c))}','consentSplash',this.checked,this)">
         <i class="ti ti-ripple" style="color:var(--blue)"></i> Splash Pad
       </label>
       <label class="consent-row">
-        <input type="checkbox" ${regs.some(r=>r.consentPhoto)?'checked':''}
+        <input type="checkbox" ${regs.some(r=>r.consentPhoto)?'checked':''} ${window._userRole==='admin'?'':'disabled'}
                onchange="toggleConsent('${jsArg(camperKey(c))}','consentPhoto',this.checked,this)">
         <i class="ti ti-camera" style="color:var(--purple)"></i> Photo
       </label>
@@ -8290,7 +8290,7 @@ function openDetail(key) {
     <div class="detail-section">
       <div class="detail-section-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <span>Weeks &amp; schedule</span>
-        <button class="btn btn-sm btn-ghost" onclick="closeDetail();openModal('${c.id}','addweek')"><i class="ti ti-plus"></i> Add a week</button>
+        ${window._userRole === 'admin' ? `<button class="btn btn-sm btn-ghost" onclick="closeDetail();openModal('${c.id}','addweek')"><i class="ti ti-plus"></i> Add a week</button>` : ''}
       </div>
       ${regs.map(r => {
         const campDayNames = (r.campDays||[]).map(d=>DN[d]).join(', ') || 'None';
@@ -8302,7 +8302,7 @@ function openDetail(key) {
               <div class="reg-block-title">${esc(weekLabel(r.weekStart))}</div>
               <div class="reg-block-type"><span class="badge ${r.type==='weekly'?'badge-weekly':'badge-daily'}">${r.type==='weekly'?'Weekly':'Daily'}</span></div>
             </div>
-            <button class="btn btn-sm btn-ghost" onclick="closeDetail();openModal('${r.id}','schedule')"><i class="ti ti-edit"></i> Edit</button>
+            ${window._userRole === 'admin' ? `<button class="btn btn-sm btn-ghost" onclick="closeDetail();openModal('${r.id}','schedule')"><i class="ti ti-edit"></i> Edit</button>` : ''}
           </div>
           <div class="detail-row"><i class="ti ti-tent" style="color:var(--green)"></i><span><strong>Camp:</strong> ${campDayNames}</span></div>
           ${r.preDays?.length?`<div class="detail-row"><i class="ti ti-sunrise" style="color:var(--blue)"></i><span><strong>Pre-care:</strong> ${preDayNames}</span></div>`:''}
@@ -8343,6 +8343,7 @@ function closeDetail() {
 // .some() so partially-written legacy data still shows as consented if any
 // doc has the flag.
 async function toggleConsent(key, field, checked, cbEl) {
+  if (window._userRole !== 'admin') { if (cbEl) cbEl.checked = !checked; showToast('Admin only', 'error'); return; }
   if (field !== 'consentSplash' && field !== 'consentPhoto') return;
   const regs = window.campers.filter(c => camperKey(c) === key);
   if (!regs.length) { showToast('Camper not found', 'error'); return; }
@@ -8430,6 +8431,9 @@ function togCare(el, k) {
 let modalMode = 'full'; // 'full' (new camper) | 'personal' | 'schedule'
 
 function openModal(id=null, mode='full') {
+  // Adding or editing camper records is admin-only. Employees can view campers
+  // but not modify them or add new ones.
+  if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
   editingId = id;
   modalMode = mode;
   const c = id ? window.campers.find(x=>x.id===id) : null;
@@ -10898,6 +10902,7 @@ function editInvoiceNumber(key) {
 let pendingRefundCamperId = null;
 
 function openRefundModal(camperId) {
+  if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
   const c = window.campers.find(x => x.id === camperId);
   if (!c) return;
   pendingRefundCamperId = camperId;
@@ -10955,6 +10960,7 @@ async function confirmRefund() {
 }
 
 async function restoreCamper(key) {
+  if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
   if (!confirm('Restore this camper to the roster?')) return;
   try {
     const siblings = window.campers.filter(x => camperKey(x) === key);
