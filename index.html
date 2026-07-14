@@ -8600,6 +8600,50 @@ async function saveCamper() {
       if(!first||!last) { showToast("Please enter the camper's name.", 'error'); return; }
       const editing = window.campers.find(x => x.id === editingId);
       const key = editing ? camperKey(editing) : (first.toLowerCase()+'|'+last.toLowerCase());
+      const newKey = first.toLowerCase().trim() + '|' + last.toLowerCase().trim();
+
+      // ── NAME CHANGE: migrate name-keyed records so payments + invoices
+      //    follow the camper instead of being orphaned under the old name. ──
+      if (editing && newKey !== key) {
+        // Collision guard: if a DIFFERENT camper already has the new name,
+        // renaming would merge two children's records. Block it.
+        const collision = window.campers.some(c => camperKey(c) === newKey && camperKey(c) !== key);
+        if (collision) {
+          showToast('Another camper already has that exact name — rename blocked to avoid merging their records.', 'error');
+          return;
+        }
+        const oldId = adminId(key), newId = adminId(newKey);
+        if (oldId !== newId) {
+          // Payments record (admin collection)
+          try {
+            const oldSnap = await window._getDoc(window._doc(window._db, 'admin', oldId));
+            if (oldSnap.exists()) {
+              const data = oldSnap.data();
+              await window._setDoc(window._doc(window._db, 'admin', newId),
+                { ...data, camperKey: newKey, updatedAt: window._serverTimestamp() });
+              await window._deleteDoc(window._doc(window._db, 'admin', oldId));
+              // keep the in-memory map in sync so the Admin table shows it immediately
+              if (window.adminData) {
+                window.adminData.delete(oldId);
+                window.adminData.set(newId, { id: newId, ...data, camperKey: newKey });
+              }
+            }
+          } catch (e) { console.warn('Payment record migration failed:', e); }
+          // Saved invoice PDF record (invoices collection). The stored PDF
+          // itself is left untouched (old name inside) — it only re-generates
+          // if the admin explicitly regenerates, per policy.
+          try {
+            const oldInv = await window._getDoc(window._doc(window._db, 'invoices', oldId));
+            if (oldInv.exists()) {
+              const inv = oldInv.data();
+              await window._setDoc(window._doc(window._db, 'invoices', newId),
+                { ...inv, ...(inv.camperKey ? { camperKey: newKey } : {}) });
+              await window._deleteDoc(window._doc(window._db, 'invoices', oldId));
+            }
+          } catch (e) { console.warn('Invoice record migration failed:', e); }
+        }
+      }
+
       const siblings = window.campers.filter(c => camperKey(c) === key);
       await Promise.all(siblings.map(c =>
         window._updateDoc(window._doc(window._db, 'campers', c.id), { ...sharedData })
