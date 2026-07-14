@@ -1060,6 +1060,38 @@
   }
   .import-sel-btn:hover { filter: brightness(0.96); }
 
+  /* ── Reports page ── */
+  .report-controls {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap; margin: 14px 0 12px;
+  }
+  .report-controls select {
+    padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--surface); font-size: 13.5px; color: var(--text);
+    font-family: inherit; min-width: 220px;
+  }
+  .report-controls-right { display: flex; gap: 8px; flex-wrap: wrap; }
+  .report-intro {
+    font-size: 13px; color: var(--text-2); margin: 14px 0 12px; max-width: 640px; line-height: 1.5;
+  }
+  .report-summary {
+    font-size: 13px; color: var(--text-2); margin-bottom: 10px;
+  }
+  .report-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 10px 14px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px;
+  }
+  .report-name { font-weight: 600; font-size: 14px; color: var(--text); display: inline-flex; align-items: center; gap: 6px; margin-right: auto; }
+  .report-row-text { align-items: flex-start; }
+  .report-row-text .report-name { flex: 0 0 auto; min-width: 180px; }
+  .report-text { flex: 1; font-size: 13.5px; color: var(--text-2); line-height: 1.45; min-width: 200px; }
+  .report-empty { padding: 28px; text-align: center; color: var(--text-3); font-size: 14px; }
+  @media (max-width: 640px) {
+    .report-row-text { flex-direction: column; gap: 4px; }
+    .report-row-text .report-name { min-width: 0; }
+  }
+
   /* ── Calendar header ── */
   .cal-header {
     background: var(--bg);
@@ -2259,6 +2291,9 @@
         <button class="nav-item" data-page="calendar" onclick="showPage('calendar',this)">
           <i class="ti ti-calendar-week"></i><span>Calendar</span>
         </button>
+        <button class="nav-item" data-page="reports" id="reportsNavItemTop" onclick="showPage('reports',this)">
+          <i class="ti ti-report-analytics"></i><span>Reports</span>
+        </button>
         <button class="nav-item" data-page="admin" id="adminNavItemTop" onclick="requestAdmin(this)">
           <i class="ti ti-lock"></i><span>Admin</span>
         </button>
@@ -2426,6 +2461,48 @@
     </div>
 
     <!-- Admin page -->
+    <!-- Reports page (admin-only) -->
+    <div id="page-reports" class="page">
+      <div class="top-bar top-bar-heading">
+        <h1 class="page-heading">Reports</h1>
+      </div>
+      <div style="padding: 6px var(--page-pad-x) 28px">
+        <div class="admin-tabs">
+          <button class="admin-tab active" data-rtab="consent" onclick="showReportTab('consent',this)"><i class="ti ti-checklist"></i> Consent</button>
+          <button class="admin-tab" data-rtab="allergies" onclick="showReportTab('allergies',this)"><i class="ti ti-alert-triangle"></i> Allergies</button>
+          <button class="admin-tab" data-rtab="notes" onclick="showReportTab('notes',this)"><i class="ti ti-notes"></i> Notes</button>
+        </div>
+
+        <!-- Consent report -->
+        <div id="rtab-consent">
+          <div class="report-controls">
+            <select id="consentWeekSel" onchange="renderConsentReport()"></select>
+            <div class="report-controls-right">
+              <button class="btn btn-sm" id="copySplashBtn" onclick="copyMissingConsentEmails('splash')" title="Copy primary parent emails of campers missing Splash Pad consent">
+                <i class="ti ti-mail"></i> Emails: missing Splash Pad
+              </button>
+              <button class="btn btn-sm" id="copyPhotoBtn" onclick="copyMissingConsentEmails('photo')" title="Copy primary parent emails of campers missing Photo consent">
+                <i class="ti ti-mail"></i> Emails: missing Photo
+              </button>
+            </div>
+          </div>
+          <div id="consentReportBody"><div class="report-empty">Loading…</div></div>
+        </div>
+
+        <!-- Allergies report -->
+        <div id="rtab-allergies" style="display:none">
+          <div class="report-intro">Every camper with an allergy on file, and what it is. Pulled from the registration data across all weeks.</div>
+          <div id="allergyReportBody"><div class="report-empty">Loading…</div></div>
+        </div>
+
+        <!-- Notes report -->
+        <div id="rtab-notes" style="display:none">
+          <div class="report-intro">Campers whose registration includes special notes or interests (the "anything else we should know" field).</div>
+          <div id="notesReportBody"><div class="report-empty">Loading…</div></div>
+        </div>
+      </div>
+    </div>
+
     <div id="page-admin" class="page">
       <div class="top-bar">
         <h1 class="page-heading">Admin</h1>
@@ -2738,6 +2815,10 @@
       <button class="mobile-nav-btn nav-item" data-page="calendar" onclick="showPage('calendar',this)">
         <i class="ti ti-calendar-week"></i>
         Calendar
+      </button>
+      <button class="mobile-nav-btn nav-item" data-page="reports" id="reportsNavItemMobile" onclick="showPage('reports',this)">
+        <i class="ti ti-report-analytics"></i>
+        Reports
       </button>
       <button class="mobile-nav-btn nav-item" data-page="admin" id="adminNavItemMobile" onclick="requestAdmin(this)">
         <i class="ti ti-lock"></i>
@@ -3695,7 +3776,206 @@ function showPage(id, btn) {
   if (id === 'calendar') rCal();
   if (id === 'weekly') { populateWeekButtons(); rWeekly(); }
   if (id === 'admin') renderAdmin();
+  if (id === 'reports') renderReports();
 }
+
+// ════════════════════ REPORTS PAGE ════════════════════
+// Admin-only reporting: consent status per week (with missing-consent email
+// generation), allergies list, and special-notes list. Groups registrations
+// per CHILD (camperKey) since consent/allergies/notes are per-child, not
+// per-week-registration. Refunded campers are excluded everywhere.
+
+function renderReports() {
+  if (window._userRole !== 'admin') {
+    showToast('Reports are restricted to administrators', 'error');
+    showPage('roster');
+    return;
+  }
+  // Populate the week selector once.
+  const sel = document.getElementById('consentWeekSel');
+  if (sel && !sel.options.length && typeof WEEKS !== 'undefined') {
+    const all = document.createElement('option');
+    all.value = 'all'; all.textContent = 'All weeks';
+    sel.appendChild(all);
+    WEEKS.forEach((wk, i) => {
+      const o = document.createElement('option');
+      o.value = wk.start;
+      o.textContent = `Week ${i + 1} — ${weekLabel(wk.start)}`;
+      sel.appendChild(o);
+    });
+  }
+  // Render whichever tab is active.
+  const active = document.querySelector('#page-reports .admin-tab.active');
+  const tab = active ? active.getAttribute('data-rtab') : 'consent';
+  if (tab === 'consent') renderConsentReport();
+  else if (tab === 'allergies') renderAllergyReport();
+  else renderNotesReport();
+}
+window.renderReports = renderReports;
+
+function showReportTab(name, btn) {
+  document.querySelectorAll('#page-reports .admin-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  ['consent', 'allergies', 'notes'].forEach(t => {
+    const el = document.getElementById('rtab-' + t);
+    if (el) el.style.display = (t === name) ? '' : 'none';
+  });
+  if (name === 'consent') renderConsentReport();
+  else if (name === 'allergies') renderAllergyReport();
+  else renderNotesReport();
+}
+window.showReportTab = showReportTab;
+
+// Group non-refunded campers per child for the selected week ('all' = every
+// week). Consent counts as given if ANY of the child's registrations has it.
+function consentGroupsForWeek(weekStart) {
+  const active = (window.campers || []).filter(c =>
+    !c.refunded && (weekStart === 'all' || c.weekStart === weekStart));
+  const byChild = new Map();
+  active.forEach(c => {
+    const k = camperKey(c);
+    if (!k || k === '|') return;
+    const cur = byChild.get(k) || {
+      name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(),
+      email: '', splash: false, photo: false
+    };
+    cur.splash = cur.splash || !!c.consentSplash;
+    cur.photo  = cur.photo  || !!c.consentPhoto;
+    if (!cur.email && c.email && String(c.email).trim()) cur.email = String(c.email).trim();
+    byChild.set(k, cur);
+  });
+  return [...byChild.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function renderConsentReport() {
+  const body = document.getElementById('consentReportBody');
+  const sel = document.getElementById('consentWeekSel');
+  if (!body || !sel) return;
+  const rows = consentGroupsForWeek(sel.value || 'all');
+  if (!rows.length) {
+    body.innerHTML = '<div class="report-empty">No campers found for this week.</div>';
+    return;
+  }
+  const missingSplash = rows.filter(r => !r.splash).length;
+  const missingPhoto  = rows.filter(r => !r.photo).length;
+  body.innerHTML = `
+    <div class="report-summary">${rows.length} camper${rows.length === 1 ? '' : 's'}
+      · missing Splash Pad: <strong>${missingSplash}</strong>
+      · missing Photo: <strong>${missingPhoto}</strong></div>
+    ${rows.map(r => `
+      <div class="report-row">
+        <span class="report-name">${esc(r.name)}</span>
+        <span class="badge ${r.splash ? 'badge-consent-yes' : 'badge-consent-no'}"><i class="ti ${r.splash ? 'ti-check' : 'ti-x'}" style="font-size:10px"></i> Splash pad</span>
+        <span class="badge ${r.photo ? 'badge-consent-yes' : 'badge-consent-no'}"><i class="ti ${r.photo ? 'ti-check' : 'ti-x'}" style="font-size:10px"></i> Photo</span>
+      </div>`).join('')}`;
+}
+window.renderConsentReport = renderConsentReport;
+
+// Copy the primary parent emails of campers missing the given consent for the
+// currently selected week. kind: 'splash' | 'photo'.
+async function copyMissingConsentEmails(kind) {
+  const sel = document.getElementById('consentWeekSel');
+  const rows = consentGroupsForWeek(sel ? (sel.value || 'all') : 'all');
+  const missing = rows.filter(r => kind === 'splash' ? !r.splash : !r.photo);
+  const seen = new Set();
+  const emails = [];
+  missing.forEach(r => {
+    const e = (r.email || '').trim();
+    if (!e) return;
+    const lower = e.toLowerCase();
+    if (seen.has(lower)) return;
+    seen.add(lower);
+    emails.push(e);
+  });
+  const noEmailCount = missing.filter(r => !(r.email || '').trim()).length;
+  if (!emails.length) {
+    showToast(missing.length
+      ? 'Campers are missing consent, but none have a parent email on file'
+      : 'Nobody is missing that consent — nothing to copy', missing.length ? 'error' : 'success');
+    return;
+  }
+  const text = emails.join(', ');
+  const btn = document.getElementById(kind === 'splash' ? 'copySplashBtn' : 'copyPhotoBtn');
+  const flash = () => {
+    if (!btn) return;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="ti ti-check"></i> Copied ' + emails.length + '!';
+    btn.disabled = true;
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1800);
+  };
+  let copied = false;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(text); copied = true; } catch (e) {}
+  }
+  if (!copied) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select();
+      copied = document.execCommand('copy');
+      ta.remove();
+    } catch (e) {}
+  }
+  if (copied) {
+    showToast(`${emails.length} email${emails.length === 1 ? '' : 's'} copied${noEmailCount ? ` — ${noEmailCount} camper(s) missing consent have no email on file` : ''}`);
+    flash();
+  } else {
+    showToast('Copy failed — try again', 'error');
+  }
+}
+window.copyMissingConsentEmails = copyMissingConsentEmails;
+
+// Allergies: every child with a non-empty allergies field (any week).
+function renderAllergyReport() {
+  const body = document.getElementById('allergyReportBody');
+  if (!body) return;
+  const byChild = new Map();
+  (window.campers || []).filter(c => !c.refunded).forEach(c => {
+    const k = camperKey(c);
+    if (!k || k === '|') return;
+    const txt = (c.allergies && String(c.allergies).trim()) || '';
+    const cur = byChild.get(k) || { name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(), allergies: '' };
+    if (txt && txt.length > cur.allergies.length) cur.allergies = txt; // keep fullest
+    byChild.set(k, cur);
+  });
+  const rows = [...byChild.values()].filter(r => r.allergies).sort((a, b) => a.name.localeCompare(b.name));
+  body.innerHTML = rows.length
+    ? `<div class="report-summary">${rows.length} camper${rows.length === 1 ? '' : 's'} with allergies on file</div>` +
+      rows.map(r => `
+        <div class="report-row report-row-text">
+          <span class="report-name"><i class="ti ti-alert-triangle" style="color:var(--coral);font-size:14px"></i> ${esc(r.name)}</span>
+          <span class="report-text">${esc(r.allergies)}</span>
+        </div>`).join('')
+    : '<div class="report-empty">No campers with allergies on file. 🎉</div>';
+}
+window.renderAllergyReport = renderAllergyReport;
+
+// Notes: every child with a non-empty notes/interests field (any week).
+function renderNotesReport() {
+  const body = document.getElementById('notesReportBody');
+  if (!body) return;
+  const byChild = new Map();
+  (window.campers || []).filter(c => !c.refunded).forEach(c => {
+    const k = camperKey(c);
+    if (!k || k === '|') return;
+    const txt = (c.notes && String(c.notes).trim()) || '';
+    const cur = byChild.get(k) || { name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(), notes: '' };
+    if (txt && txt.length > cur.notes.length) cur.notes = txt;
+    byChild.set(k, cur);
+  });
+  const rows = [...byChild.values()].filter(r => r.notes).sort((a, b) => a.name.localeCompare(b.name));
+  body.innerHTML = rows.length
+    ? `<div class="report-summary">${rows.length} camper${rows.length === 1 ? '' : 's'} with notes</div>` +
+      rows.map(r => `
+        <div class="report-row report-row-text">
+          <span class="report-name"><i class="ti ti-note" style="color:var(--purple);font-size:14px"></i> ${esc(r.name)}</span>
+          <span class="report-text">${esc(r.notes)}</span>
+        </div>`).join('')
+    : '<div class="report-empty">No campers with special notes.</div>';
+}
+window.renderNotesReport = renderNotesReport;
 
 // Admin page is restricted to admins via their signed-in role. The login
 // itself is the gate, so no separate admin password is needed.
@@ -3811,7 +4091,7 @@ function hideLogin() {
 function applyRoleUI() {
   const isAdmin = window._userRole === 'admin';
   // Employees don't see the Admin page at all
-  ['adminNavItem', 'adminNavItemMobile', 'adminNavItemTop'].forEach(id => {
+  ['adminNavItem', 'adminNavItemMobile', 'adminNavItemTop', 'reportsNavItemTop', 'reportsNavItemMobile'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdmin ? '' : 'none';
   });
