@@ -1061,14 +1061,13 @@
   .import-sel-btn:hover { filter: brightness(0.96); }
 
   /* ── Reports page ── */
-  .report-controls {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 10px; flex-wrap: wrap; margin: 14px 0 12px;
+  .report-week-btns {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin: 14px 0 12px;
   }
-  .report-controls select {
-    padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px;
-    background: var(--surface); font-size: 13.5px; color: var(--text);
-    font-family: inherit; min-width: 220px;
+  .report-controls {
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: 10px; flex-wrap: wrap; margin: 0 0 12px;
   }
   .report-controls-right { display: flex; gap: 8px; flex-wrap: wrap; }
   .report-intro {
@@ -1091,6 +1090,30 @@
     .report-row-text { flex-direction: column; gap: 4px; }
     .report-row-text .report-name { min-width: 0; }
   }
+
+  /* ── Archived campers ── */
+  .camper-card-archived {
+    position: relative;
+    opacity: 0.62;
+    filter: grayscale(0.5);
+    border-style: dashed !important;
+  }
+  .camper-card-archived:hover { opacity: 0.85; }
+  .archived-ribbon {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: #6B7280; color: #fff;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+    padding: 3px 10px; border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  .archive-banner {
+    display: flex; align-items: center; gap: 8px;
+    background: #F3F4F6; color: #374151;
+    border: 1.5px dashed #9CA3AF;
+    font-size: 13px; font-weight: 600;
+    padding: 10px 14px; border-radius: 10px; margin-top: 12px;
+  }
+  .archive-banner i { font-size: 16px; flex-shrink: 0; }
 
   /* ── Calendar header ── */
   .cal-header {
@@ -2151,6 +2174,18 @@
   .admin-name-btn.refunded { color: var(--text-3); }
   .admin-row-refunded td { background: #FBF8F2; }
   .admin-row-refunded .admin-inp[disabled] { opacity: .55; cursor: not-allowed; }
+  /* Archived campers: whole row visibly greyed out and locked */
+  .admin-row-archived td { background: #F5F5F4; }
+  .admin-row-archived { opacity: .58; filter: grayscale(0.4); }
+  .admin-row-archived .admin-inp[disabled],
+  .admin-row-archived .admin-check[disabled] { opacity: .6; cursor: not-allowed; }
+  .archive-badge {
+    display: inline-flex; align-items: center; gap: 3px; margin-left: 8px;
+    background: #E5E7EB; color: #4B5563; border: 1px solid #C8CCD2;
+    padding: 1px 8px; border-radius: 999px; font-size: 10px;
+    font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+    font-family: var(--font-sans, Inter), sans-serif;
+  }
   .admin-refund { font-weight: 600; color: #8A6D2F; }
   .admin-totals-row td {
     border-top: 2px solid var(--border); background: var(--sidebar-bg);
@@ -2475,8 +2510,8 @@
 
         <!-- Consent report -->
         <div id="rtab-consent">
+          <div class="report-week-btns" id="consentWeekBtns"></div>
           <div class="report-controls">
-            <select id="consentWeekSel" onchange="renderConsentReport()"></select>
             <div class="report-controls-right">
               <button class="btn btn-sm" id="copySplashBtn" onclick="copyMissingConsentEmails('splash')" title="Copy primary parent emails of campers missing Splash Pad consent">
                 <i class="ti ti-mail"></i> Emails: missing Splash Pad
@@ -3785,23 +3820,43 @@ function showPage(id, btn) {
 // per CHILD (camperKey) since consent/allergies/notes are per-child, not
 // per-week-registration. Refunded campers are excluded everywhere.
 
+// Currently selected week in the consent report ('all' or a week start date).
+let _consentWeek = 'all';
+
 function renderReports() {
   if (window._userRole !== 'admin') {
     showToast('Reports are restricted to administrators', 'error');
     showPage('roster');
     return;
   }
-  // Populate the week selector once.
-  const sel = document.getElementById('consentWeekSel');
-  if (sel && !sel.options.length && typeof WEEKS !== 'undefined') {
-    const all = document.createElement('option');
-    all.value = 'all'; all.textContent = 'All weeks';
-    sel.appendChild(all);
-    WEEKS.forEach((wk, i) => {
-      const o = document.createElement('option');
-      o.value = wk.start;
-      o.textContent = `Week ${i + 1} — ${weekLabel(wk.start)}`;
-      sel.appendChild(o);
+  // Build the week buttons once — same .week-btn pattern as the Weekly and
+  // Activities pages, plus a leading "All weeks" button.
+  const btnRow = document.getElementById('consentWeekBtns');
+  if (btnRow && btnRow.children.length === 0 && typeof WEEKS !== 'undefined') {
+    const allBtn = document.createElement('button');
+    allBtn.className = 'week-btn';
+    allBtn.dataset.weekStart = 'all';
+    allBtn.onclick = () => selectConsentWeek('all');
+    allBtn.innerHTML = '<div class="week-btn-label">All weeks</div>' +
+                       '<div class="week-btn-dates">Whole summer</div>';
+    btnRow.appendChild(allBtn);
+    WEEKS.forEach(wk => {
+      const parts = (wk.label || '').split(' (');
+      const name = parts[0] || wk.start;
+      const dates = parts[1] ? parts[1].replace(')', '') : '';
+      const btn = document.createElement('button');
+      btn.className = 'week-btn';
+      btn.dataset.weekStart = wk.start;
+      btn.onclick = () => selectConsentWeek(wk.start);
+      btn.innerHTML = '<div class="week-btn-label">' + esc(name) + '</div>' +
+                      (dates ? '<div class="week-btn-dates">' + esc(dates) + '</div>' : '');
+      btnRow.appendChild(btn);
+    });
+  }
+  // Refresh active state each visit.
+  if (btnRow) {
+    btnRow.querySelectorAll('.week-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.weekStart === _consentWeek);
     });
   }
   // Render whichever tab is active.
@@ -3812,6 +3867,18 @@ function renderReports() {
   else renderNotesReport();
 }
 window.renderReports = renderReports;
+
+function selectConsentWeek(weekStart) {
+  _consentWeek = weekStart;
+  const btnRow = document.getElementById('consentWeekBtns');
+  if (btnRow) {
+    btnRow.querySelectorAll('.week-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.weekStart === weekStart);
+    });
+  }
+  renderConsentReport();
+}
+window.selectConsentWeek = selectConsentWeek;
 
 function showReportTab(name, btn) {
   document.querySelectorAll('#page-reports .admin-tab').forEach(b => b.classList.remove('active'));
@@ -3830,7 +3897,7 @@ window.showReportTab = showReportTab;
 // week). Consent counts as given if ANY of the child's registrations has it.
 function consentGroupsForWeek(weekStart) {
   const active = (window.campers || []).filter(c =>
-    !c.refunded && (weekStart === 'all' || c.weekStart === weekStart));
+    !c.refunded && !c.archived && (weekStart === 'all' || c.weekStart === weekStart));
   const byChild = new Map();
   active.forEach(c => {
     const k = camperKey(c);
@@ -3849,9 +3916,8 @@ function consentGroupsForWeek(weekStart) {
 
 function renderConsentReport() {
   const body = document.getElementById('consentReportBody');
-  const sel = document.getElementById('consentWeekSel');
-  if (!body || !sel) return;
-  const rows = consentGroupsForWeek(sel.value || 'all');
+  if (!body) return;
+  const rows = consentGroupsForWeek(_consentWeek || 'all');
   if (!rows.length) {
     body.innerHTML = '<div class="report-empty">No campers found for this week.</div>';
     return;
@@ -3874,8 +3940,7 @@ window.renderConsentReport = renderConsentReport;
 // Copy the primary parent emails of campers missing the given consent for the
 // currently selected week. kind: 'splash' | 'photo'.
 async function copyMissingConsentEmails(kind) {
-  const sel = document.getElementById('consentWeekSel');
-  const rows = consentGroupsForWeek(sel ? (sel.value || 'all') : 'all');
+  const rows = consentGroupsForWeek(_consentWeek || 'all');
   const missing = rows.filter(r => kind === 'splash' ? !r.splash : !r.photo);
   const seen = new Set();
   const emails = [];
@@ -3932,7 +3997,7 @@ function renderAllergyReport() {
   const body = document.getElementById('allergyReportBody');
   if (!body) return;
   const byChild = new Map();
-  (window.campers || []).filter(c => !c.refunded).forEach(c => {
+  (window.campers || []).filter(c => !c.refunded && !c.archived).forEach(c => {
     const k = camperKey(c);
     if (!k || k === '|') return;
     const txt = (c.allergies && String(c.allergies).trim()) || '';
@@ -3957,7 +4022,7 @@ function renderNotesReport() {
   const body = document.getElementById('notesReportBody');
   if (!body) return;
   const byChild = new Map();
-  (window.campers || []).filter(c => !c.refunded).forEach(c => {
+  (window.campers || []).filter(c => !c.refunded && !c.archived).forEach(c => {
     const k = camperKey(c);
     if (!k || k === '|') return;
     const txt = (c.notes && String(c.notes).trim()) || '';
@@ -5622,11 +5687,13 @@ function groupCampers(includeRefunded = false) {
 
 // ── Stats ──
 function renderStats() {
-  const groups = groupCampers();
+  // Archived campers appear on the Campers page but don't count toward
+  // enrollment stats — the numbers reflect active attendance.
+  const groups = groupCampers().filter(g => !(g.registrations || []).every(r => r.archived));
   const totalUnique = groups.length;
   const weeklyUnique = groups.filter(g => g.registrations.some(r => r.type==='weekly')).length;
   const dailyUnique  = groups.filter(g => g.registrations.some(r => r.type==='daily')).length;
-  const totalRegs = window.campers.filter(c => !c.refunded).length;
+  const totalRegs = window.campers.filter(c => !c.refunded && !c.archived).length;
   document.getElementById('statsGrid').innerHTML = `
     <div class="stat-card">
       <div class="stat-card-head">
@@ -5657,7 +5724,7 @@ function renderStats() {
 // pre/post-care signups. Refunded campers are excluded so the dashboard
 // reflects who's actually attending.
 function dashboardWeekData() {
-  const campers = (window.campers || []).filter(c => !c.refunded);
+  const campers = (window.campers || []).filter(c => !c.refunded && !c.archived);
   return WEEKS.map(wk => {
     const weekCampers = dedupeRegistrations(campers.filter(c => c.weekStart === wk.start));
     let weekly = 0, daily = 0, pre = 0, post = 0;
@@ -7664,7 +7731,9 @@ function renderRoster() {
     const hasPost = g.registrations.some(r => r.postDays?.length);
     const okSplash = g.registrations.some(r => r.consentSplash);
     const okPhoto  = g.registrations.some(r => r.consentPhoto);
-    return `<div class="camper-card" onclick="openDetail('${firstReg.id}')">
+    const isArchived = g.registrations.every(r => r.archived);
+    return `<div class="camper-card${isArchived ? ' camper-card-archived' : ''}" onclick="openDetail('${firstReg.id}')">
+      ${isArchived ? '<div class="archived-ribbon"><i class="ti ti-archive"></i> ARCHIVED</div>' : ''}
       <div class="card-header">
         <div class="avatar" style="background:${bg};color:${fg}">${esc(ini)}</div>
         <div>
@@ -7699,7 +7768,7 @@ function rWeekly() {
   }
 
   // All registrations for this week
-  let wkCampers = window.campers.filter(c => c.weekStart === weeklyWk && !c.refunded);
+  let wkCampers = window.campers.filter(c => c.weekStart === weeklyWk && !c.refunded && !c.archived);
   // SAFETY NET: collapse any duplicate registrations for the same child+week+
   // type that may exist in the data (e.g. from older imports before dedup was
   // enforced). Keep the most recently updated one. This ensures each camper
@@ -7903,7 +7972,7 @@ function refreshEmailList() {
   if (!sel || !textEl) return;
   const val = sel.value;
   // Pick campers to include: single week (weekStart match) OR all weeks.
-  const roster = (window.campers || []).filter(c => !c.refunded && (
+  const roster = (window.campers || []).filter(c => !c.refunded && !c.archived && (
     val === '__all__' ? true : c.weekStart === val
   ));
   // Extract every non-empty PRIMARY parent email, dedup case-insensitively
@@ -7974,7 +8043,7 @@ function openPhoneList() {
   // Deduplicate: one record per child, across all weeks. Keep the most
   // complete record — the one with the most parent/phone fields filled in — so
   // we don't lose a secondary parent that only exists on one registration.
-  const active = (window.campers || []).filter(c => !c.refunded);
+  const active = (window.campers || []).filter(c => !c.refunded && !c.archived);
   const fieldScore = (c) => ['parent', 'phone', 'parent2', 'phone2']
     .reduce((n, f) => n + (c[f] && String(c[f]).trim() ? 1 : 0), 0);
   const byChild = new Map();
@@ -8387,7 +8456,7 @@ function doPrint() {
   const subtitle = targetDate.toLocaleDateString('en-CA', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
   const dateLine = weekLabel(weeklyWk);
   const campers = dedupeRegistrations(window.campers
-    .filter(c => c.weekStart === weeklyWk && !c.refunded && (c.campDays || []).includes(dayIdx)))
+    .filter(c => c.weekStart === weeklyWk && !c.refunded && !c.archived && (c.campDays || []).includes(dayIdx)))
     .sort((a,b) => ((a.last||'')+(a.first||'')).localeCompare((b.last||'')+(b.first||'')));
 
   const rowsHtml = campers.length
@@ -8525,6 +8594,7 @@ function openDetail(key) {
       <button class="detail-close" onclick="closeDetail()"><i class="ti ti-x"></i></button>
     </div>
     ${c.allergies?`<div class="allergy-alert"><i class="ti ti-alert-triangle"></i><strong>Allergy:</strong> ${esc(c.allergies)}</div>`:''}
+    ${c.archived?`<div class="archive-banner"><i class="ti ti-archive"></i> This camper is ARCHIVED — kept in the system but hidden from all rosters, reports, and calendars.</div>`:''}
     ${c.refunded?`<div class="refund-banner"><i class="ti ti-receipt-refund"></i> This camper has been marked as refunded and is hidden from the roster.</div>`:''}
     ${window._userRole === 'admin' ? `<div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn" style="flex:1;justify-content:center" onclick="closeDetail();openModal('${c.id}','personal')">
@@ -8534,7 +8604,10 @@ function openDetail(key) {
         <i class="ti ti-file-invoice"></i> Print invoice
       </button>
     </div>` : ''}
-    ${window._userRole === 'admin' ? `<div style="text-align:right;margin-top:8px">
+    ${window._userRole === 'admin' ? `<div style="text-align:right;margin-top:8px;display:flex;gap:14px;justify-content:flex-end;flex-wrap:wrap">
+      ${c.archived
+        ? `<button class="btn-link-subtle" onclick="toggleArchiveCamper('${jsArg(camperKey(c))}', false)"><i class="ti ti-archive-off"></i> Restore from archive</button>`
+        : `<button class="btn-link-subtle" onclick="toggleArchiveCamper('${jsArg(camperKey(c))}', true)"><i class="ti ti-archive"></i> Archive camper</button>`}
       ${c.refunded
         ? `<button class="btn-link-subtle" onclick="restoreCamper('${jsArg(camperKey(c))}')"><i class="ti ti-rotate"></i> Restore camper to roster</button>`
         : `<button class="btn-link-subtle" onclick="openRefundModal('${c.id}')"><i class="ti ti-receipt-refund"></i> Mark as refunded</button>`}
@@ -9154,7 +9227,7 @@ function rCalMonth() {
       });
   }
   const allEntries = window.campers
-    .filter(c => !c.refunded && (cF==='all' || c.type===cF))
+    .filter(c => !c.refunded && !c.archived && (cF==='all' || c.type===cF))
     .flatMap(campDates);
 
   const byDate = {};
@@ -11016,6 +11089,9 @@ function renderAdmin() {
   const body = document.getElementById('adminTableBody');
   if (!body) return;
   let groups = groupCampers(true).slice(); // include refunded; copy so we don't mutate the shared cache
+  // Archived campers stay VISIBLE in the payments table but greyed out and
+  // locked (see isArchived handling below) — their records are preserved and
+  // readable, just not editable, and they contribute $0 owing.
   if (adminSQ) {
     groups = groups.filter(g => ((g.first||'')+' '+(g.last||'')).toLowerCase().includes(adminSQ));
   }
@@ -11060,6 +11136,8 @@ function renderAdmin() {
     const rec = window.adminData.get(id) || {};
     const firstReg = g.registrations[0];
     const isRefunded = !!firstReg.refunded;
+    const isArchived = (g.registrations || []).every(r => r.archived);
+    const locked = isRefunded || isArchived;
     // Default payment method to the imported value if no admin override yet
     const importedPay = (g.registrations.find(r => r.payMethod) || {}).payMethod || '';
     const methodRaw = rec.paymentMethod != null ? rec.paymentMethod : importedPay;
@@ -11077,16 +11155,22 @@ function renderAdmin() {
     const invoiceCell = hasPdf
       ? `<div class="admin-invoice-cell">
            <button class="admin-pdf-link" onclick="viewInvoicePdf('${keyEsc}')" title="Open saved invoice PDF"><i class="ti ti-file-invoice"></i>${esc(invNum||'View PDF')}</button>
-           <i class="ti ti-mail admin-pdf-icon" title="Email invoice to parent" onclick="emailInvoice('${keyEsc}')"></i>
+           ${isArchived ? '' : `<i class="ti ti-mail admin-pdf-icon" title="Email invoice to parent" onclick="emailInvoice('${keyEsc}')"></i>
            <i class="ti ti-refresh admin-pdf-icon" title="Regenerate invoice PDF from current data" onclick="regenerateInvoiceForKey('${keyEsc}')"></i>
-           <i class="ti ti-pencil admin-pdf-icon" title="Edit invoice number" onclick="editInvoiceNumber('${keyEsc}')"></i>
+           <i class="ti ti-pencil admin-pdf-icon" title="Edit invoice number" onclick="editInvoiceNumber('${keyEsc}')"></i>`}
          </div>`
       : `<input class="admin-inp" type="text" value="${esc(invNum)}" placeholder="—"
-           onchange="updateAdminField('${keyEsc}','invoiceNumber',this.value)">`;
+           onchange="updateAdminField('${keyEsc}','invoiceNumber',this.value)" ${isArchived?'disabled':''}>`;
 
-    // Amount paid / Owed cells: refunded > paid in full > normal
+    // Amount paid / Owed cells: archived > refunded > paid in full > normal
     let paidCell, owedCell, paidInFullCell;
-    if (isRefunded) {
+    if (isArchived) {
+      // Locked, read-only view of what was recorded; owed always shows as
+      // nothing — an archived camper never contributes an outstanding amount.
+      paidCell = `<input class="admin-inp amount" type="number" value="${paidAmt}" placeholder="—" disabled>`;
+      owedCell = `<span class="admin-muted">—</span>`;
+      paidInFullCell = `<input class="admin-check" type="checkbox" ${paid?'checked':''} disabled>`;
+    } else if (isRefunded) {
       paidCell = `<input class="admin-inp amount" type="number" step="0.01" min="0" value="${paidAmt}" placeholder="0.00" disabled>`;
       const refundAmt = (rec.refundedAmount != null && rec.refundedAmount !== '') ? rec.refundedAmount : 0;
       owedCell = `<span class="admin-refund">Refunded ${money(refundAmt)}</span>`;
@@ -11104,35 +11188,47 @@ function renderAdmin() {
             onchange="updateAdminField('${keyEsc}','paidInFull',this.checked)">`;
     }
 
-    const nameCell = isRefunded
+    const nameCell = isArchived
+      ? `<button class="admin-name-btn refunded" onclick="openDetail('${firstReg.id}')">${esc(g.first)} ${esc(g.last)}</button><span class="archive-badge"><i class="ti ti-archive" style="font-size:10px"></i> Archived</span>`
+      : isRefunded
       ? `<button class="admin-name-btn refunded" onclick="openDetail('${firstReg.id}')">${esc(g.first)} ${esc(g.last)}</button><span class="refund-badge">Refunded</span>`
       : `<button class="admin-name-btn" onclick="openDetail('${firstReg.id}')">${esc(g.first)} ${esc(g.last)}</button>`;
 
-    return `<tr class="${isRefunded?'admin-row-refunded':''}">
+    return `<tr class="${isArchived?'admin-row-archived':isRefunded?'admin-row-refunded':''}">
       <td>${nameCell}</td>
       <td>${esc(g.parent||'—')}</td>
       <td>${invoiceCell}</td>
       <td><input class="admin-inp amount" type="number" step="0.01" min="0" value="${total}" placeholder="0.00"
-            onchange="updateAdminField('${keyEsc}','totalAmount',this.value)" ${isRefunded?'disabled':''}></td>
-      <td><select class="admin-inp" onchange="updateAdminField('${keyEsc}','paymentMethod',this.value)" ${isRefunded?'disabled':''}>${methodOptions}</select></td>
+            onchange="updateAdminField('${keyEsc}','totalAmount',this.value)" ${locked?'disabled':''}></td>
+      <td><select class="admin-inp" onchange="updateAdminField('${keyEsc}','paymentMethod',this.value)" ${locked?'disabled':''}>${methodOptions}</select></td>
       <td class="admin-paid-cell">${paidInFullCell}</td>
       <td>${paidCell}</td>
       <td>${owedCell}</td>
       <td><input class="admin-inp notes" type="text" value="${esc(rec.adminNotes||'')}" placeholder="Add a note…"
-            onchange="updateAdminField('${keyEsc}','adminNotes',this.value)"></td>
+            onchange="updateAdminField('${keyEsc}','adminNotes',this.value)" ${isArchived?'disabled':''}></td>
     </tr>`;
   }).join('');
 
-  // Totals (active campers only; refunded excluded). Paid-in-full counts as fully paid.
+  // Totals (refunded excluded). Paid-in-full counts as fully paid. ARCHIVED
+  // campers count only what was actually collected — invoiced is capped at
+  // the collected amount so they contribute $0 owing (per policy: archiving
+  // removes any outstanding balance from the books without erasing income).
   let totalInvoiced = 0, totalPaid = 0, totalOwed = 0, totalTax = 0;
   groups.forEach(g => {
     if (g.registrations[0] && g.registrations[0].refunded) return;
+    const gArchived = (g.registrations || []).every(x => x.archived);
     const r = window.adminData.get(adminId(g.key)) || {};
     const total = parseFloat(r.totalAmount) || 0;
-    totalInvoiced += total;
     const collected = r.paidInFull ? total : (parseFloat(r.amountPaid) || 0);
-    totalPaid += collected;
-    totalOwed += Math.max(0, total - collected);
+    if (gArchived) {
+      totalInvoiced += collected;
+      totalPaid += collected;
+      // owed += 0
+    } else {
+      totalInvoiced += total;
+      totalPaid += collected;
+      totalOwed += Math.max(0, total - collected);
+    }
     totalTax += (typeof invoiceTaxOf === 'function' ? invoiceTaxOf(collected) : 0);
   });
   const totalsRow = `<tr class="admin-totals-row">
@@ -11184,6 +11280,13 @@ window.toggleAdminSort = toggleAdminSort;
 
 // Write a single admin field (merges into the camper's admin record)
 async function updateAdminField(key, field, value) {
+  // Archived campers' payment records are locked — read-only until unarchived.
+  const regsForKey = (window.campers || []).filter(c => camperKey(c) === key);
+  if (regsForKey.length && regsForKey.every(c => c.archived)) {
+    showToast('This camper is archived — unarchive to edit payments', 'error');
+    if (typeof renderAdmin === 'function') { try { renderAdmin(); } catch (e) {} }
+    return;
+  }
   if (field === 'amountPaid' || field === 'totalAmount') {
     value = (value === '' ? null : parseFloat(value));
     if (typeof value === 'number' && !isFinite(value)) value = null; // NaN would poison totals
@@ -11283,6 +11386,38 @@ async function confirmRefund() {
     btn.disabled = false;
   }
 }
+
+// ── Archive / unarchive a camper ──
+// Archiving keeps the camper (and all their payment/invoice history) in the
+// system but removes them from every operational view — weekly rosters,
+// dashboard, calendar, reports, print sheets, phone/email lists, and the
+// payments table. They remain visible ONLY on the main Campers page, clearly
+// marked as archived. Unlike refunding, archiving does NOT affect income
+// figures — the family paid; we're just tucking the record away.
+async function toggleArchiveCamper(key, archive) {
+  if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
+  const msg = archive
+    ? 'Archive this camper?\n\nThey will disappear from rosters, reports, calendars, and lists — but stay on the Campers page marked as Archived. Payment records are kept.'
+    : 'Restore this camper from the archive?\n\nThey will reappear in all rosters, reports, and calendars.';
+  if (!confirm(msg)) return;
+  try {
+    const siblings = (window.campers || []).filter(c => camperKey(c) === key);
+    if (!siblings.length) { showToast('Camper not found', 'error'); return; }
+    for (const r of siblings) {
+      await window._updateDoc(window._doc(window._db, 'campers', r.id), {
+        archived: !!archive,
+        updatedAt: window._serverTimestamp()
+      });
+      r.archived = !!archive;
+    }
+    closeDetail();
+    if (typeof renderRoster === 'function') { try { renderRoster(); } catch (e) {} }
+    showToast(archive ? 'Camper archived' : 'Camper restored from archive');
+  } catch (e) {
+    showToast('Could not update: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+window.toggleArchiveCamper = toggleArchiveCamper;
 
 async function restoreCamper(key) {
   if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
