@@ -161,6 +161,52 @@
     border-radius: 0 3px 3px 0;
   }
 
+  /* ── Weather (Environment Canada) ─────────────────────────────────── */
+  /* The advisory banner is fixed to the very top and pushes the nav/content
+     down by --wx-banner-h, which JS sets to the banner's measured height
+     (0 when hidden). This keeps a variable-height banner from ever covering
+     the nav or the page heading. */
+  :root { --wx-banner-h: 0px; }
+  .wx-banner {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 950;              /* above the top nav (900), below modals (1000) */
+    padding: 9px 18px;
+    font-size: 13.5px; line-height: 1.45; font-weight: 600;
+    color: #fff; background: #B45309;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    box-shadow: 0 2px 10px rgba(0,0,0,.14);
+  }
+  .wx-banner.wx-warning  { background: #B91C1C; }  /* warnings — most severe */
+  .wx-banner.wx-watch    { background: #B45309; }  /* watches */
+  .wx-banner.wx-advisory { background: #92700E; }  /* statements/advisories */
+  .wx-banner.wx-stale    { background: #57534E; }  /* couldn't reach EC */
+  .wx-banner i { font-size: 17px; flex-shrink: 0; }
+  .wx-banner-items { flex: 1; min-width: 0; }
+  .wx-banner-item { display: block; }
+  .wx-banner-item + .wx-banner-item { margin-top: 2px; opacity: .92; }
+  .wx-banner a {
+    color: #fff; text-decoration: underline; white-space: nowrap;
+    font-weight: 700; opacity: .95;
+  }
+  .wx-banner a:hover { opacity: 1; }
+
+  /* Current conditions card on the Dashboard */
+  .wx-now {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px 18px; margin-bottom: 20px;
+  }
+  .wx-now-main { display: flex; align-items: center; gap: 12px; }
+  .wx-now-icon { font-size: 30px; color: var(--green); }
+  .wx-now-temp { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+  .wx-now-cond { font-size: 13px; color: var(--text-2); margin-top: 3px; }
+  .wx-now-stats { display: flex; gap: 20px; flex-wrap: wrap; margin-left: auto; }
+  .wx-stat-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); }
+  .wx-stat-value { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 2px; }
+  .wx-stat-value.wx-hot { color: var(--coral); }
+  .wx-now-src { font-size: 11px; color: var(--text-3); width: 100%; }
+  .wx-now-src a { color: var(--text-3); text-decoration: underline; }
+
   /* ── Desktop floating top nav ─────────────────────────────────────── */
   /* Hidden by default (mobile uses the bottom nav). On desktop it replaces
      the sidebar entirely. Two visual states:
@@ -173,15 +219,15 @@
 
   @media (min-width: 769px) {
     aside.sidebar { display: none; }
-    main.main-content { margin-left: 0; padding-top: 72px; }
+    main.main-content { margin-left: 0; padding-top: calc(72px + var(--wx-banner-h, 0px)); }
 
     .top-nav {
       display: block;
       position: fixed;
-      top: 0; left: 0; right: 0;
+      top: var(--wx-banner-h, 0px); left: 0; right: 0;
       z-index: 900;
       padding: 0;
-      transition: padding .28s ease;
+      transition: padding .28s ease, top .2s ease;
       pointer-events: none; /* the inner bar re-enables; lets clicks pass around the pill */
     }
     .top-nav-inner {
@@ -1811,7 +1857,7 @@
     .sidebar { display: none; }
     .mobile-nav { display: block; }
     .mobile-sync-bar { display: flex; }
-    .main-content { margin-left: 0; padding-bottom: 72px; }
+    .main-content { margin-left: 0; padding-bottom: 72px; padding-top: var(--wx-banner-h, 0px); }
 
     /* ── Top bar ── */
     .top-bar { padding: 11px 14px; gap: 6px; flex-wrap: nowrap; }
@@ -2289,6 +2335,10 @@
 </head>
 <body>
 
+<!-- Environment Canada weather advisory banner. Hidden unless there is an
+     active alert (or a fetch failure) for the camp's forecast region. -->
+<div id="wxBanner" class="wx-banner" style="display:none" role="alert" aria-live="polite"></div>
+
 <div class="loading-screen" id="loadingScreen">
   <div class="loading-logo">⛺</div>
   <div class="loading-text">Loading camp data…</div>
@@ -2476,6 +2526,7 @@
         </button>
       </div>
       <div style="padding:28px var(--page-pad-x)">
+        <div id="wxNow" class="wx-now" style="display:none"></div>
         <div class="stats-grid" id="statsGrid"></div>
         <div class="camper-grid" id="camperGrid"></div>
       </div>
@@ -7351,6 +7402,194 @@ window.actImportFromText = actImportFromText;
 // lives in camp-url-fetcher.js in this repo. CORS-locked to the camp app's
 // origins so it can't be used as a free public proxy.
 const CAMP_URL_FETCHER = 'https://campurlfetcher.littleladybugscamp.workers.dev';
+
+// ════════════════════ WEATHER (Environment Canada) ════════════════════
+// Two tiers, deliberately:
+//   1. ADVISORY BANNER — only shown when EC has an active alert for the camp's
+//      forecast region. Silence the rest of the time so it never becomes
+//      wallpaper that staff stop noticing.
+//   2. CURRENT CONDITIONS — a quiet card on the Dashboard with the numbers that
+//      actually drive camp decisions: temperature, humidex, and UV index.
+//
+// This is an AWARENESS NUDGE, not a safety system. If the fetch fails we say so
+// explicitly rather than showing nothing, because a silent failure would read
+// as "all clear" — the dangerous failure mode for a kids' camp.
+
+// Caledonia, ON (Haldimand). Coordinates are EC's own for the community.
+const WX_LAT = 43.069, WX_LON = -79.954;
+// EC public-alert forecast region: on33 = "Dunnville - Caledonia - Haldimand".
+const WX_REGION = 'on33';
+const WX_ALERT_FEED = `https://weather.gc.ca/rss/battleboard/${WX_REGION}_e.xml`;
+const WX_ALERT_PAGE = `https://weather.gc.ca/warnings/report_e.html?${WX_REGION}=`;
+const WX_FORECAST_PAGE = `https://weather.gc.ca/en/location/index.html?coords=${WX_LAT},${WX_LON}`;
+const WX_REFRESH_MS = 15 * 60 * 1000;  // re-check every 15 minutes
+
+// Open-Meteo WMO weather codes → short label + Tabler icon.
+const WX_CODES = {
+  0:['Clear','ti-sun'], 1:['Mainly clear','ti-sun'], 2:['Partly cloudy','ti-cloud'], 3:['Overcast','ti-cloud'],
+  45:['Fog','ti-mist'], 48:['Freezing fog','ti-mist'],
+  51:['Light drizzle','ti-cloud-rain'], 53:['Drizzle','ti-cloud-rain'], 55:['Heavy drizzle','ti-cloud-rain'],
+  56:['Freezing drizzle','ti-cloud-rain'], 57:['Freezing drizzle','ti-cloud-rain'],
+  61:['Light rain','ti-cloud-rain'], 63:['Rain','ti-cloud-rain'], 65:['Heavy rain','ti-cloud-storm'],
+  66:['Freezing rain','ti-cloud-rain'], 67:['Freezing rain','ti-cloud-storm'],
+  71:['Light snow','ti-snowflake'], 73:['Snow','ti-snowflake'], 75:['Heavy snow','ti-snowflake'],
+  77:['Snow grains','ti-snowflake'],
+  80:['Showers','ti-cloud-rain'], 81:['Showers','ti-cloud-rain'], 82:['Heavy showers','ti-cloud-storm'],
+  85:['Snow showers','ti-snowflake'], 86:['Snow showers','ti-snowflake'],
+  95:['Thunderstorm','ti-bolt'], 96:['Thunderstorm w/ hail','ti-bolt'], 99:['Thunderstorm w/ hail','ti-bolt'],
+};
+
+// Humidex, the Canadian standard EC quotes in heat warnings. Computed from
+// temperature + dew point per the Environment Canada formula. Only meaningful
+// above ~20°C; below that EC doesn't report it.
+function wxHumidex(tempC, dewC) {
+  if (typeof tempC !== 'number' || typeof dewC !== 'number') return null;
+  if (tempC < 20) return null;
+  const e = 6.11 * Math.exp(5417.7530 * ((1 / 273.16) - (1 / (273.15 + dewC))));
+  const h = tempC + 0.5555 * (e - 10);
+  return (h > tempC) ? Math.round(h) : null;
+}
+
+// Fetch a URL directly; if that's blocked (EC doesn't send CORS headers), retry
+// through the camp's Cloudflare Worker, which adds them.
+async function wxFetchText(url) {
+  try {
+    const r = await fetch(url, { cache: 'no-store' });
+    if (r.ok) return await r.text();
+  } catch (e) { /* CORS or network — fall through to the proxy */ }
+  const r2 = await fetch(`${CAMP_URL_FETCHER}/?url=${encodeURIComponent(url)}`, { cache: 'no-store' });
+  if (!r2.ok) throw new Error('Alert feed unreachable (' + r2.status + ')');
+  return await r2.text();
+}
+
+// Parse EC's ATOM alert feed. Entries are titled like:
+//   "HEAT WARNING IN EFFECT"  /  "No watches or warnings in effect"
+// We keep only entries that represent an ACTIVE alert.
+function wxParseAlerts(xmlText) {
+  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  if (doc.querySelector('parsererror')) throw new Error('Could not read the alert feed');
+  const out = [];
+  doc.querySelectorAll('entry').forEach(en => {
+    const title = (en.querySelector('title')?.textContent || '').trim();
+    if (!title) return;
+    const low = title.toLowerCase();
+    // EC publishes a placeholder entry when nothing is active.
+    if (low.includes('no watches or warnings') || low.includes('no alerts in effect')) return;
+    // Ignore the feed's own non-alert entries (ended alerts say "ENDED").
+    if (low.includes('ended')) return;
+    let sev = 'advisory';
+    if (low.includes('warning')) sev = 'warning';
+    else if (low.includes('watch')) sev = 'watch';
+    else if (low.includes('statement') || low.includes('advisory')) sev = 'advisory';
+    else return; // not an alert-shaped entry
+    out.push({ title: title.replace(/\s+/g, ' ').trim(), severity: sev });
+  });
+  return out;
+}
+
+function wxRenderBanner(alerts, errorMsg) {
+  const el = document.getElementById('wxBanner');
+  if (!el) return;
+  const setH = () => {
+    const h = (el.style.display === 'none') ? 0 : el.offsetHeight;
+    document.documentElement.style.setProperty('--wx-banner-h', h + 'px');
+  };
+  if (errorMsg) {
+    // Explicit failure state — never let "no banner" imply "all clear".
+    el.className = 'wx-banner wx-stale';
+    el.innerHTML = `<i class="ti ti-cloud-off"></i>
+      <span class="wx-banner-items"><span class="wx-banner-item">Weather alerts unavailable — check Environment Canada directly.</span></span>
+      <a href="${WX_ALERT_PAGE}" target="_blank" rel="noopener">Open EC</a>`;
+    el.style.display = 'flex';
+    requestAnimationFrame(setH);
+    return;
+  }
+  if (!alerts || !alerts.length) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    setH();
+    return;
+  }
+  // Banner colour follows the most severe active alert.
+  const rank = { warning: 3, watch: 2, advisory: 1 };
+  const worst = alerts.reduce((a, b) => (rank[b.severity] > rank[a.severity] ? b : a));
+  el.className = 'wx-banner wx-' + worst.severity;
+  el.innerHTML = `<i class="ti ti-alert-triangle-filled"></i>
+    <span class="wx-banner-items">${alerts.map(a => `<span class="wx-banner-item">${esc(a.title)}</span>`).join('')}</span>
+    <a href="${WX_ALERT_PAGE}" target="_blank" rel="noopener">Details — Environment Canada</a>`;
+  el.style.display = 'flex';
+  requestAnimationFrame(setH);
+}
+
+function wxRenderNow(data) {
+  const el = document.getElementById('wxNow');
+  if (!el) return;
+  if (!data) { el.style.display = 'none'; return; }
+  const [label, icon] = WX_CODES[data.code] || ['—', 'ti-cloud'];
+  const hx = wxHumidex(data.temp, data.dew);
+  // EC treats humidex 40+ as the point where heat becomes a real risk.
+  const hxHot = (hx != null && hx >= 35) ? ' wx-hot' : '';
+  const uvHot = (data.uv != null && data.uv >= 8) ? ' wx-hot' : '';
+  el.innerHTML = `
+    <div class="wx-now-main">
+      <i class="ti ${icon} wx-now-icon"></i>
+      <div>
+        <div class="wx-now-temp">${Math.round(data.temp)}°C</div>
+        <div class="wx-now-cond">${esc(label)} · Caledonia</div>
+      </div>
+    </div>
+    <div class="wx-now-stats">
+      ${hx != null ? `<div><div class="wx-stat-label">Humidex</div><div class="wx-stat-value${hxHot}">${hx}</div></div>` : ''}
+      ${data.uv != null ? `<div><div class="wx-stat-label">UV index</div><div class="wx-stat-value${uvHot}">${Math.round(data.uv)}</div></div>` : ''}
+      ${data.wind != null ? `<div><div class="wx-stat-label">Wind</div><div class="wx-stat-value">${Math.round(data.wind)} km/h</div></div>` : ''}
+    </div>
+    <div class="wx-now-src">Conditions via Open-Meteo (Environment Canada model) · <a href="${WX_FORECAST_PAGE}" target="_blank" rel="noopener">Full EC forecast</a></div>`;
+  el.style.display = 'flex';
+}
+
+async function wxRefresh() {
+  // Conditions — Open-Meteo is CORS-enabled and needs no API key (important:
+  // this file is public on GitHub, so a keyed API would leak its key).
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${WX_LAT}&longitude=${WX_LON}` +
+      `&current=temperature_2m,dew_point_2m,weather_code,wind_speed_10m` +
+      `&daily=uv_index_max&timezone=America/Toronto&forecast_days=1`;
+    const r = await fetch(url, { cache: 'no-store' });
+    if (!r.ok) throw new Error('conditions ' + r.status);
+    const j = await r.json();
+    wxRenderNow({
+      temp: j.current?.temperature_2m,
+      dew:  j.current?.dew_point_2m,
+      code: j.current?.weather_code,
+      wind: j.current?.wind_speed_10m,
+      uv:   j.daily?.uv_index_max?.[0],
+    });
+  } catch (e) {
+    console.warn('Weather conditions unavailable:', e.message);
+    wxRenderNow(null);   // just hide the card; the banner carries the safety load
+  }
+  // Alerts — the part that actually matters.
+  try {
+    const xml = await wxFetchText(WX_ALERT_FEED);
+    wxRenderBanner(wxParseAlerts(xml), null);
+  } catch (e) {
+    console.warn('Weather alerts unavailable:', e.message);
+    wxRenderBanner(null, e.message || 'unavailable');
+  }
+}
+window.wxRefresh = wxRefresh;
+
+// Kick off once the app is up, then poll. Also re-check when the tab regains
+// focus, so a phone left open overnight isn't showing yesterday's alerts.
+setTimeout(wxRefresh, 1200);
+setInterval(wxRefresh, WX_REFRESH_MS);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) wxRefresh(); });
+window.addEventListener('resize', () => {
+  const el = document.getElementById('wxBanner');
+  if (el && el.style.display !== 'none') {
+    document.documentElement.style.setProperty('--wx-banner-h', el.offsetHeight + 'px');
+  }
+});
 
 // ── Smart HTML article extraction ──
 // Strips navigation/sidebar/footer junk before parsing so we don't pollute
