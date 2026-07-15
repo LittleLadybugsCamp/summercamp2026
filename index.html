@@ -3612,6 +3612,12 @@ function startDataListeners() {
     if (typeof window.populateWeekButtons === 'function') window.populateWeekButtons();
     const wk = document.getElementById('page-weekly');
     if (typeof window.rWeekly === 'function' && wk && wk.classList.contains('active')) window.rWeekly();
+    // Keep the Admin payments table and Reports page live too — camper-level
+    // changes (archive flag, consent, renames) affect both.
+    const adm = document.getElementById('page-admin');
+    if (typeof window.renderAdmin === 'function' && adm && adm.classList.contains('active')) window.renderAdmin();
+    const rep = document.getElementById('page-reports');
+    if (typeof window.renderReports === 'function' && rep && rep.classList.contains('active') && window._userRole === 'admin') window.renderReports();
   }
   _unsubscribers.push(onSnapshot(campersRef, (snapshot) => {
     window.campers = [];
@@ -8615,9 +8621,9 @@ function openDetail(key) {
       <button class="btn" style="flex:1;justify-content:center" onclick="closeDetail();openModal('${c.id}','personal')">
         <i class="ti ti-edit"></i> Edit details
       </button>
-      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openInvoice('${c.id}')">
+      ${c.archived ? '' : `<button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openInvoice('${c.id}')">
         <i class="ti ti-file-invoice"></i> Print invoice
-      </button>
+      </button>`}
     </div>` : ''}
     ${window._userRole === 'admin' ? `<div style="text-align:right;margin-top:8px;display:flex;gap:14px;justify-content:flex-end;flex-wrap:wrap">
       ${c.archived
@@ -10739,8 +10745,21 @@ function invoiceFooterText(payMethod, hasDaily) {
   return 'Thank you for registering.';
 }
 
+// True when every registration for this camper key/id is archived. Used to
+// lock invoice + payment mutations for archived campers.
+function isCamperArchived(keyOrId) {
+  let key = keyOrId;
+  if (keyOrId && !String(keyOrId).includes('|')) {
+    const c = (window.campers || []).find(x => x.id === keyOrId);
+    if (c) key = camperKey(c);
+  }
+  const regs = (window.campers || []).filter(c => camperKey(c) === key);
+  return regs.length > 0 && regs.every(c => c.archived);
+}
+
 function openInvoice(keyOrId) {
   if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
+  if (isCamperArchived(keyOrId)) { showToast('This camper is archived — unarchive to manage invoices', 'error'); return; }
   // Accept either a group key ("first|last") or a single camper id
   let key = keyOrId;
   if (keyOrId && !keyOrId.includes('|')) {
@@ -11364,6 +11383,7 @@ async function updateAdminFieldBulk(key, patch) {
 }
 
 function editInvoiceNumber(key) {
+  if (isCamperArchived(key)) { showToast('This camper is archived — unarchive to manage invoices', 'error'); return; }
   const rec = window.adminData.get(adminId(key)) || {};
   const v = prompt('Invoice number:', rec.invoiceNumber || '');
   if (v !== null) updateAdminField(key, 'invoiceNumber', v.trim());
@@ -11545,6 +11565,7 @@ async function autoGenerateInvoiceForKey(key) {
 // the saved copy in Admin. Used when registrations have been edited (e.g., duplicates
 // removed) and the existing PDF no longer matches reality.
 async function regenerateInvoiceForKey(key) {
+  if (isCamperArchived(key)) { showToast('This camper is archived — unarchive to manage invoices', 'error'); return; }
   const group = groupCampers(true).find(g => g.key === key);
   if (!group) { showToast('Could not find that camper.', 'error'); return; }
   const childName = `${group.first||''} ${group.last||''}`.trim() || 'this camper';
@@ -11627,6 +11648,7 @@ Little Ladybugs Camp Team
 };
 
 async function emailInvoice(key) {
+  if (isCamperArchived(key)) { showToast('This camper is archived — unarchive to manage invoices', 'error'); return; }
   console.log('[emailInvoice v2] click for', key);
   // Show an immediate toast so the user gets visual confirmation that the click
   // registered — even before the async PDF fetch completes.
