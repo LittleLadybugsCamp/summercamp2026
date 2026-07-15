@@ -1086,6 +1086,52 @@
   .report-row-text .report-name { flex: 0 0 auto; min-width: 180px; }
   .report-text { flex: 1; font-size: 13.5px; color: var(--text-2); line-height: 1.45; min-width: 200px; }
   .report-empty { padding: 28px; text-align: center; color: var(--text-3); font-size: 14px; }
+
+  /* Email hub — big action buttons */
+  .email-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .email-action {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 16px 16px;
+    text-align: left;
+    cursor: pointer;
+    display: flex; flex-direction: column; gap: 6px;
+    font-family: inherit;
+    transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease, background .2s ease;
+  }
+  .email-action i { font-size: 26px; color: var(--green); }
+  .email-action .ea-title { font-weight: 700; font-size: 15px; color: var(--text); }
+  .email-action .ea-desc { font-size: 12.5px; color: var(--text-2); line-height: 1.4; }
+  .email-action:hover {
+    border-color: var(--green);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,.07);
+  }
+  .email-action.copied {
+    border-color: var(--green);
+    background: var(--green-light);
+  }
+  /* Copy button pinned to the top-right of the email output box */
+  .email-out-wrap { position: relative; }
+  .email-out-wrap textarea { width: 100%; padding-right: 96px; }
+  .email-out-copy {
+    position: absolute; top: 8px; right: 8px;
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--green); color: #fff;
+    border: none; border-radius: 9px;
+    padding: 6px 12px; font-size: 12.5px; font-weight: 600;
+    font-family: inherit; cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12);
+    transition: filter .15s ease, background .2s ease;
+  }
+  .email-out-copy:hover { filter: brightness(1.06); }
+  .email-out-copy.copied { background: var(--text-2); }
   @media (max-width: 640px) {
     .report-row-text { flex-direction: column; gap: 4px; }
     .report-row-text .report-name { min-width: 0; }
@@ -2442,9 +2488,6 @@
         <button class="btn btn-icon" onclick="toggleSearch('weeklySearchBar','weeklySearchInput')" aria-label="Search">
           <i class="ti ti-search"></i>
         </button>
-        <button class="btn btn-icon admin-only-btn" onclick="openEmailList()" aria-label="Copy parent emails" title="Copy parent emails">
-          <i class="ti ti-mail"></i>
-        </button>
         <button class="btn btn-icon" onclick="openPrint()" aria-label="Print">
           <i class="ti ti-printer"></i>
         </button>
@@ -2503,24 +2546,52 @@
       </div>
       <div style="padding: 6px var(--page-pad-x) 28px">
         <div class="admin-tabs">
-          <button class="admin-tab active" data-rtab="consent" onclick="showReportTab('consent',this)"><i class="ti ti-checklist"></i> Consent</button>
+          <button class="admin-tab active" data-rtab="email" onclick="showReportTab('email',this)"><i class="ti ti-mail"></i> Email</button>
+          <button class="admin-tab" data-rtab="consent" onclick="showReportTab('consent',this)"><i class="ti ti-checklist"></i> Consent</button>
           <button class="admin-tab" data-rtab="allergies" onclick="showReportTab('allergies',this)"><i class="ti ti-alert-triangle"></i> Allergies</button>
           <button class="admin-tab" data-rtab="notes" onclick="showReportTab('notes',this)"><i class="ti ti-notes"></i> Notes</button>
         </div>
 
-        <!-- Consent report -->
-        <div id="rtab-consent">
-          <div class="report-week-btns" id="consentWeekBtns"></div>
-          <div class="report-controls">
-            <div class="report-controls-right">
-              <button class="btn btn-sm" id="copySplashBtn" onclick="copyMissingConsentEmails('splash')" title="Copy primary parent emails of campers missing Splash Pad consent">
-                <i class="ti ti-mail"></i> Emails: missing Splash Pad
-              </button>
-              <button class="btn btn-sm" id="copyPhotoBtn" onclick="copyMissingConsentEmails('photo')" title="Copy primary parent emails of campers missing Photo consent">
-                <i class="ti ti-mail"></i> Emails: missing Photo
+        <!-- Email hub -->
+        <div id="rtab-email">
+          <div class="report-intro">Pick a week, then tap an option — the email addresses are copied to your clipboard and shown below, ready to paste into BCC. Secondary parents are included where "Include in email lists" is on.</div>
+          <div class="report-week-btns" id="emailWeekBtns"></div>
+          <div class="email-actions-grid">
+            <button class="email-action" onclick="copyReportEmails('all', this)">
+              <i class="ti ti-users"></i>
+              <span class="ea-title">All parents</span>
+              <span class="ea-desc">Every camper registered in the selected week</span>
+            </button>
+            <button class="email-action" onclick="copyReportEmails('new', this)">
+              <i class="ti ti-user-plus"></i>
+              <span class="ea-title">New campers this week</span>
+              <span class="ea-desc">Only campers whose FIRST week of camp is the selected week</span>
+            </button>
+            <button class="email-action" onclick="copyReportEmails('splash', this)">
+              <i class="ti ti-ripple"></i>
+              <span class="ea-title">Missing Splash Pad consent</span>
+              <span class="ea-desc">Parents who haven't submitted splash pad consent</span>
+            </button>
+            <button class="email-action" onclick="copyReportEmails('photo', this)">
+              <i class="ti ti-camera"></i>
+              <span class="ea-title">Missing Photo consent</span>
+              <span class="ea-desc">Parents who haven't submitted photo consent</span>
+            </button>
+          </div>
+          <div class="form-group" style="margin-top:16px">
+            <div class="email-out-wrap">
+              <textarea id="emailReportOut" readonly rows="5" onclick="this.select()" placeholder="Tap an option above — the emails will appear here (and are copied automatically)."></textarea>
+              <button class="email-out-copy" id="emailReportCopyBtn" onclick="copyEmailReportOut()" title="Copy emails to clipboard">
+                <i class="ti ti-copy"></i> Copy
               </button>
             </div>
+            <div class="form-hint" id="emailReportHint"></div>
           </div>
+        </div>
+
+        <!-- Consent report -->
+        <div id="rtab-consent" style="display:none">
+          <div class="report-week-btns" id="consentWeekBtns"></div>
           <div id="consentReportBody"><div class="report-empty">Loading…</div></div>
         </div>
 
@@ -3038,31 +3109,6 @@
     <button class="btn btn-primary" onclick="doPrint()" style="width:100%">
       <i class="ti ti-printer"></i> Print
     </button>
-  </div>
-</div>
-
-<!-- Parent email list -->
-<div class="modal-overlay" id="emailListOverlay">
-  <div class="modal" style="max-width:560px">
-    <div class="modal-header">
-      <div class="modal-title"><i class="ti ti-mail" style="margin-right:6px"></i>Copy parent emails</div>
-      <button class="btn btn-ghost btn-icon" onclick="closeEmailList()" aria-label="Close"><i class="ti ti-x"></i></button>
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="emailListWeekSel">Week</label>
-      <select id="emailListWeekSel" onchange="refreshEmailList()"></select>
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="emailListText">
-        Emails <span id="emailListCount" class="email-list-count"></span>
-      </label>
-      <textarea id="emailListText" readonly rows="8" onclick="this.select()"></textarea>
-      <div class="form-hint">Primary parent emails, plus secondary parents where "Include in email lists" is turned on in the camper's card. Comma-separated — paste into your email client's To or BCC field. Tap the text box to select all.</div>
-    </div>
-    <div class="email-list-actions">
-      <button class="btn btn-primary" onclick="copyEmailList()" id="emailListCopyBtn"><i class="ti ti-copy"></i> Copy</button>
-      <button class="btn" onclick="closeEmailList()">Close</button>
-    </div>
   </div>
 </div>
 
@@ -3828,6 +3874,43 @@ function showPage(id, btn) {
 
 // Currently selected week in the consent report ('all' or a week start date).
 let _consentWeek = 'all';
+// Currently selected week in the Email hub.
+let _emailWeek = 'all';
+
+// Build a week-button row (All weeks + Week 1..N) into the given container,
+// wiring each button to onSelect(weekStart). Same .week-btn pattern as the
+// Weekly and Activities pages.
+function buildReportWeekButtons(containerId, onSelect) {
+  const btnRow = document.getElementById(containerId);
+  if (!btnRow || btnRow.children.length > 0 || typeof WEEKS === 'undefined') return;
+  const allBtn = document.createElement('button');
+  allBtn.className = 'week-btn';
+  allBtn.dataset.weekStart = 'all';
+  allBtn.onclick = () => onSelect('all');
+  allBtn.innerHTML = '<div class="week-btn-label">All weeks</div>' +
+                     '<div class="week-btn-dates">Whole summer</div>';
+  btnRow.appendChild(allBtn);
+  WEEKS.forEach(wk => {
+    const parts = (wk.label || '').split(' (');
+    const name = parts[0] || wk.start;
+    const dates = parts[1] ? parts[1].replace(')', '') : '';
+    const btn = document.createElement('button');
+    btn.className = 'week-btn';
+    btn.dataset.weekStart = wk.start;
+    btn.onclick = () => onSelect(wk.start);
+    btn.innerHTML = '<div class="week-btn-label">' + esc(name) + '</div>' +
+                    (dates ? '<div class="week-btn-dates">' + esc(dates) + '</div>' : '');
+    btnRow.appendChild(btn);
+  });
+}
+
+function syncWeekBtnActive(containerId, weekStart) {
+  const btnRow = document.getElementById(containerId);
+  if (!btnRow) return;
+  btnRow.querySelectorAll('.week-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.weekStart === weekStart);
+  });
+}
 
 function renderReports() {
   if (window._userRole !== 'admin') {
@@ -3835,69 +3918,184 @@ function renderReports() {
     showPage('roster');
     return;
   }
-  // Build the week buttons once — same .week-btn pattern as the Weekly and
-  // Activities pages, plus a leading "All weeks" button.
-  const btnRow = document.getElementById('consentWeekBtns');
-  if (btnRow && btnRow.children.length === 0 && typeof WEEKS !== 'undefined') {
-    const allBtn = document.createElement('button');
-    allBtn.className = 'week-btn';
-    allBtn.dataset.weekStart = 'all';
-    allBtn.onclick = () => selectConsentWeek('all');
-    allBtn.innerHTML = '<div class="week-btn-label">All weeks</div>' +
-                       '<div class="week-btn-dates">Whole summer</div>';
-    btnRow.appendChild(allBtn);
-    WEEKS.forEach(wk => {
-      const parts = (wk.label || '').split(' (');
-      const name = parts[0] || wk.start;
-      const dates = parts[1] ? parts[1].replace(')', '') : '';
-      const btn = document.createElement('button');
-      btn.className = 'week-btn';
-      btn.dataset.weekStart = wk.start;
-      btn.onclick = () => selectConsentWeek(wk.start);
-      btn.innerHTML = '<div class="week-btn-label">' + esc(name) + '</div>' +
-                      (dates ? '<div class="week-btn-dates">' + esc(dates) + '</div>' : '');
-      btnRow.appendChild(btn);
-    });
-  }
-  // Refresh active state each visit.
-  if (btnRow) {
-    btnRow.querySelectorAll('.week-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.weekStart === _consentWeek);
-    });
-  }
+  // Build both week-button rows once, refresh active states each visit.
+  buildReportWeekButtons('consentWeekBtns', selectConsentWeek);
+  buildReportWeekButtons('emailWeekBtns', selectEmailWeek);
+  syncWeekBtnActive('consentWeekBtns', _consentWeek);
+  syncWeekBtnActive('emailWeekBtns', _emailWeek);
   // Render whichever tab is active.
   const active = document.querySelector('#page-reports .admin-tab.active');
-  const tab = active ? active.getAttribute('data-rtab') : 'consent';
+  const tab = active ? active.getAttribute('data-rtab') : 'email';
   if (tab === 'consent') renderConsentReport();
   else if (tab === 'allergies') renderAllergyReport();
-  else renderNotesReport();
+  else if (tab === 'notes') renderNotesReport();
+  // 'email' tab needs no render — it's the buttons themselves.
 }
 window.renderReports = renderReports;
 
 function selectConsentWeek(weekStart) {
   _consentWeek = weekStart;
-  const btnRow = document.getElementById('consentWeekBtns');
-  if (btnRow) {
-    btnRow.querySelectorAll('.week-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.weekStart === weekStart);
-    });
-  }
+  syncWeekBtnActive('consentWeekBtns', weekStart);
   renderConsentReport();
 }
 window.selectConsentWeek = selectConsentWeek;
 
+function selectEmailWeek(weekStart) {
+  _emailWeek = weekStart;
+  syncWeekBtnActive('emailWeekBtns', weekStart);
+  // Clear the output so it never shows a stale list for a different week.
+  const out = document.getElementById('emailReportOut');
+  const hint = document.getElementById('emailReportHint');
+  if (out) out.value = '';
+  if (hint) hint.textContent = '';
+}
+window.selectEmailWeek = selectEmailWeek;
+
 function showReportTab(name, btn) {
   document.querySelectorAll('#page-reports .admin-tab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['consent', 'allergies', 'notes'].forEach(t => {
+  ['email', 'consent', 'allergies', 'notes'].forEach(t => {
     const el = document.getElementById('rtab-' + t);
     if (el) el.style.display = (t === name) ? '' : 'none';
   });
   if (name === 'consent') renderConsentReport();
   else if (name === 'allergies') renderAllergyReport();
-  else renderNotesReport();
+  else if (name === 'notes') renderNotesReport();
 }
 window.showReportTab = showReportTab;
+
+// ── Email hub helpers ──
+
+// Per-child email collection honoring the ccParent2 opt-in flag.
+function collectChildEmails(regsOfChild) {
+  const emails = [];
+  regsOfChild.forEach(c => {
+    const candidates = [c.email];
+    if (c.ccParent2) candidates.push(c.email2);
+    candidates.forEach(e => {
+      const t = String(e || '').trim();
+      if (t && !emails.some(x => x.toLowerCase() === t.toLowerCase())) emails.push(t);
+    });
+  });
+  return emails;
+}
+
+// Children grouped for the selected week ('all' = every week), each with the
+// child's emails and their FIRST week of camp (earliest weekStart across all
+// their registrations — used for "new campers this week").
+function emailGroupsForWeek(weekStart) {
+  const activeAll = (window.campers || []).filter(c => !c.refunded && !c.archived);
+  // First, each child's earliest week across the WHOLE summer.
+  const firstWeek = new Map();
+  activeAll.forEach(c => {
+    const k = camperKey(c);
+    if (!k || k === '|') return;
+    const w = c.weekStart || '';
+    if (!firstWeek.has(k) || (w && w < firstWeek.get(k))) firstWeek.set(k, w);
+  });
+  // Then group the selected week's registrations per child.
+  const byChild = new Map();
+  activeAll
+    .filter(c => weekStart === 'all' || c.weekStart === weekStart)
+    .forEach(c => {
+      const k = camperKey(c);
+      if (!k || k === '|') return;
+      if (!byChild.has(k)) byChild.set(k, { key: k, name: `${(c.first||'').trim()} ${(c.last||'').trim()}`.trim(), regs: [] });
+      byChild.get(k).regs.push(c);
+    });
+  return [...byChild.values()].map(g => ({
+    ...g,
+    emails: collectChildEmails(g.regs),
+    isNew: firstWeek.get(g.key) === weekStart, // meaningful only for a specific week
+  })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// One unified copier for the Email hub's big buttons.
+// kind: 'all' | 'new' | 'splash' | 'photo'
+async function copyReportEmails(kind, btnEl) {
+  const week = _emailWeek || 'all';
+  if (kind === 'new' && week === 'all') {
+    showToast('Pick a specific week first — "new campers" compares against earlier weeks', 'error');
+    return;
+  }
+  let children, label;
+  if (kind === 'splash' || kind === 'photo') {
+    const rows = consentGroupsForWeek(week);
+    children = rows.filter(r => kind === 'splash' ? !r.splash : !r.photo)
+                   .map(r => ({ name: r.name, emails: r.emails }));
+    label = kind === 'splash' ? 'missing Splash Pad consent' : 'missing Photo consent';
+  } else {
+    const groups = emailGroupsForWeek(week);
+    children = (kind === 'new' ? groups.filter(g => g.isNew) : groups);
+    label = kind === 'new' ? 'new this week' : 'all parents';
+  }
+  const seen = new Set();
+  const emails = [];
+  children.forEach(ch => (ch.emails || []).forEach(e => {
+    const lower = e.toLowerCase();
+    if (seen.has(lower)) return;
+    seen.add(lower);
+    emails.push(e);
+  }));
+  const noEmail = children.filter(ch => !(ch.emails || []).length).length;
+  const out = document.getElementById('emailReportOut');
+  const hint = document.getElementById('emailReportHint');
+  if (!emails.length) {
+    if (out) out.value = '';
+    if (hint) hint.textContent = children.length
+      ? `${children.length} camper(s) match (${label}) but none have an email on file.`
+      : `No campers match (${label}) for this selection.`;
+    showToast(children.length ? 'Matches found but no emails on file' : 'No matching campers', 'error');
+    return;
+  }
+  const text = emails.join(', ');
+  if (out) out.value = text;
+  if (hint) hint.textContent = `${emails.length} email${emails.length===1?'':'s'} · ${children.length} camper${children.length===1?'':'s'} (${label})${noEmail ? ` · ${noEmail} camper(s) have no email on file` : ''}`;
+  let copied = false;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(text); copied = true; } catch (e) {}
+  }
+  if (!copied && out) {
+    try { out.focus(); out.select(); copied = document.execCommand('copy'); } catch (e) {}
+  }
+  if (copied) {
+    showToast(`${emails.length} email${emails.length===1?'':'s'} copied`);
+    if (btnEl) {
+      btnEl.classList.add('copied');
+      setTimeout(() => btnEl.classList.remove('copied'), 1600);
+    }
+  } else {
+    showToast('Copy failed — tap the box below to select manually', 'error');
+  }
+}
+window.copyReportEmails = copyReportEmails;
+
+// Copy button on the Email hub's output box — re-copies whatever list is
+// currently displayed, with a "Copied!" flash on the button.
+async function copyEmailReportOut() {
+  const out = document.getElementById('emailReportOut');
+  const btn = document.getElementById('emailReportCopyBtn');
+  if (!out || !out.value.trim()) { showToast('Nothing to copy yet — tap an option above first', 'error'); return; }
+  let copied = false;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(out.value); copied = true; } catch (e) {}
+  }
+  if (!copied) {
+    try { out.focus(); out.select(); copied = document.execCommand('copy'); } catch (e) {}
+  }
+  if (copied) {
+    showToast('Emails copied');
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 1600);
+    }
+  } else {
+    showToast('Copy failed — tap the box to select manually', 'error');
+  }
+}
+window.copyEmailReportOut = copyEmailReportOut;
 
 // Group non-refunded campers per child for the selected week ('all' = every
 // week). Consent counts as given if ANY of the child's registrations has it.
@@ -3950,62 +4148,7 @@ function renderConsentReport() {
 }
 window.renderConsentReport = renderConsentReport;
 
-// Copy the primary parent emails of campers missing the given consent for the
-// currently selected week. kind: 'splash' | 'photo'.
-async function copyMissingConsentEmails(kind) {
-  const rows = consentGroupsForWeek(_consentWeek || 'all');
-  const missing = rows.filter(r => kind === 'splash' ? !r.splash : !r.photo);
-  const seen = new Set();
-  const emails = [];
-  missing.forEach(r => {
-    (r.emails || []).forEach(e => {
-      const t = (e || '').trim();
-      if (!t) return;
-      const lower = t.toLowerCase();
-      if (seen.has(lower)) return;
-      seen.add(lower);
-      emails.push(t);
-    });
-  });
-  const noEmailCount = missing.filter(r => !(r.emails || []).some(e => (e || '').trim())).length;
-  if (!emails.length) {
-    showToast(missing.length
-      ? 'Campers are missing consent, but none have a parent email on file'
-      : 'Nobody is missing that consent — nothing to copy', missing.length ? 'error' : 'success');
-    return;
-  }
-  const text = emails.join(', ');
-  const btn = document.getElementById(kind === 'splash' ? 'copySplashBtn' : 'copyPhotoBtn');
-  const flash = () => {
-    if (!btn) return;
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<i class="ti ti-check"></i> Copied ' + emails.length + '!';
-    btn.disabled = true;
-    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1800);
-  };
-  let copied = false;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    try { await navigator.clipboard.writeText(text); copied = true; } catch (e) {}
-  }
-  if (!copied) {
-    try {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.cssText = 'position:fixed;opacity:0';
-      document.body.appendChild(ta);
-      ta.focus(); ta.select();
-      copied = document.execCommand('copy');
-      ta.remove();
-    } catch (e) {}
-  }
-  if (copied) {
-    showToast(`${emails.length} email${emails.length === 1 ? '' : 's'} copied${noEmailCount ? ` — ${noEmailCount} camper(s) missing consent have no email on file` : ''}`);
-    flash();
-  } else {
-    showToast('Copy failed — try again', 'error');
-  }
-}
-window.copyMissingConsentEmails = copyMissingConsentEmails;
+
 
 // Allergies: every child with a non-empty allergies field (any week).
 function renderAllergyReport() {
@@ -6837,7 +6980,6 @@ document.addEventListener('keydown', (e) => {
   const importEl  = document.getElementById('activityImportOverlay');
   const addEditEl = document.getElementById('activityModal');
   const empEl     = document.getElementById('empModal');
-  const emailEl   = document.getElementById('emailListOverlay');
   const phoneEl   = document.getElementById('phoneListOverlay');
   const actPrintEl = document.getElementById('activityPrintOverlay');
   const mumu      = document.getElementById('mobileUserMenu');
@@ -6856,11 +6998,6 @@ document.addEventListener('keydown', (e) => {
   }
   if (empEl && empEl.classList.contains('open')) {
     closeEmpModal();
-    e.stopPropagation();
-    return;
-  }
-  if (emailEl && emailEl.classList.contains('open')) {
-    closeEmailList();
     e.stopPropagation();
     return;
   }
@@ -7949,105 +8086,7 @@ function closePrintModal() {
 // Opens a modal with a week picker and a textarea of comma-separated,
 // deduplicated parent emails ready to copy into an email client. Both primary
 // and secondary parent emails are included. Case-insensitive dedup.
-function openEmailList() {
-  if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
-  const sel = document.getElementById('emailListWeekSel');
-  if (!sel) return;
-  // Populate the week dropdown once (or if it's empty)
-  sel.innerHTML = '';
-  if (typeof WEEKS !== 'undefined' && WEEKS.length) {
-    WEEKS.forEach((wk, i) => {
-      const opt = document.createElement('option');
-      opt.value = wk.start;
-      opt.textContent = `Week ${i + 1} — ${weekLabel(wk.start)}`;
-      sel.appendChild(opt);
-    });
-  }
-  const allOpt = document.createElement('option');
-  allOpt.value = '__all__';
-  allOpt.textContent = 'All weeks combined';
-  sel.appendChild(allOpt);
-  // Default to the currently-selected week on the page, if any.
-  if (weeklyWk) sel.value = weeklyWk;
-  refreshEmailList();
-  document.getElementById('emailListOverlay').classList.add('open');
-}
-window.openEmailList = openEmailList;
-
-function closeEmailList() {
-  document.getElementById('emailListOverlay').classList.remove('open');
-}
-window.closeEmailList = closeEmailList;
-
-// Rebuild the textarea contents from the currently-selected week option.
-function refreshEmailList() {
-  const sel = document.getElementById('emailListWeekSel');
-  const textEl = document.getElementById('emailListText');
-  const countEl = document.getElementById('emailListCount');
-  if (!sel || !textEl) return;
-  const val = sel.value;
-  // Pick campers to include: single week (weekStart match) OR all weeks.
-  const roster = (window.campers || []).filter(c => !c.refunded && !c.archived && (
-    val === '__all__' ? true : c.weekStart === val
-  ));
-  // Extract every non-empty parent email. The PRIMARY parent (email) is
-  // always included; the SECONDARY parent (email2) is included only for
-  // campers where the per-camper "CC secondary parent" flag is on (set from
-  // the camper's detail card). Deduplicated case-insensitively, first-seen
-  // casing preserved.
-  const seen = new Set();
-  const emails = [];
-  const addEmail = (raw) => {
-    const trimmed = String(raw || '').trim();
-    if (!trimmed) return;
-    const key = trimmed.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    emails.push(trimmed);
-  };
-  roster.forEach(c => {
-    addEmail(c.email);
-    if (c.ccParent2) addEmail(c.email2);
-  });
-  textEl.value = emails.join(', ');
-  if (countEl) countEl.textContent = emails.length
-    ? `${emails.length} unique`
-    : 'none found';
-}
-window.refreshEmailList = refreshEmailList;
-
-// Copy the textarea contents to the clipboard. Shows visible feedback on the
-// button itself (in addition to the toast) since users often miss the toast.
-async function copyEmailList() {
-  const textEl = document.getElementById('emailListText');
-  const btn = document.getElementById('emailListCopyBtn');
-  if (!textEl || !textEl.value.trim()) { showToast('No emails to copy', 'error'); return; }
-  const flashSuccess = () => {
-    if (!btn) return;
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<i class="ti ti-check"></i> Copied!';
-    btn.disabled = true;
-    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1600);
-  };
-  // Prefer the async Clipboard API; fall back to legacy execCommand for older
-  // Safari or non-HTTPS contexts.
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    try {
-      await navigator.clipboard.writeText(textEl.value);
-      showToast('Emails copied to clipboard');
-      flashSuccess();
-      return;
-    } catch (e) { /* fall through */ }
-  }
-  try {
-    textEl.focus();
-    textEl.select();
-    const ok = document.execCommand('copy');
-    if (ok) { showToast('Emails copied to clipboard'); flashSuccess(); return; }
-  } catch (e) { /* ignore */ }
-  showToast('Copy failed — please select and copy manually', 'error');
-}
-window.copyEmailList = copyEmailList;
+// (Weekly parent email list moved to Reports → Email tab)
 
 // ── Parent phone list ──
 // Builds a copyable list of every registered camper (deduplicated to one per
