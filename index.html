@@ -3057,7 +3057,7 @@
         Emails <span id="emailListCount" class="email-list-count"></span>
       </label>
       <textarea id="emailListText" readonly rows="8" onclick="this.select()"></textarea>
-      <div class="form-hint">Primary parent email only, comma-separated. Paste into your email client's To or BCC field. Tap the text box to select all.</div>
+      <div class="form-hint">Primary parent emails, plus secondary parents where "Include in email lists" is turned on in the camper's card. Comma-separated — paste into your email client's To or BCC field. Tap the text box to select all.</div>
     </div>
     <div class="email-list-actions">
       <button class="btn btn-primary" onclick="copyEmailList()" id="emailListCopyBtn"><i class="ti ti-copy"></i> Copy</button>
@@ -3904,11 +3904,18 @@ function consentGroupsForWeek(weekStart) {
     if (!k || k === '|') return;
     const cur = byChild.get(k) || {
       name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(),
-      email: '', splash: false, photo: false
+      emails: [], splash: false, photo: false
     };
     cur.splash = cur.splash || !!c.consentSplash;
     cur.photo  = cur.photo  || !!c.consentPhoto;
-    if (!cur.email && c.email && String(c.email).trim()) cur.email = String(c.email).trim();
+    // Primary parent email always; secondary only if this camper has the
+    // per-camper "CC secondary parent" flag turned on.
+    const candidates = [c.email];
+    if (c.ccParent2) candidates.push(c.email2);
+    candidates.forEach(e => {
+      const t = String(e || '').trim();
+      if (t && !cur.emails.some(x => x.toLowerCase() === t.toLowerCase())) cur.emails.push(t);
+    });
     byChild.set(k, cur);
   });
   return [...byChild.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -3945,14 +3952,16 @@ async function copyMissingConsentEmails(kind) {
   const seen = new Set();
   const emails = [];
   missing.forEach(r => {
-    const e = (r.email || '').trim();
-    if (!e) return;
-    const lower = e.toLowerCase();
-    if (seen.has(lower)) return;
-    seen.add(lower);
-    emails.push(e);
+    (r.emails || []).forEach(e => {
+      const t = (e || '').trim();
+      if (!t) return;
+      const lower = t.toLowerCase();
+      if (seen.has(lower)) return;
+      seen.add(lower);
+      emails.push(t);
+    });
   });
-  const noEmailCount = missing.filter(r => !(r.email || '').trim()).length;
+  const noEmailCount = missing.filter(r => !(r.emails || []).some(e => (e || '').trim())).length;
   if (!emails.length) {
     showToast(missing.length
       ? 'Campers are missing consent, but none have a parent email on file'
@@ -7975,18 +7984,24 @@ function refreshEmailList() {
   const roster = (window.campers || []).filter(c => !c.refunded && !c.archived && (
     val === '__all__' ? true : c.weekStart === val
   ));
-  // Extract every non-empty PRIMARY parent email, dedup case-insensitively
-  // while preserving the first-seen casing (nicer for humans). Secondary
-  // parent email is intentionally excluded — only the main contact.
+  // Extract every non-empty parent email. The PRIMARY parent (email) is
+  // always included; the SECONDARY parent (email2) is included only for
+  // campers where the per-camper "CC secondary parent" flag is on (set from
+  // the camper's detail card). Deduplicated case-insensitively, first-seen
+  // casing preserved.
   const seen = new Set();
   const emails = [];
-  roster.forEach(c => {
-    const trimmed = String(c.email || '').trim();
+  const addEmail = (raw) => {
+    const trimmed = String(raw || '').trim();
     if (!trimmed) return;
     const key = trimmed.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
     emails.push(trimmed);
+  };
+  roster.forEach(c => {
+    addEmail(c.email);
+    if (c.ccParent2) addEmail(c.email2);
   });
   textEl.value = emails.join(', ');
   if (countEl) countEl.textContent = emails.length
@@ -8672,6 +8687,11 @@ function openDetail(key) {
       ${c.phone2?`<div class="detail-row"><i class="ti ti-phone"></i><span>${esc(c.phone2)}</span></div>`:''}
       ${c.email2?`<div class="detail-row"><i class="ti ti-mail"></i><span>${esc(c.email2)}</span></div>`:''}
       ${c.address2?`<div class="detail-row"><i class="ti ti-map-pin"></i><span>${esc(c.address2)}</span></div>`:''}
+      ${(c.email2 && window._userRole === 'admin')?`<label class="consent-row" style="margin-top:4px" title="When on, this secondary parent's email is included in the weekly email list and the consent-reminder email lists">
+        <input type="checkbox" ${regs.some(r=>r.ccParent2)?'checked':''}
+               onchange="toggleCcParent2('${jsArg(camperKey(c))}',this.checked,this)">
+        <i class="ti ti-mail-plus" style="color:var(--green)"></i> Include in email lists
+      </label>`:''}
     </div>`:''}
     ${(c.ec1Name||c.ec2Name)?`<div class="detail-section">
       <div class="detail-section-title">Additional emergency contacts</div>
@@ -8720,6 +8740,29 @@ async function toggleConsent(key, field, checked, cbEl) {
   }
 }
 window.toggleConsent = toggleConsent;
+
+// ── Per-camper "CC secondary parent on emails" flag ──
+// Admin-only. When on, this camper's secondary parent email (email2) is
+// included in the weekly parent email list and the Reports consent-reminder
+// lists. Written to every registration doc for the child so all views agree.
+async function toggleCcParent2(key, checked, cbEl) {
+  if (window._userRole !== 'admin') { if (cbEl) cbEl.checked = !checked; showToast('Admin only', 'error'); return; }
+  const regs = window.campers.filter(c => camperKey(c) === key);
+  if (!regs.length) { showToast('Camper not found', 'error'); return; }
+  const prev = regs.map(r => r.ccParent2);
+  regs.forEach(r => { r.ccParent2 = !!checked; });
+  try {
+    await Promise.all(regs.map(r =>
+      window._updateDoc(window._doc(window._db, 'campers', r.id), { ccParent2: !!checked })
+    ));
+    showToast(checked ? 'Secondary parent will be included in email lists' : 'Secondary parent removed from email lists');
+  } catch (e) {
+    regs.forEach((r, i) => { r.ccParent2 = prev[i]; });
+    if (cbEl) cbEl.checked = !checked;
+    showToast('Could not update: ' + (e.code || e.message || 'error'), 'error');
+  }
+}
+window.toggleCcParent2 = toggleCcParent2;
 
 // ── Modal helpers ──
 let modalSelectedWeeks = new Set();
