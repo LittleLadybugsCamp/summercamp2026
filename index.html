@@ -7453,13 +7453,39 @@ function wxHumidex(tempC, dewC) {
 // Fetch a URL directly; if that's blocked (EC doesn't send CORS headers), retry
 // through the camp's Cloudflare Worker, which adds them.
 async function wxFetchText(url) {
+  let directErr = '';
   try {
     const r = await fetch(url, { cache: 'no-store' });
     if (r.ok) return await r.text();
-  } catch (e) { /* CORS or network — fall through to the proxy */ }
+    directErr = 'direct HTTP ' + r.status;
+  } catch (e) { directErr = 'direct blocked (CORS)'; }
+  // Fall back to the camp's Cloudflare Worker, which adds CORS headers.
   const r2 = await fetch(`${CAMP_URL_FETCHER}/?url=${encodeURIComponent(url)}`, { cache: 'no-store' });
-  if (!r2.ok) throw new Error('Alert feed unreachable (' + r2.status + ')');
+  if (!r2.ok) {
+    // Surface WHY precisely — the two realistic causes look identical to a
+    // user otherwise:
+    //   403 = page opened from file:// (Origin: null), or origin not allowed
+    //   404 = EC retired this alert region code (they resized regions)
+    let detail = '';
+    try { const j = await r2.json(); detail = j.error || ''; } catch (e) {}
+    const hint = r2.status === 403
+      ? 'the page must be opened from roster.littleladybugscamp.com, not a local file'
+      : (r2.status === 404 || /404/.test(detail))
+        ? 'Environment Canada may have retired region code "' + WX_REGION + '"'
+        : detail;
+    throw new Error('HTTP ' + r2.status + (hint ? ' — ' + hint : '') + ' [' + directErr + ']');
+  }
   return await r2.text();
+}
+
+// Confirm a feed really is for our region before trusting it. EC feed titles
+// look like "Dunnville - Caledonia - Haldimand - Weather Alert - Environment
+// Canada". If the code ever silently points somewhere else, we want to know
+// rather than show another town's warnings.
+function wxFeedMatchesRegion(xmlText) {
+  const m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(xmlText || '');
+  const title = m ? m[1] : '';
+  return /haldimand|caledonia|dunnville/i.test(title);
 }
 
 // Parse EC's ATOM alert feed. Entries are titled like:
@@ -7571,13 +7597,59 @@ async function wxRefresh() {
   // Alerts — the part that actually matters.
   try {
     const xml = await wxFetchText(WX_ALERT_FEED);
+    if (!wxFeedMatchesRegion(xml)) {
+      // Got *a* feed, but not ours — don't show another region's warnings.
+      throw new Error('feed is not for the Caledonia/Haldimand region — check WX_REGION');
+    }
     wxRenderBanner(wxParseAlerts(xml), null);
   } catch (e) {
     console.warn('Weather alerts unavailable:', e.message);
+    console.warn('Run  wxDiagnose()  in this console for a full report.');
     wxRenderBanner(null, e.message || 'unavailable');
   }
 }
 window.wxRefresh = wxRefresh;
+
+// ── wxDiagnose() ──
+// Paste `wxDiagnose()` in the browser console to see exactly why alerts aren't
+// showing. Prints the page origin, tries the feed both directly and via the
+// Worker, and reports status codes + whether the feed is really our region.
+async function wxDiagnose() {
+  const line = (k, v) => console.log('  ' + String(k).padEnd(22) + ': ' + v);
+  console.log('%c── Weather alert diagnostics ──', 'font-weight:bold');
+  line('Page origin', window.location.origin);
+  line('Running from file://', window.location.protocol === 'file:'
+      ? 'YES — this is the problem; the Worker rejects Origin: null. Open the deployed site.'
+      : 'no');
+  line('Region code', WX_REGION);
+  line('Feed URL', WX_ALERT_FEED);
+  // Direct
+  try {
+    const r = await fetch(WX_ALERT_FEED, { cache: 'no-store' });
+    line('Direct fetch', 'HTTP ' + r.status + (r.ok ? ' OK' : ''));
+  } catch (e) { line('Direct fetch', 'blocked (' + e.message + ')'); }
+  // Via worker
+  try {
+    const r = await fetch(`${CAMP_URL_FETCHER}/?url=${encodeURIComponent(WX_ALERT_FEED)}`, { cache: 'no-store' });
+    line('Via Worker', 'HTTP ' + r.status);
+    const body = await r.text();
+    if (!r.ok) {
+      line('Worker said', body.slice(0, 200));
+      if (r.status === 403) line('MEANING', 'origin rejected — open the deployed site, not a local file');
+      if (r.status === 404) line('MEANING', 'EC retired region "' + WX_REGION + '" — we need the new code');
+    } else {
+      line('Feed bytes', body.length);
+      line('Is our region?', wxFeedMatchesRegion(body) ? 'YES' : 'NO — wrong region code!');
+      const titles = [...body.matchAll(/<title[^>]*>([\s\S]*?)<\/title>/gi)].map(m => m[1].trim());
+      line('Feed title', titles[0] || '(none)');
+      console.log('  Entry titles:'); titles.slice(1).forEach(t => console.log('     • ' + t));
+      try { console.log('  Parsed alerts:', wxParseAlerts(body)); }
+      catch (e) { line('Parse error', e.message); }
+    }
+  } catch (e) { line('Via Worker', 'failed (' + e.message + ')'); }
+  console.log('%c── end ──', 'font-weight:bold');
+}
+window.wxDiagnose = wxDiagnose;
 
 // Kick off once the app is up, then poll. Also re-check when the tab regains
 // focus, so a phone left open overnight isn't showing yesterday's alerts.
