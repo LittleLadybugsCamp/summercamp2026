@@ -7420,7 +7420,17 @@ const CAMP_URL_FETCHER = 'https://campurlfetcher.littleladybugscamp.workers.dev'
 const WX_LAT = 43.069, WX_LON = -79.954;
 // EC public-alert forecast region: on33 = "Dunnville - Caledonia - Haldimand".
 const WX_REGION = 'on33';
-const WX_ALERT_FEED = `https://weather.gc.ca/rss/battleboard/${WX_REGION}_e.xml`;
+// PRIMARY alert source: EC's coordinate-based alerts feed. This is the feed
+// linked from the "Follow: Alerts" section of the Caledonia location page, and
+// it reflects exactly what weather.gc.ca shows for these coordinates.
+//
+// We originally used the region "battleboard" feed (on33). Verified live on
+// 15 Jul 2026: the battleboard feed reported "No alerts in effect" while EC's
+// own location page carried an active Air Quality warning — the two products
+// don't always agree. The coords feed matches the page, so it wins; the
+// battleboard feed is kept as a fallback in case the coords feed is missing.
+const WX_ALERT_FEED = `https://weather.gc.ca/rss/alerts/${WX_LAT}_${WX_LON}_e.xml`;
+const WX_ALERT_FEED_FALLBACK = `https://weather.gc.ca/rss/battleboard/${WX_REGION}_e.xml`;
 const WX_ALERT_PAGE = `https://weather.gc.ca/warnings/report_e.html?${WX_REGION}=`;
 const WX_FORECAST_PAGE = `https://weather.gc.ca/en/location/index.html?coords=${WX_LAT},${WX_LON}`;
 const WX_REFRESH_MS = 15 * 60 * 1000;  // re-check every 15 minutes
@@ -7606,12 +7616,20 @@ async function wxRefresh() {
     console.warn('Weather conditions unavailable:', e.message);
     wxRenderNow(null);   // just hide the card; the banner carries the safety load
   }
-  // Alerts — the part that actually matters.
+  // Alerts — the part that actually matters. Try the coords feed first; if it
+  // is unavailable, fall back to the region feed rather than showing nothing.
   try {
-    const xml = await wxFetchText(WX_ALERT_FEED);
-    if (!wxFeedMatchesRegion(xml)) {
-      // Got *a* feed, but not ours — don't show another region's warnings.
-      throw new Error('feed is not for the Caledonia/Haldimand region — check WX_REGION');
+    let xml, usedFallback = false;
+    try {
+      xml = await wxFetchText(WX_ALERT_FEED);
+    } catch (primaryErr) {
+      console.warn('Coords alert feed failed, trying region feed:', primaryErr.message);
+      xml = await wxFetchText(WX_ALERT_FEED_FALLBACK);
+      usedFallback = true;
+    }
+    if (usedFallback && !wxFeedMatchesRegion(xml)) {
+      // Only the region feed carries a region name we can verify.
+      throw new Error('fallback feed is not for the Caledonia/Haldimand region');
     }
     wxRenderBanner(wxParseAlerts(xml), null);
   } catch (e) {
@@ -7631,34 +7649,26 @@ async function wxDiagnose() {
   console.log('%c── Weather alert diagnostics ──', 'font-weight:bold');
   line('Page origin', window.location.origin);
   line('Running from file://', window.location.protocol === 'file:'
-      ? 'YES — this is the problem; the Worker rejects Origin: null. Open the deployed site.'
+      ? 'YES — the Worker rejects Origin: null. Open the deployed site.'
       : 'no');
-  line('Region code', WX_REGION);
-  line('Feed URL', WX_ALERT_FEED);
-  // Direct
-  try {
-    const r = await fetch(WX_ALERT_FEED, { cache: 'no-store' });
-    line('Direct fetch', 'HTTP ' + r.status + (r.ok ? ' OK' : ''));
-  } catch (e) { line('Direct fetch', 'blocked (' + e.message + ')'); }
-  // Via worker
-  try {
-    const r = await fetch(`${CAMP_URL_FETCHER}/?url=${encodeURIComponent(WX_ALERT_FEED)}`, { cache: 'no-store' });
-    line('Via Worker', 'HTTP ' + r.status);
-    const body = await r.text();
-    if (!r.ok) {
-      line('Worker said', body.slice(0, 200));
-      if (r.status === 403) line('MEANING', 'origin rejected — open the deployed site, not a local file');
-      if (r.status === 404) line('MEANING', 'EC retired region "' + WX_REGION + '" — we need the new code');
-    } else {
-      line('Feed bytes', body.length);
-      line('Is our region?', wxFeedMatchesRegion(body) ? 'YES' : 'NO — wrong region code!');
+  // Check BOTH feeds so we can see which one carries the alert.
+  for (const [label, url] of [['COORDS feed (primary)', WX_ALERT_FEED],
+                              ['REGION feed (fallback)', WX_ALERT_FEED_FALLBACK]]) {
+    console.log('%c  ' + label, 'font-weight:bold');
+    line('  URL', url);
+    try {
+      const r = await fetch(`${CAMP_URL_FETCHER}/?url=${encodeURIComponent(url)}`, { cache: 'no-store' });
+      line('  Via Worker', 'HTTP ' + r.status);
+      const body = await r.text();
+      if (!r.ok) { line('  Worker said', body.slice(0, 160)); continue; }
       const titles = [...body.matchAll(/<title[^>]*>([\s\S]*?)<\/title>/gi)].map(m => m[1].trim());
-      line('Feed title', titles[0] || '(none)');
-      console.log('  Entry titles:'); titles.slice(1).forEach(t => console.log('     • ' + t));
-      try { console.log('  Parsed alerts:', wxParseAlerts(body)); }
-      catch (e) { line('Parse error', e.message); }
-    }
-  } catch (e) { line('Via Worker', 'failed (' + e.message + ')'); }
+      line('  Feed title', titles[0] || '(none)');
+      console.log('    Entry titles:');
+      titles.slice(1).forEach(t => console.log('       • ' + t));
+      try { console.log('    Parsed alerts:', wxParseAlerts(body)); }
+      catch (e) { line('  Parse error', e.message); }
+    } catch (e) { line('  Via Worker', 'failed (' + e.message + ')'); }
+  }
   console.log('%c── end ──', 'font-weight:bold');
 }
 window.wxDiagnose = wxDiagnose;
