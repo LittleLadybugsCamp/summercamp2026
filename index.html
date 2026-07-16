@@ -176,10 +176,11 @@
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     box-shadow: 0 2px 10px rgba(0,0,0,.14);
   }
-  .wx-banner.wx-warning  { background: #B91C1C; }  /* warnings — most severe */
-  .wx-banner.wx-watch    { background: #B45309; }  /* watches */
-  .wx-banner.wx-advisory { background: #92700E; }  /* statements/advisories */
-  .wx-banner.wx-stale    { background: #57534E; }  /* couldn't reach EC */
+  /* Matches Environment Canada's own alert colour coding. */
+  .wx-banner.wx-red    { background: #B91C1C; }
+  .wx-banner.wx-orange { background: #C2410C; }
+  .wx-banner.wx-yellow { background: #A16207; }
+  .wx-banner.wx-stale  { background: #57534E; }  /* couldn't reach EC */
   .wx-banner i { font-size: 17px; flex-shrink: 0; }
   .wx-banner-items { flex: 1; min-width: 0; }
   .wx-banner-item { display: block; }
@@ -7486,27 +7487,39 @@ function wxFeedMatchesRegion(xmlText) {
   return /haldimand|caledonia|dunnville/i.test(title);
 }
 
-// Parse EC's ATOM alert feed. Entries are titled like:
-//   "HEAT WARNING IN EFFECT"  /  "No watches or warnings in effect"
-// We keep only entries that represent an ACTIVE alert.
+// Parse EC's ATOM alert feed.
+//
+// EC now titles alerts with their OWN colour code, e.g.
+//   "ORANGE WARNING - AIR QUALITY"        (verified live for Haldimand)
+//   "YELLOW WARNING - HEAT"
+//   "YELLOW WATCH - SEVERE THUNDERSTORM"
+// Older/other feeds use "AIR QUALITY WARNING IN EFFECT". We handle both.
+//
+// This parser is deliberately FAIL-OPEN: anything in the feed that isn't
+// explicitly "no alerts" or an ended alert gets shown. For a children's camp,
+// surfacing an alert we don't recognise is far safer than silently dropping
+// it because the wording changed — which is exactly the bug this replaces.
 function wxParseAlerts(xmlText) {
   const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
   if (doc.querySelector('parsererror')) throw new Error('Could not read the alert feed');
   const out = [];
   doc.querySelectorAll('entry').forEach(en => {
-    const title = (en.querySelector('title')?.textContent || '').trim();
+    let title = (en.querySelector('title')?.textContent || '').replace(/\s+/g, ' ').trim();
     if (!title) return;
     const low = title.toLowerCase();
-    // EC publishes a placeholder entry when nothing is active.
+    // EC's placeholder when nothing is active.
     if (low.includes('no watches or warnings') || low.includes('no alerts in effect')) return;
-    // Ignore the feed's own non-alert entries (ended alerts say "ENDED").
-    if (low.includes('ended')) return;
-    let sev = 'advisory';
-    if (low.includes('warning')) sev = 'warning';
-    else if (low.includes('watch')) sev = 'watch';
-    else if (low.includes('statement') || low.includes('advisory')) sev = 'advisory';
-    else return; // not an alert-shaped entry
-    out.push({ title: title.replace(/\s+/g, ' ').trim(), severity: sev });
+    // Alerts that have been lifted linger briefly in the feed.
+    if (/\bended\b/.test(low)) return;
+    // Severity: prefer EC's own colour word so our banner matches their site.
+    let sev;
+    if (/^\s*red\b/.test(low)) sev = 'red';
+    else if (/^\s*orange\b/.test(low)) sev = 'orange';
+    else if (/^\s*yellow\b/.test(low)) sev = 'yellow';
+    else if (low.includes('warning')) sev = 'red';        // legacy wording
+    else if (low.includes('watch')) sev = 'orange';
+    else sev = 'yellow';                                   // statements etc.
+    out.push({ title, severity: sev });
   });
   return out;
 }
@@ -7534,8 +7547,9 @@ function wxRenderBanner(alerts, errorMsg) {
     setH();
     return;
   }
-  // Banner colour follows the most severe active alert.
-  const rank = { warning: 3, watch: 2, advisory: 1 };
+  // Banner colour follows the most severe active alert, using EC's own
+  // red > orange > yellow convention so it matches weather.gc.ca at a glance.
+  const rank = { red: 3, orange: 2, yellow: 1 };
   const worst = alerts.reduce((a, b) => (rank[b.severity] > rank[a.severity] ? b : a));
   el.className = 'wx-banner wx-' + worst.severity;
   el.innerHTML = `<i class="ti ti-alert-triangle-filled"></i>
