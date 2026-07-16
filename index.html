@@ -1129,6 +1129,16 @@
     border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px;
   }
   .report-name { font-weight: 600; font-size: 14px; color: var(--text); display: inline-flex; align-items: center; gap: 6px; margin-right: auto; }
+  /* Camper names in reports open the same detail slide-over as the Campers
+     page. Styled as a link-ish button so it reads as tappable. */
+  .report-name-btn {
+    background: none; border: none; padding: 0; margin-right: auto;
+    font-family: inherit; text-align: left; cursor: pointer;
+    border-bottom: 1px solid transparent;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  .report-name-btn:hover { color: var(--green); border-bottom-color: var(--green); }
+  .report-name-btn:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 3px; }
   .report-row-text { align-items: flex-start; }
   .report-row-text .report-name { flex: 0 0 auto; min-width: 180px; }
   .report-text { flex: 1; font-size: 13.5px; color: var(--text-2); line-height: 1.45; min-width: 200px; }
@@ -4159,6 +4169,7 @@ function consentGroupsForWeek(weekStart) {
     const k = camperKey(c);
     if (!k || k === '|') return;
     const cur = byChild.get(k) || {
+      key: k,
       name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(),
       emails: [], splash: false, photo: false
     };
@@ -4193,7 +4204,7 @@ function renderConsentReport() {
       · missing Photo: <strong>${missingPhoto}</strong></div>
     ${rows.map(r => `
       <div class="report-row">
-        <span class="report-name">${esc(r.name)}</span>
+        <button class="report-name report-name-btn" onclick="openDetail('${jsArg(r.key)}')" title="Open camper details">${esc(r.name)}</button>
         <span class="badge ${r.splash ? 'badge-consent-yes' : 'badge-consent-no'}"><i class="ti ${r.splash ? 'ti-check' : 'ti-x'}" style="font-size:10px"></i> Splash pad</span>
         <span class="badge ${r.photo ? 'badge-consent-yes' : 'badge-consent-no'}"><i class="ti ${r.photo ? 'ti-check' : 'ti-x'}" style="font-size:10px"></i> Photo</span>
       </div>`).join('')}`;
@@ -4211,7 +4222,7 @@ function renderAllergyReport() {
     const k = camperKey(c);
     if (!k || k === '|') return;
     const txt = (c.allergies && String(c.allergies).trim()) || '';
-    const cur = byChild.get(k) || { name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(), allergies: '' };
+    const cur = byChild.get(k) || { key: k, name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(), allergies: '' };
     if (txt && txt.length > cur.allergies.length) cur.allergies = txt; // keep fullest
     byChild.set(k, cur);
   });
@@ -4220,7 +4231,7 @@ function renderAllergyReport() {
     ? `<div class="report-summary">${rows.length} camper${rows.length === 1 ? '' : 's'} with allergies on file</div>` +
       rows.map(r => `
         <div class="report-row report-row-text">
-          <span class="report-name"><i class="ti ti-alert-triangle" style="color:var(--coral);font-size:14px"></i> ${esc(r.name)}</span>
+          <button class="report-name report-name-btn" onclick="openDetail('${jsArg(r.key)}')" title="Open camper details"><i class="ti ti-alert-triangle" style="color:var(--coral);font-size:14px"></i> ${esc(r.name)}</button>
           <span class="report-text">${esc(r.allergies)}</span>
         </div>`).join('')
     : '<div class="report-empty">No campers with allergies on file. 🎉</div>';
@@ -4236,7 +4247,7 @@ function renderNotesReport() {
     const k = camperKey(c);
     if (!k || k === '|') return;
     const txt = (c.notes && String(c.notes).trim()) || '';
-    const cur = byChild.get(k) || { name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(), notes: '' };
+    const cur = byChild.get(k) || { key: k, name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(), notes: '' };
     if (txt && txt.length > cur.notes.length) cur.notes = txt;
     byChild.set(k, cur);
   });
@@ -4245,7 +4256,7 @@ function renderNotesReport() {
     ? `<div class="report-summary">${rows.length} camper${rows.length === 1 ? '' : 's'} with notes</div>` +
       rows.map(r => `
         <div class="report-row report-row-text">
-          <span class="report-name"><i class="ti ti-note" style="color:var(--purple);font-size:14px"></i> ${esc(r.name)}</span>
+          <button class="report-name report-name-btn" onclick="openDetail('${jsArg(r.key)}')" title="Open camper details"><i class="ti ti-note" style="color:var(--purple);font-size:14px"></i> ${esc(r.name)}</button>
           <span class="report-text">${esc(r.notes)}</span>
         </div>`).join('')
     : '<div class="report-empty">No campers with special notes.</div>';
@@ -5705,39 +5716,96 @@ function removeImportedReceipt(i) {
   if (!_importedReceipts.length) document.getElementById('receiptImportSaveBtn').style.display = 'none';
 }
 
+// Firestore writes resolve ONLY when the server acknowledges them. If the
+// connection is degraded — Safari's WebChannel to firestore.googleapis.com
+// failing is a known offender, and shows up as "Fetch API cannot load
+// .../Firestore/Listen/channel ... due to access control checks" — the promise
+// NEVER settles. Awaiting it with no timeout left the button disabled at
+// "Saving…" forever, with no error, no retry, and no way out. This wrapper
+// guarantees the UI always gets an answer.
+const FIN_WRITE_TIMEOUT_MS = 20000;
+function withWriteTimeout(promise, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error('Timed out after ' + (FIN_WRITE_TIMEOUT_MS / 1000) +
+        's ' + label + '. The connection to the database may be blocked.')),
+      FIN_WRITE_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function saveAllImportedReceipts() {
   const valid = _importedReceipts.filter(r => parseFloat(r.amount) > 0);
   if (!valid.length) { showToast('Enter an amount on at least one receipt first.', 'error'); return; }
   const btn = document.getElementById('receiptImportSaveBtn');
-  btn.disabled = true; btn.querySelector('#receiptImportSaveLabel').textContent = 'Saving…';
+  const label = btn.querySelector('#receiptImportSaveLabel');
+  btn.disabled = true;
   let saved = 0;
+  const done = [];   // receipts that fully committed — removed so a retry can't duplicate them
   try {
-    for (const r of valid) {
+    for (let i = 0; i < valid.length; i++) {
+      const r = valid[i];
+      label.textContent = `Saving ${i + 1} of ${valid.length}…`;
       const amount = Math.round(parseFloat(r.amount) * 100) / 100;
       const hasReceipt = !!r.dataUri;
-      const ref = await window._addDoc(window._collection(window._db, 'finances'), {
-        type: 'expense',
-        date: r.date,
-        amount,
-        category: r.category || 'Other expense',
-        description: r.vendor || '',
-        hasReceipt,
-        receiptName: hasReceipt ? r.name : null,
-        createdAt: window._serverTimestamp(),
-        createdBy: window._userEmail || ''
-      });
+      const ref = await withWriteTimeout(
+        window._addDoc(window._collection(window._db, 'finances'), {
+          type: 'expense',
+          date: r.date,
+          amount,
+          category: r.category || 'Other expense',
+          description: r.vendor || '',
+          hasReceipt,
+          receiptName: hasReceipt ? r.name : null,
+          createdAt: window._serverTimestamp(),
+          createdBy: window._userEmail || ''
+        }),
+        `saving the expense for "${r.name}"`
+      );
       if (hasReceipt) {
-        await window._setDoc(window._doc(window._db, 'receipts', ref.id), { dataUri: r.dataUri, name: r.name });
+        try {
+          await withWriteTimeout(
+            window._setDoc(window._doc(window._db, 'receipts', ref.id), { dataUri: r.dataUri, name: r.name }),
+            `attaching the PDF for "${r.name}"`
+          );
+        } catch (attachErr) {
+          // The expense itself saved. Rather than leave a row promising a
+          // receipt that isn't there, mark it as having none and carry on.
+          console.warn('Receipt attach failed for', r.name, attachErr);
+          try {
+            await withWriteTimeout(
+              window._updateDoc(window._doc(window._db, 'finances', ref.id), { hasReceipt: false, receiptName: null }),
+              'updating the expense'
+            );
+          } catch (e2) { /* best effort */ }
+          showToast(`Saved "${r.name}" but couldn't attach its PDF`, 'error');
+        }
       }
+      done.push(r);
       saved++;
     }
     showToast(`Imported ${saved} expense${saved === 1 ? '' : 's'}`);
     closeReceiptImport();
     renderFinances();
   } catch (e) {
-    console.error(e);
-    showToast('Saved ' + saved + ' before an error: ' + (e.code || e.message || 'error'), 'error');
-    btn.disabled = false; btn.querySelector('#receiptImportSaveLabel').textContent = 'Save expenses';
+    console.error('Receipt import failed:', e);
+    // Drop the ones that DID save, so pressing Save again doesn't duplicate them.
+    _importedReceipts = _importedReceipts.filter(r => !done.includes(r));
+    renderReceiptCards();
+    const statusEl = document.getElementById('receiptImportStatus');
+    if (statusEl) {
+      statusEl.innerHTML = `<span style="color:var(--coral)">` +
+        (saved ? `Saved ${saved}, then stopped: ` : `Couldn't save: `) +
+        escapeHtml(e.message || String(e)) +
+        `</span><br>The remaining receipts are still listed below — fix the connection and press Save again.`;
+    }
+    showToast(saved ? `Saved ${saved} before stopping` : 'Could not save', 'error');
+  } finally {
+    // ALWAYS give the button back, whatever happened.
+    btn.disabled = false;
+    label.textContent = 'Save expenses';
+    if (!_importedReceipts.length) btn.style.display = 'none';
   }
 }
 
