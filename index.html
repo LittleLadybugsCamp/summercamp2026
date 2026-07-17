@@ -11249,6 +11249,22 @@ const INVOICE_WEEKS = [
   { wk: 7, name: 'Carnival Fun',        dates: 'Aug 24-28',  start: '2026-08-24', camp: 255 },
 ];
 const PRE_CARE_PRICE = 40, POST_CARE_PRICE = 40, HST_RATE = 0.13;
+// Pre/post care: $40 buys the whole week, otherwise it's $10 per day.
+// Charging whichever is LOWER implements that rule exactly and can never
+// overcharge:
+//   5 days (whole week) → min($40, 5x$10=$50) = $40   ← weekly rate
+//   4 days              → min($40, $40)       = $40
+//   3 days              → min($40, $30)       = $30   ← per-day
+//   1 day               → min($40, $10)       = $10   ← per-day
+// The old code charged a flat $40 whenever ANY day was selected, so a camper
+// with a single day of post-care was billed for a full week.
+function careCharge(days, weeklyPrice) {
+  const n = (days || []).length;
+  if (!n) return null;
+  return Math.min(weeklyPrice, n * DAILY_CARE_PRICE);
+}
+window.careCharge = careCharge;
+
 // Today's list price for a given week (Week 4 is short, hence cheaper).
 function currentWeeklyRate(weekStart) {
   const w = INVOICE_WEEKS.find(x => x.start === weekStart);
@@ -11317,8 +11333,8 @@ function buildInvoiceData(key) {
       // Uses the rate locked onto THIS registration when present, so an
       // early-bird week stays at $199 while a week added later bills at $255.
       const camp = rateForRegistration(reg);
-      const pre  = (reg.preDays  && reg.preDays.length)  ? PRE_CARE_PRICE  : null;
-      const post = (reg.postDays && reg.postDays.length) ? POST_CARE_PRICE : null;
+      const pre  = careCharge(reg.preDays,  PRE_CARE_PRICE);
+      const post = careCharge(reg.postDays, POST_CARE_PRICE);
       const dates = wkInfo ? wkInfo.dates : fmtWk(reg.weekStart);
       const namePart = wkInfo ? `Week ${wkInfo.wk} — ${wkInfo.name}` : weekLabel(reg.weekStart);
       lineItems.push({
