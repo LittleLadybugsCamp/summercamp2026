@@ -924,6 +924,18 @@
   .badge-pre { background: var(--blue-light); color: var(--blue); }
   .badge-post { background: var(--purple-light); color: var(--purple); }
   .badge-allergy { background: var(--coral-light); color: var(--coral); }
+  /* Days camp is closed (statutory holiday) — not selectable */
+  .day-sel.day-closed, .care-day.day-closed {
+    opacity: .4 !important; cursor: not-allowed !important;
+    text-decoration: line-through;
+    background: var(--surface2) !important;
+    color: var(--text-3) !important;
+  }
+  .holiday-note {
+    background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;
+    border-radius: 8px; padding: 7px 11px; font-size: 12.5px;
+    font-weight: 600; margin-bottom: 10px;
+  }
   /* Consent badges — always visible on camper quick cards. Green check when
      consent is given, muted with an X when it isn't. */
   .badge-consent-yes { background: var(--green-light); color: var(--green); }
@@ -3420,11 +3432,17 @@
     <!-- Single-week picker (adding one new week to an existing camper) -->
     <div class="form-group" id="weekAddGroup" style="display:none">
       <label class="form-label">Which week?</label>
-      <select id="fWeekAdd" style="width:100%"></select>
+      <select id="fWeekAdd" style="width:100%" onchange="onWeekAddChange()"></select>
     </div>
 
     <input type="hidden" id="fWeekStart">
 
+    <div class="form-group" id="rateGroup" style="display:none">
+      <label class="form-label">Weekly rate ($)</label>
+      <input type="number" id="fWeeklyRate" step="0.01" min="0" placeholder="255.00">
+      <div class="form-hint" id="rateHint"></div>
+    </div>
+    <div id="holidayNote" class="holiday-note" style="display:none"></div>
     <div class="form-group" id="dayPickerGroup" style="display:none">
       <label class="form-label">Camp days</label>
       <div class="days-row" id="dayGrid">
@@ -9245,8 +9263,28 @@ function selType(t) {
   document.getElementById('typeWeekly').className = 'type-opt' + (t==='weekly'?' sel-weekly':'');
   document.getElementById('typeDaily').className = 'type-opt' + (t==='daily'?' sel-daily':'');
   document.getElementById('dayPickerGroup').style.display = t==='daily'?'':'none';
+  const _rg = document.getElementById('rateGroup');
+  if (_rg && t === 'daily') _rg.style.display = 'none';
   syncCare();
 }
+// ── Holiday-aware camp days ──
+// Some weeks have statutory holidays when camp is CLOSED — e.g. Week 4 runs
+// Aug 4-7 because Monday Aug 3 is the Civic Holiday (holidayDays:[0], indexed
+// from Monday). Camp days must never include those, or the camper shows up on
+// that day's roster and sign-in sheet, and daily campers get charged for a day
+// the camp isn't open.
+function weekHolidayDays(weekStart) {
+  const wk = (typeof WEEKS !== 'undefined') ? WEEKS.find(w => w.start === weekStart) : null;
+  return (wk && wk.holidayDays) || [];
+}
+// Filter a day list down to days camp actually runs that week.
+function stripHolidayDays(weekStart, days) {
+  const hol = weekHolidayDays(weekStart);
+  if (!hol.length) return days || [];
+  return (days || []).filter(d => !hol.includes(d));
+}
+window.stripHolidayDays = stripHolidayDays;
+
 function getSelDays() {
   return [...document.querySelectorAll('#dayGrid .day-sel.sel')].map(x=>+x.dataset.d);
 }
@@ -9255,21 +9293,92 @@ function syncCare() {
   ['pre','post'].forEach(k => {
     document.querySelectorAll('.care-day.'+k).forEach(el => {
       const d = +el.dataset.d;
-      const ok = cType==='weekly' || cd.includes(d);
+      const closed = _modalHolidays.includes(d);
+      // Weekly campers attend every day EXCEPT days camp is closed.
+      const ok = !closed && (cType==='weekly' || cd.includes(d));
       el.classList.toggle('dis', !ok);
+      el.classList.toggle('day-closed', closed);
       if(!ok) el.classList.remove('sel');
     });
   });
 }
 function togDay(el) {
+  if(el.classList.contains('day-closed')) { showToast('Camp is closed that day (holiday)', 'error'); return; }
   if(cType==='weekly') return;
   el.classList.toggle('sel');
   syncCare();
 }
 function togCare(el, k) {
+  // Closed days get the 'dis' class from syncCare(), so this already blocks them.
   if(el.classList.contains('dis')) return;
   el.classList.toggle('sel');
 }
+
+// Days camp is closed for the week currently open in the modal. syncCare() is
+// the single gate for care-day enablement, so holidays live here rather than
+// being bolted on beside it.
+let _modalHolidays = [];
+
+// Reflect a week's holidays in the picker: grey out and deselect closed days,
+// and explain why. weekStart === null means "unknown / multiple weeks" (the new
+// camper flow) → show everything; saveCamper still strips per week.
+function applyHolidayDayUI(weekStart) {
+  _modalHolidays = weekStart ? weekHolidayDays(weekStart) : [];
+  document.querySelectorAll('#dayGrid .day-sel').forEach(el => {
+    const closed = _modalHolidays.includes(+el.dataset.d);
+    el.classList.toggle('day-closed', closed);
+    if (closed) el.classList.remove('sel');
+    el.title = closed ? 'Camp is closed this day (holiday)' : '';
+  });
+  const note = document.getElementById('holidayNote');
+  if (note) {
+    if (_modalHolidays.length) {
+      note.textContent = 'Camp is closed ' + _modalHolidays.map(d => DN[d]).join(', ') +
+                         ' this week (holiday) — those days can\'t be selected.';
+      note.style.display = '';
+    } else { note.style.display = 'none'; }
+  }
+  syncCare(); // re-gate the care rows against the new holiday set
+}
+window.applyHolidayDayUI = applyHolidayDayUI;
+
+// Which week's holidays apply to the picker right now.
+function modalHolidayWeek(mode, c) {
+  if (mode === 'schedule') return c ? c.weekStart : (document.getElementById('fWeekStart').value || null);
+  if (mode === 'addweek')  return document.getElementById('fWeekAdd').value || null;
+  return null; // 'full' spans several weeks; 'personal' has no schedule
+}
+
+// Show the agreed weekly rate for the single week being edited/added, so an
+// early-bird week is visible (and correctable) rather than hidden in the data.
+// Not shown for new campers (several weeks at once, each with its own list
+// price) or daily campers (billed per day, no weekly rate).
+function applyRateUI(mode, c) {
+  const group = document.getElementById('rateGroup');
+  const input = document.getElementById('fWeeklyRate');
+  const hint  = document.getElementById('rateHint');
+  if (!group || !input) return;
+  const singleWeek = (mode === 'schedule' || mode === 'addweek');
+  if (!singleWeek || cType !== 'weekly') { group.style.display = 'none'; return; }
+  group.style.display = '';
+  const ws = modalHolidayWeek(mode, c);
+  const list = currentWeeklyRate(ws);
+  const locked = (mode === 'schedule' && c) ? c.weeklyRate : null;
+  const effective = (locked !== undefined && locked !== null && locked !== '' && isFinite(Number(locked)))
+    ? Number(locked) : list;
+  input.value = effective.toFixed(2);
+  const isDiscounted = Math.abs(effective - list) > 0.005;
+  hint.innerHTML = isDiscounted
+    ? `<span style="color:#92400E;font-weight:600">Locked at $${effective.toFixed(2)} — today's list price is $${list.toFixed(2)}.</span> Regenerating keeps this rate.`
+    : `Today's list price for this week. Change it only if this family agreed a different rate.`;
+}
+window.applyRateUI = applyRateUI;
+
+function onWeekAddChange() {
+  applyHolidayDayUI(document.getElementById('fWeekAdd').value || null);
+  applyRateUI('addweek', null);
+}
+window.onWeekAddChange = onWeekAddChange;
 
 let modalMode = 'full'; // 'full' (new camper) | 'personal' | 'schedule'
 
@@ -9386,7 +9495,9 @@ function openModal(id=null, mode='full') {
   });
   document.querySelectorAll('.care-day.pre').forEach(el => el.classList.toggle('sel', mode!=='addweek' && (c?.preDays?.includes(+el.dataset.d)||false)));
   document.querySelectorAll('.care-day.post').forEach(el => el.classList.toggle('sel', mode!=='addweek' && (c?.postDays?.includes(+el.dataset.d)||false)));
-  syncCare();
+  // Grey out days camp is closed for this week (calls syncCare internally).
+  applyHolidayDayUI(modalHolidayWeek(mode, c));
+  applyRateUI(mode, c);
   // New fields
   document.getElementById('fParent2').value = c?.parent2||'';
   document.getElementById('fPhone2').value = c?.phone2||'';
@@ -9502,16 +9613,28 @@ async function saveCamper() {
     if(cType==='daily' && !campDays.length) { showToast('Please select at least one camp day.', 'error'); return; }
     const preDays = [...document.querySelectorAll('.care-day.pre.sel')].map(x=>+x.dataset.d);
     const postDays = [...document.querySelectorAll('.care-day.post.sel')].map(x=>+x.dataset.d);
+    // Rate agreed for this booking. Recording it on the registration is what
+    // lets an early-bird week keep its $199 when the invoice is regenerated,
+    // while a week added today bills at the current list price.
+    const _rateRaw = document.getElementById('fWeeklyRate')?.value;
+    const _rateEntered = (_rateRaw !== undefined && _rateRaw !== '' && isFinite(parseFloat(_rateRaw)))
+      ? Math.round(parseFloat(_rateRaw) * 100) / 100 : null;
 
     if (modalMode === 'schedule') {
       // ── Edit just this week's schedule (week stays the same, no personal fields touched) ──
       const existing = window.campers.find(x => x.id === editingId);
-      await window._updateDoc(window._doc(window._db, 'campers', editingId), {
+      const ws = existing ? existing.weekStart : document.getElementById('fWeekStart').value;
+      const _schedUpdate = {
         type: cType,
-        weekStart: existing ? existing.weekStart : document.getElementById('fWeekStart').value,
-        campDays, preDays, postDays,
+        weekStart: ws,
+        campDays:  stripHolidayDays(ws, campDays),
+        preDays:   stripHolidayDays(ws, preDays),
+        postDays:  stripHolidayDays(ws, postDays),
         updatedAt: window._serverTimestamp()
-      });
+      };
+      // Only weekly registrations carry a weekly rate.
+      if (cType === 'weekly' && _rateEntered != null) _schedUpdate.weeklyRate = _rateEntered;
+      await window._updateDoc(window._doc(window._db, 'campers', editingId), _schedUpdate);
       showToast('Week schedule updated!');
     } else if (modalMode === 'addweek') {
       // ── Add one new week to an existing camper (personal info copied over) ──
@@ -9530,9 +9653,10 @@ async function saveCamper() {
       personalFields.forEach(f => { if (editing[f] !== undefined && editing[f] !== null) newReg[f] = editing[f]; });
       newReg.type = cType;
       newReg.weekStart = ws;
-      newReg.campDays = campDays;
-      newReg.preDays = preDays;
-      newReg.postDays = postDays;
+      newReg.campDays = stripHolidayDays(ws, campDays);
+      newReg.preDays  = stripHolidayDays(ws, preDays);
+      newReg.postDays = stripHolidayDays(ws, postDays);
+      if (cType === 'weekly') newReg.weeklyRate = (_rateEntered != null) ? _rateEntered : currentWeeklyRate(ws);
       newReg.createdAt = window._serverTimestamp();
       newReg.updatedAt = window._serverTimestamp();
       await window._addDoc(window._collection(window._db, 'campers'), newReg);
@@ -9542,12 +9666,17 @@ async function saveCamper() {
       if(!first||!last) { showToast("Please enter the camper's name.", 'error'); return; }
       const weeks = [...modalSelectedWeeks];
       if(!weeks.length) { showToast('Please select at least one week.', 'error'); return; }
+      // Strip per week: Monday is a real camp day in most weeks but a holiday
+      // in Week 4, so the same picks must be filtered against each week.
       await Promise.all(weeks.map(ws =>
         window._addDoc(window._collection(window._db, 'campers'), {
           ...sharedData,
           type: cType,
           weekStart: ws,
-          campDays, preDays, postDays,
+          campDays: stripHolidayDays(ws, campDays),
+          preDays:  stripHolidayDays(ws, preDays),
+          postDays: stripHolidayDays(ws, postDays),
+          ...(cType === 'weekly' ? { weeklyRate: currentWeeklyRate(ws) } : {}),
           createdAt: window._serverTimestamp()
         })
       ));
@@ -10005,6 +10134,17 @@ window.registrationDocId = registrationDocId;
 
 function buildImportRows(csvRows) {
   importRows = [];
+  // The API sync sets __regDate itself; CSV rows don't have it yet. Pull it
+  // from the export's "Submission Date" column. rowFind copes with the BOM the
+  // exporter prefixes onto the first header (\ufeff"Submission Date"), which is
+  // why a plain row['Submission Date'] lookup would silently miss.
+  (csvRows || []).forEach(row => {
+    if (row.__regDate) return;
+    const raw = rowFind(row, ['Submission Date', 'Submission date', 'Date'],
+                        { includes: ['submission date'] });
+    const ymd = anyDateToYmd(raw);
+    if (ymd) row.__regDate = ymd;
+  });
   // Track dedup keys we've already added in THIS batch, so two identical
   // registrations within one sync (e.g. duplicate JotForm submissions) don't
   // both slip through the "exists" check — window.campers doesn't yet contain
@@ -10824,6 +10964,25 @@ function jotformYmd(createdAt) {
   const m = String(createdAt).match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? (m[1] + '-' + m[2] + '-' + m[3]) : '';
 }
+
+// The registration date is JotForm's submission date. The API gives it as
+// ISO ("2026-07-02 14:33:12"), but the CSV export writes it as "Jul 2, 2026" —
+// jotformYmd only understood the ISO form, so every camper imported by CSV
+// ended up with a blank regDate. Normalise both to YYYY-MM-DD.
+function anyDateToYmd(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);        // 2026-07-02…
+  if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+  // "Jul 2, 2026" / "July 2 2026" / "Jul 02, 2026"
+  const m = s.match(/^([A-Za-z]{3,})\s+(\d{1,2}),?\s+(\d{4})/);
+  if (m) {
+    const idx = MONTH_ABBR.findIndex(a => a.toLowerCase() === m[1].slice(0, 3).toLowerCase());
+    if (idx >= 0) return m[3] + '-' + String(idx + 1).padStart(2, '0') + '-' + String(m[2]).padStart(2, '0');
+  }
+  return '';
+}
+window.anyDateToYmd = anyDateToYmd;
 function submissionsToRows(subs) {
   return subs.map(s => {
     const r = jotformAnswerToRow(s.answers || {});
@@ -11090,6 +11249,25 @@ const INVOICE_WEEKS = [
   { wk: 7, name: 'Carnival Fun',        dates: 'Aug 24-28',  start: '2026-08-24', camp: 255 },
 ];
 const PRE_CARE_PRICE = 40, POST_CARE_PRICE = 40, HST_RATE = 0.13;
+// Today's list price for a given week (Week 4 is short, hence cheaper).
+function currentWeeklyRate(weekStart) {
+  const w = INVOICE_WEEKS.find(x => x.start === weekStart);
+  return w ? w.camp : 255;
+}
+// The rate a registration is actually billed at. A registration may carry a
+// LOCKED rate agreed at booking time (e.g. the $199/week early-bird price for
+// families who registered before 15 Mar 2026). That recorded figure always
+// wins over the current list price — otherwise regenerating an invoice would
+// silently reprice weeks the family already paid for at a different rate.
+function rateForRegistration(reg) {
+  const locked = reg && reg.weeklyRate;
+  if (locked !== undefined && locked !== null && locked !== '' && isFinite(Number(locked))) {
+    return Number(locked);
+  }
+  return currentWeeklyRate(reg && reg.weekStart);
+}
+window.currentWeeklyRate = currentWeeklyRate;
+window.rateForRegistration = rateForRegistration;
 // Daily (per-day) rates
 const DAILY_CAMP_PRICE = 55, DAILY_CARE_PRICE = 10;
 const ETRANSFER_EMAIL = 'littleladybugscamp@gmail.com';
@@ -11135,8 +11313,10 @@ function buildInvoiceData(key) {
         });
       });
     } else {
-      // Weekly registration — one row, weekly pricing
-      const camp = wkInfo ? wkInfo.camp : 255;
+      // Weekly registration — one row, weekly pricing.
+      // Uses the rate locked onto THIS registration when present, so an
+      // early-bird week stays at $199 while a week added later bills at $255.
+      const camp = rateForRegistration(reg);
       const pre  = (reg.preDays  && reg.preDays.length)  ? PRE_CARE_PRICE  : null;
       const post = (reg.postDays && reg.postDays.length) ? POST_CARE_PRICE : null;
       const dates = wkInfo ? wkInfo.dates : fmtWk(reg.weekStart);
@@ -11155,8 +11335,22 @@ function buildInvoiceData(key) {
   const grand = Math.round((subtotal + hst) * 100) / 100;
   const weekCount = new Set(regs.map(r => r.weekStart)).size;
 
+  // Money already collected, so the invoice can show a running balance when
+  // charges are added to a camper who has already paid something.
+  // IMPORTANT: this uses the SAME formula as the payments table and the
+  // Finances tab (collected = paidInFull ? total : amountPaid) so the PDF can
+  // never disagree with what the app reports elsewhere. Guarding against the
+  // "paid in full at the old total" trap is handled in regenerateInvoiceForKey,
+  // which warns before it can corrupt anything.
+  const _rec = (window.adminData && window.adminData.get(adminId(key))) || {};
+  const paid = _rec.paidInFull
+    ? grand
+    : (Math.round((parseFloat(_rec.amountPaid) || 0) * 100) / 100);
+  const balance = Math.round((grand - paid) * 100) / 100;
+
   return {
     lineItems, weekCount, subtotal, hst, grand,
+    paid, balance,
     hasDaily: regs.some(r => r.type === 'daily'),
     parent: rep.parent || '',
     address: rep.address || '',
@@ -11384,7 +11578,31 @@ function buildInvoicePDF(data, invNum, invDate, footer, filename) {
   const tempBoxLines = doc.splitTextToSize(footer, tableW - 30);
   const thankYouBoxH = 24 + tempBoxLines.length * 14;
   const tableHeaderH = 22;
-  const totalsTailH  = (24 * 3) + 30 + thankYouBoxH;   // 3 totals rows + spacer + box
+  // Totals rows are built up-front so the page-fitting reservation below can
+  // never drift out of sync with what actually gets drawn. When money has
+  // already been collected we add "Amount paid" and "Balance owing", and the
+  // balance (not the grand total) becomes the highlighted figure — it's the
+  // number the parent needs to act on.
+  const _showPaid = (data.paid || 0) > 0;
+  // If days were removed (or the parent overpaid) the balance goes negative.
+  // "Balance owing -$27.12" is nonsense on an invoice — call it a credit and
+  // show a positive figure.
+  const _credit = (data.balance || 0) < -0.005;
+  const totalsRows = _showPaid
+    ? [
+        ['Subtotal',      money(data.subtotal), false],
+        ['HST (13%)',     money(data.hst),      false],
+        ['Grand total',   money(data.grand),    false],
+        ['Amount paid',   '-' + money(data.paid), false],
+        [_credit ? 'Credit balance' : 'Balance owing',
+         money(Math.abs(data.balance)), true],
+      ]
+    : [
+        ['Subtotal',    money(data.subtotal), false],
+        ['HST (13%)',   money(data.hst),      false],
+        ['Grand total', money(data.grand),    true],
+      ];
+  const totalsTailH  = (24 * totalsRows.length) + 30 + thankYouBoxH;
   const usableH      = pageH - FOOTER_RESERVED;
   const firstPageRowSpace = usableH - ty - tableHeaderH;   // budget after first-page chrome
   const contPageRowSpace  = usableH - 50 - tableHeaderH;   // budget on continuation pages
@@ -11474,12 +11692,7 @@ function buildInvoicePDF(data, invNum, invDate, footer, filename) {
       ty += rowH;
     }
     if (page.hasTotals) {
-      // Subtotal / HST / Grand total
-      const totalsRows = [
-        ['Subtotal', money(data.subtotal), false],
-        ['HST (13%)', money(data.hst), false],
-        ['Grand total', money(data.grand), true],
-      ];
+      // totalsRows was built above (and drives the page-fitting maths).
       doc.setFontSize(10);
       totalsRows.forEach(([label, val, isGrand]) => {
         if (isGrand) {
@@ -12017,6 +12230,29 @@ async function regenerateInvoiceForKey(key) {
     const data = buildInvoiceData(key);
     if (!data || !data.lineItems.length || !data.grand) {
       showToast('Cannot regenerate — no chargeable items found for this camper.', 'error');
+      return;
+    }
+    // ── Guard: "Paid in full" at the OLD total ──
+    // "Paid in full" isn't a record of a sum — it means "collected == total".
+    // So if the total is about to RISE while that box stays ticked, the app
+    // will silently decide the parent paid the new, larger amount: Owed drops
+    // to $0 and the Finances tab books income that was never received. Catch
+    // it here, before any of that is written.
+    const oldTotal = parseFloat(rec.totalAmount) || 0;
+    if (rec.paidInFull && data.grand > oldTotal + 0.005) {
+      const extra = Math.round((data.grand - oldTotal) * 100) / 100;
+      showToast('Regenerate cancelled — fix "Paid in full" first', 'error');
+      alert(
+        `Hold on — ${childName} is marked "Paid in full" at ${money(oldTotal)}, ` +
+        `but the new total is ${money(data.grand)}.\n\n` +
+        `"Paid in full" means "collected = the total", so if you regenerate now the app ` +
+        `will treat them as having paid ${money(data.grand)}. The extra ${money(extra)} ` +
+        `would disappear from Owed AND be reported as income you never received.\n\n` +
+        `Do this first, on their Payments row:\n` +
+        `  1. Untick "Paid in full"\n` +
+        `  2. Type ${money(oldTotal)} into "Amount paid"\n\n` +
+        `Then regenerate — the invoice will show a ${money(extra)} balance owing.`
+      );
       return;
     }
     // Reuse the existing invoice number so the customer-facing reference doesn't change
