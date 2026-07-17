@@ -3442,6 +3442,11 @@
       <input type="number" id="fWeeklyRate" step="0.01" min="0" placeholder="255.00">
       <div class="form-hint" id="rateHint"></div>
     </div>
+    <div class="form-group" id="dailyRateGroup" style="display:none">
+      <label class="form-label">Daily rate ($ per day)</label>
+      <input type="number" id="fDailyRate" step="0.01" min="0" placeholder="55.00">
+      <div class="form-hint" id="dailyRateHint"></div>
+    </div>
     <div id="holidayNote" class="holiday-note" style="display:none"></div>
     <div class="form-group" id="dayPickerGroup" style="display:none">
       <label class="form-label">Camp days</label>
@@ -9263,8 +9268,9 @@ function selType(t) {
   document.getElementById('typeWeekly').className = 'type-opt' + (t==='weekly'?' sel-weekly':'');
   document.getElementById('typeDaily').className = 'type-opt' + (t==='daily'?' sel-daily':'');
   document.getElementById('dayPickerGroup').style.display = t==='daily'?'':'none';
-  const _rg = document.getElementById('rateGroup');
-  if (_rg && t === 'daily') _rg.style.display = 'none';
+  // Switching type swaps which rate field applies (weekly vs per-day).
+  applyRateUI(modalMode, (modalMode === 'schedule' && editingId)
+    ? window.campers.find(x => x.id === editingId) : null);
   syncCare();
 }
 // ── Holiday-aware camp days ──
@@ -9357,20 +9363,38 @@ function applyRateUI(mode, c) {
   const group = document.getElementById('rateGroup');
   const input = document.getElementById('fWeeklyRate');
   const hint  = document.getElementById('rateHint');
-  if (!group || !input) return;
+  const dGroup = document.getElementById('dailyRateGroup');
+  const dInput = document.getElementById('fDailyRate');
+  const dHint  = document.getElementById('dailyRateHint');
+  if (!group || !input || !dGroup || !dInput) return;
+
   const singleWeek = (mode === 'schedule' || mode === 'addweek');
-  if (!singleWeek || cType !== 'weekly') { group.style.display = 'none'; return; }
-  group.style.display = '';
+  group.style.display  = (singleWeek && cType === 'weekly') ? '' : 'none';
+  dGroup.style.display = (singleWeek && cType === 'daily')  ? '' : 'none';
+  if (!singleWeek) return;
+
   const ws = modalHolidayWeek(mode, c);
-  const list = currentWeeklyRate(ws);
-  const locked = (mode === 'schedule' && c) ? c.weeklyRate : null;
-  const effective = (locked !== undefined && locked !== null && locked !== '' && isFinite(Number(locked)))
-    ? Number(locked) : list;
-  input.value = effective.toFixed(2);
-  const isDiscounted = Math.abs(effective - list) > 0.005;
-  hint.innerHTML = isDiscounted
-    ? `<span style="color:#92400E;font-weight:600">Locked at $${effective.toFixed(2)} — today's list price is $${list.toFixed(2)}.</span> Regenerating keeps this rate.`
-    : `Today's list price for this week. Change it only if this family agreed a different rate.`;
+  // A rate recorded on the registration counts even when it is 0 (a comped
+  // week/day), so test for null/''/NaN explicitly rather than truthiness.
+  const isSet = v => (v !== undefined && v !== null && v !== '' && isFinite(Number(v)));
+
+  if (cType === 'weekly') {
+    const list = currentWeeklyRate(ws);
+    const locked = (mode === 'schedule' && c) ? c.weeklyRate : null;
+    const effective = isSet(locked) ? Number(locked) : list;
+    input.value = effective.toFixed(2);
+    hint.innerHTML = (Math.abs(effective - list) > 0.005)
+      ? `<span style="color:#92400E;font-weight:600">Locked at $${effective.toFixed(2)} — today's list price is $${list.toFixed(2)}.</span> Regenerating keeps this rate.`
+      : `Today's list price for this week. Change it only if this family agreed a different rate.`;
+  } else if (cType === 'daily') {
+    const list = DAILY_CAMP_PRICE;
+    const locked = (mode === 'schedule' && c) ? c.dailyRate : null;
+    const effective = isSet(locked) ? Number(locked) : list;
+    dInput.value = effective.toFixed(2);
+    dHint.innerHTML = (Math.abs(effective - list) > 0.005)
+      ? `<span style="color:#92400E;font-weight:600">Locked at $${effective.toFixed(2)}/day — today's list price is $${list.toFixed(2)}/day.</span> Charged per camp day selected. Regenerating keeps this rate.`
+      : `Today's list price per camp day. Change it only if this family agreed a different rate. Pre/post care is billed separately.`;
+  }
 }
 window.applyRateUI = applyRateUI;
 
@@ -9616,9 +9640,17 @@ async function saveCamper() {
     // Rate agreed for this booking. Recording it on the registration is what
     // lets an early-bird week keep its $199 when the invoice is regenerated,
     // while a week added today bills at the current list price.
-    const _rateRaw = document.getElementById('fWeeklyRate')?.value;
-    const _rateEntered = (_rateRaw !== undefined && _rateRaw !== '' && isFinite(parseFloat(_rateRaw)))
-      ? Math.round(parseFloat(_rateRaw) * 100) / 100 : null;
+    // A rate of 0 is legitimate (a comped booking), so blank/NaN is the only
+    // thing that means "not entered" — never test these values for truthiness.
+    const _readRate = (id) => {
+      const raw = document.getElementById(id)?.value;
+      if (raw === undefined || raw === null || String(raw).trim() === '') return null;
+      const n = parseFloat(raw);
+      if (!isFinite(n) || n < 0) return null;
+      return Math.round(n * 100) / 100;
+    };
+    const _rateEntered      = _readRate('fWeeklyRate');
+    const _dailyRateEntered = _readRate('fDailyRate');
 
     if (modalMode === 'schedule') {
       // ── Edit just this week's schedule (week stays the same, no personal fields touched) ──
@@ -9632,8 +9664,9 @@ async function saveCamper() {
         postDays:  stripHolidayDays(ws, postDays),
         updatedAt: window._serverTimestamp()
       };
-      // Only weekly registrations carry a weekly rate.
+      // Each type carries its own rate lock: weekly → weeklyRate, daily → dailyRate.
       if (cType === 'weekly' && _rateEntered != null) _schedUpdate.weeklyRate = _rateEntered;
+      if (cType === 'daily'  && _dailyRateEntered != null) _schedUpdate.dailyRate = _dailyRateEntered;
       await window._updateDoc(window._doc(window._db, 'campers', editingId), _schedUpdate);
       showToast('Week schedule updated!');
     } else if (modalMode === 'addweek') {
@@ -9657,6 +9690,7 @@ async function saveCamper() {
       newReg.preDays  = stripHolidayDays(ws, preDays);
       newReg.postDays = stripHolidayDays(ws, postDays);
       if (cType === 'weekly') newReg.weeklyRate = (_rateEntered != null) ? _rateEntered : currentWeeklyRate(ws);
+      if (cType === 'daily')  newReg.dailyRate  = (_dailyRateEntered != null) ? _dailyRateEntered : DAILY_CAMP_PRICE;
       newReg.createdAt = window._serverTimestamp();
       newReg.updatedAt = window._serverTimestamp();
       await window._addDoc(window._collection(window._db, 'campers'), newReg);
@@ -9676,7 +9710,7 @@ async function saveCamper() {
           campDays: stripHolidayDays(ws, campDays),
           preDays:  stripHolidayDays(ws, preDays),
           postDays: stripHolidayDays(ws, postDays),
-          ...(cType === 'weekly' ? { weeklyRate: currentWeeklyRate(ws) } : {}),
+          ...(cType === 'weekly' ? { weeklyRate: currentWeeklyRate(ws) } : { dailyRate: DAILY_CAMP_PRICE }),
           createdAt: window._serverTimestamp()
         })
       ));
@@ -11282,8 +11316,21 @@ function rateForRegistration(reg) {
   }
   return currentWeeklyRate(reg && reg.weekStart);
 }
+// The per-day rate a daily registration is actually billed at. Mirrors
+// rateForRegistration: a recorded figure on the registration always wins over
+// the list price, so a family who agreed a different per-day rate keeps it when
+// the invoice is regenerated. Note a locked rate of 0 is a real, deliberate
+// value (a comped day) — hence the explicit null/'' checks rather than `||`.
+function rateForDailyRegistration(reg) {
+  const locked = reg && reg.dailyRate;
+  if (locked !== undefined && locked !== null && locked !== '' && isFinite(Number(locked))) {
+    return Number(locked);
+  }
+  return DAILY_CAMP_PRICE;
+}
 window.currentWeeklyRate = currentWeeklyRate;
 window.rateForRegistration = rateForRegistration;
+window.rateForDailyRegistration = rateForDailyRegistration;
 // Daily (per-day) rates
 const DAILY_CAMP_PRICE = 55, DAILY_CARE_PRICE = 10;
 const ETRANSFER_EMAIL = 'littleladybugscamp@gmail.com';
@@ -11318,7 +11365,7 @@ function buildInvoiceData(key) {
     if (reg.type === 'daily') {
       // One row per camp day with daily rates
       (reg.campDays || []).slice().sort((a,b)=>a-b).forEach(d => {
-        const camp = DAILY_CAMP_PRICE;
+        const camp = rateForDailyRegistration(reg);
         const pre  = (reg.preDays  || []).includes(d) ? DAILY_CARE_PRICE : null;
         const post = (reg.postDays || []).includes(d) ? DAILY_CARE_PRICE : null;
         lineItems.push({
