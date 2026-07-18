@@ -1436,10 +1436,16 @@
     transition: all .2s;
     background: var(--surface2);
   }
-  .import-drop:hover, .import-drop.over { border-color: var(--green); background: var(--green-light); }
-  .import-drop i { font-size: 36px; color: var(--text-3); display: block; margin-bottom: 10px; }
-  .import-drop p { color: var(--text); font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
+  .import-drop:hover, .import-drop.over { border-color: var(--green); background: var(--green-light); }  .import-drop i { font-size: 36px; color: var(--text-3); display: block; margin-bottom: 10px; }  .import-drop p { color: var(--text); font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
   .import-drop small { color: var(--text-3); font-size: 12.5px; }
+  /* Generic drag-over highlight for any field wired for drop/paste intake
+     (receipt PDFs, invoice PDFs, activity photo/PDF, etc.). */
+  .file-intake-over {
+    outline: 2px dashed var(--green);
+    outline-offset: 3px;
+    background: var(--green-light);
+    border-radius: 8px;
+  }
   .import-preview {
     margin-top: 16px;
     max-height: 300px;
@@ -2542,7 +2548,7 @@
       <div class="search-reveal" id="campersSearchBar" style="display:none">
         <div class="search-wrap">
           <i class="ti ti-search"></i>
-          <input id="campersSearchInput" type="text" placeholder="Search campers…" oninput="sQ=this.value.toLowerCase();renderRoster()">
+          <input id="campersSearchInput" type="text" placeholder="Search name, parent, email, address…" oninput="sQ=this.value.toLowerCase();renderRoster()">
         </div>
         <button class="btn btn-ghost btn-icon" onclick="closeSearch('campersSearchBar','campersSearchInput')" aria-label="Close search">
           <i class="ti ti-x"></i>
@@ -2569,7 +2575,7 @@
       <div class="search-reveal" id="weeklySearchBar" style="display:none">
         <div class="search-wrap">
           <i class="ti ti-search"></i>
-          <input id="weeklySearchInput" type="text" placeholder="Search this week's campers…" oninput="weeklySQ=this.value.toLowerCase();rWeekly()">
+          <input id="weeklySearchInput" type="text" placeholder="Search name, parent, email, address…" oninput="weeklySQ=this.value.toLowerCase();rWeekly()">
         </div>
         <button class="btn btn-ghost btn-icon" onclick="closeSearch('weeklySearchBar','weeklySearchInput')" aria-label="Close search">
           <i class="ti ti-x"></i>
@@ -2708,7 +2714,7 @@
       <div class="search-reveal" id="adminSearchBar" style="display:none">
         <div class="search-wrap">
           <i class="ti ti-search"></i>
-          <input id="adminSearchInput" type="text" placeholder="Search campers…" oninput="adminSQ=this.value.toLowerCase();renderAdmin()">
+          <input id="adminSearchInput" type="text" placeholder="Search name, parent, email, address…" oninput="adminSQ=this.value.toLowerCase();renderAdmin()">
         </div>
         <button class="btn btn-ghost btn-icon" onclick="closeSearch('adminSearchBar','adminSearchInput')" aria-label="Close search">
           <i class="ti ti-x"></i>
@@ -2893,6 +2899,7 @@
              its filename with View / Remove / Replace controls. Filled by JS. -->
         <div id="txnExistingReceipt" class="txn-existing-receipt" style="display:none"></div>
         <input type="file" id="txnReceipt" accept="image/*,application/pdf" onchange="onReceiptPick()">
+        <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Choose a file, drag &amp; drop, or paste a copied file.</div>
         <div class="txn-receipt-hint" id="txnReceiptHint" style="display:none"></div>
       </div>
       <div class="emp-error" id="txnError" style="display:none"></div>
@@ -2916,6 +2923,7 @@
       <div class="form-group">
         <label class="form-label" for="invPdfFile">Invoice PDF(s)</label>
         <input type="file" id="invPdfFile" accept="application/pdf" multiple onchange="handleInvoicePdfFiles(this.files)">
+        <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Choose a file, drag &amp; drop, or paste a copied file.</div>
       </div>
       <div id="invImportStatus" style="font-size:13px;color:var(--text-2);margin:10px 0"></div>
       <div id="invImportList"></div>
@@ -2939,6 +2947,7 @@
       <div class="form-group">
         <label class="form-label" for="receiptPdfFiles">Receipt PDF(s)</label>
         <input type="file" id="receiptPdfFiles" accept="application/pdf" multiple onchange="handleReceiptPdfFiles(this.files)">
+        <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Choose a file, drag &amp; drop, or paste a copied file.</div>
       </div>
       <div id="receiptImportStatus" style="font-size:13px;color:var(--text-2);margin:10px 0"></div>
       <div id="receiptImportList"></div>
@@ -3152,6 +3161,7 @@
       <div class="act-import-panel" id="actImportPanel-pdf" style="display:none">
         <label class="form-label">Upload a PDF</label>
         <input id="actPdfInput" type="file" accept="application/pdf" onchange="actImportFromPdf(this.files[0])">
+        <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Choose a file, drag &amp; drop, or paste a copied file.</div>
         <div class="act-import-hint">Text-based PDFs work best. Scanned images won't parse.</div>
       </div>
 
@@ -3253,13 +3263,10 @@
       Existing campers with the same name + week will be skipped.
     </p>
     <div class="import-drop" id="importDrop"
-      ondragover="event.preventDefault();this.classList.add('over')"
-      ondragleave="this.classList.remove('over')"
-      ondrop="handleImportDrop(event)"
       onclick="document.getElementById('importFileInput').click()">
       <i class="ti ti-file-type-csv"></i>
       <p>Drag &amp; drop your JotForm CSV here</p>
-      <small>or click to browse</small>
+      <small>or click to browse, or paste a copied file</small>
     </div>
     <input type="file" id="importFileInput" accept=".csv" style="display:none" onchange="handleImportFile(this)">
     <div id="importPreview" style="display:none">
@@ -3920,6 +3927,24 @@ let cType = 'weekly';
 let sQ = '';
 let tF = 'all';
 let wF = 'all';
+// Match a camper/group against a lowercase search query. Beyond the name,
+// this also searches the parent/guardian names, all contact emails (parent +
+// any collected child emails), and the mailing address(es) — so a family can
+// be found by who pays or where they live, not just the child's name. `g` is
+// either a grouped camper (fields spread from the first registration) or a raw
+// registration; both carry the same personal fields, which are kept in sync
+// across a camper's weeks on save.
+function camperMatchesSearch(g, q) {
+  if (!q) return true;
+  const parts = [
+    g.first, g.last,
+    g.parent, g.parent2,
+    g.email, g.email2,
+    g.address, g.address2
+  ];
+  return parts.filter(Boolean).join(' ').toLowerCase().includes(q);
+}
+window.camperMatchesSearch = camperMatchesSearch;
 // Calendar state: explicit month/week selection (restricted to July & August)
 let selectedCalMonth = '2026-07';  // YYYY-MM
 let selectedCalWeek  = '2026-07-13'; // first Monday of Week 1
@@ -8283,7 +8308,7 @@ window._setActivities = function(arr) { _activities = arr || []; };
 function renderRoster() {
   // Group by name, then filter
   const groups = groupCampers().filter(g => {
-    if (sQ && !((g.first||'')+' '+(g.last||'')).toLowerCase().includes(sQ)) return false;
+    if (sQ && !camperMatchesSearch(g, sQ)) return false;
     if (tF !== 'all' && !g.registrations.some(r => r.type === tF)) return false;
     if (wF !== 'all' && !g.registrations.some(r => r.weekStart === wF)) return false;
     return true;
@@ -8392,7 +8417,7 @@ function rWeekly() {
 
   // Apply search and type filters
   let filtered = wkCampers.filter(c => {
-    if (weeklySQ && !((c.first||'')+' '+(c.last||'')).toLowerCase().includes(weeklySQ)) return false;
+    if (weeklySQ && !camperMatchesSearch(c, weeklySQ)) return false;
     if (weeklyTF !== 'all' && c.type !== weeklyTF) return false;
     return true;
   });
@@ -10009,6 +10034,115 @@ function openImport() {
 }
 function closeImport() {
   document.getElementById('importOverlay').classList.remove('open');
+}
+
+// ── Universal file intake: drag-drop + choose-file + clipboard paste ──
+// Every file <input> in the app supports three ways to supply a file:
+//   1. click to choose (native, or via a trigger button for hidden inputs)
+//   2. drag & drop onto its visible zone
+//   3. paste an image/PDF file from the clipboard while that zone is on screen
+// Rather than special-case each handler, delivered files are pushed into the
+// real <input> (via a DataTransfer) and a 'change' event is dispatched, so the
+// existing onchange handlers run unchanged — one code path, no duplication.
+const _fileIntakes = []; // { input, zone } — used to route clipboard pastes
+
+// Does `file` satisfy an <input accept="..."> string? Matches ".ext",
+// "type/*", and exact "type/subtype". Empty accept accepts anything.
+function fileMatchesAccept(file, acceptStr) {
+  if (!acceptStr) return true;
+  const name = (file.name || '').toLowerCase();
+  const type = (file.type || '').toLowerCase();
+  return acceptStr.split(',').map(s => s.trim().toLowerCase()).filter(Boolean).some(tok => {
+    if (tok.startsWith('.')) return name.endsWith(tok);
+    if (tok.endsWith('/*')) return type.startsWith(tok.slice(0, -1));
+    return type === tok;
+  });
+}
+
+// Push a list of files into an input and fire its change handler.
+function _deliverFilesToInput(input, fileList) {
+  const accept = input.getAttribute('accept') || '';
+  const files = [...fileList].filter(f => fileMatchesAccept(f, accept));
+  if (!files.length) {
+    showToast('That file type isn’t accepted here.', 'error');
+    return;
+  }
+  // Single-file inputs only use the first; keep the rest for multiple inputs.
+  const use = input.multiple ? files : [files[0]];
+  try {
+    const dt = new DataTransfer();
+    use.forEach(f => dt.items.add(f));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  } catch (e) {
+    // DataTransfer assignment is unsupported on very old browsers — extremely
+    // unlikely on the Macs/iPhones this runs on, but fail loudly rather than
+    // silently dropping the file.
+    showToast('Drag & drop isn’t supported in this browser — use “choose file”.', 'error');
+  }
+}
+
+// Wire a field: `input` is the real file input; `zone` is the visible element
+// that accepts drops and the click (defaults to the input itself).
+function wireFileIntake(inputId, zoneId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const zone = (zoneId && document.getElementById(zoneId)) || input;
+
+  zone.addEventListener('dragover', e => {
+    e.preventDefault();
+    zone.classList.add(zone.classList.contains('import-drop') ? 'over' : 'file-intake-over');
+  });
+  const clear = () => zone.classList.remove('over', 'file-intake-over');
+  zone.addEventListener('dragleave', clear);
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    clear();
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      _deliverFilesToInput(input, e.dataTransfer.files);
+    }
+  });
+
+  _fileIntakes.push({ input, zone });
+}
+
+// One document-level paste listener routes a pasted image/PDF to whichever
+// wired field is currently visible. A visible field is one whose zone is laid
+// out on screen (offsetParent !== null) — since import modals open one at a
+// time, at most one matches. Plain-text pastes (no files) are ignored so
+// normal pasting into text boxes still works.
+document.addEventListener('paste', e => {
+  const files = e.clipboardData && e.clipboardData.files;
+  if (!files || !files.length) return;
+  const target = _fileIntakes.find(({ input, zone }) => {
+    const el = (zone && zone.offsetParent !== null) ? zone
+             : (input.offsetParent !== null ? input : null);
+    if (!el) return false;
+    return [...files].some(f => fileMatchesAccept(f, input.getAttribute('accept') || ''));
+  });
+  if (!target) return;
+  e.preventDefault();
+  _deliverFilesToInput(target.input, files);
+});
+
+// Register every file field once the DOM is ready. Pairs are [inputId, zoneId];
+// zoneId is the visible area (drop target). Hidden inputs point at their
+// surrounding row/button; visible native inputs use their own form-group.
+function initFileIntakes() {
+  [
+    ['importFileInput', 'importDrop'],     // JotForm CSV
+    ['txnImportFile',   'txnImportRow'],   // expense receipt PDF
+    ['txnReceipt',      null],             // transaction receipt (photo/PDF)
+    ['invPdfFile',      null],             // invoice PDF(s)
+    ['receiptPdfFiles', null],             // receipt PDF(s)
+    ['actPhotoFile',    'actPhotoRow'],    // activity photo
+    ['actPdfInput',     null],             // activity import PDF
+  ].forEach(([inp, zone]) => wireFileIntake(inp, zone));
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initFileIntakes);
+} else {
+  initFileIntakes();
 }
 
 function handleImportDrop(e) {
@@ -11871,7 +12005,7 @@ function renderAdmin() {
   // locked (see isArchived handling below) — their records are preserved and
   // readable, just not editable, and they contribute $0 owing.
   if (adminSQ) {
-    groups = groups.filter(g => ((g.first||'')+' '+(g.last||'')).toLowerCase().includes(adminSQ));
+    groups = groups.filter(g => camperMatchesSearch(g, adminSQ));
   }
   // Apply user-selected sort, but always sink refunded rows to the bottom so
   // they don't interfere with the active roster's totals view.
