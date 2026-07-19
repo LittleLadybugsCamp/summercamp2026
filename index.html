@@ -773,14 +773,6 @@
   }
   .act-import-row-thumb:hover .act-import-row-thumb-x { opacity: 1; }
 
-  .act-import-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
-  .act-import-tab {
-    background: none; border: none; padding: 9px 14px; cursor: pointer;
-    color: var(--text-3); font-weight: 500; font-size: 13px;
-    border-bottom: 2px solid transparent; margin-bottom: -1px;
-  }
-  .act-import-tab:hover { color: var(--text-2); }
-  .act-import-tab.active { color: var(--green); border-bottom-color: var(--green); }
   .act-import-hint { font-size: 12px; color: var(--text-3); margin-top: 6px; }
   .act-import-preview { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
   .act-import-preview-head { font-size: 13px; color: var(--text-2); margin-bottom: 10px; }
@@ -1084,40 +1076,6 @@
   .care-label { font-size: 12px; color: var(--text-2); font-weight: 500; margin-bottom: 6px; margin-top: 10px; display: flex; align-items: center; gap: 5px; }
   .modal-footer { display: flex; gap: 8px; justify-content: space-between; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-light); }
   .modal-footer-right { display: flex; gap: 8px; align-items: center; }
-  .import-update-toggle {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 13px; color: var(--text-2); cursor: pointer;
-    user-select: none; margin-right: 4px; white-space: nowrap;
-  }
-  .import-update-toggle input { width: 15px; height: 15px; accent-color: var(--green); cursor: pointer; }
-  /* Per-row "Update" checkbox — only visible when the master toggle is on. */
-  .import-update-row {
-    display: none; align-items: center; gap: 4px;
-    font-size: 12px; color: var(--green); font-weight: 600;
-    cursor: pointer; user-select: none; margin-left: 4px;
-  }
-  .import-update-row input { width: 15px; height: 15px; accent-color: var(--green); cursor: pointer; }
-  /* Phone-status badges on existing import rows */
-  .import-phone-badge {
-    display: inline-flex; align-items: center; gap: 3px;
-    font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 10px;
-    white-space: nowrap; margin-left: 4px;
-  }
-  .import-phone-badge i { font-size: 12px; }
-  .import-phone-missing { background: #FEF3C7; color: #92400E; }   /* amber — will add phone */
-  .import-phone-ok      { background: var(--green-light); color: var(--green); }
-  .import-phone-none    { background: var(--surface2); color: var(--text-3); }
-  /* Select all/none/missing helper row */
-  #importSelectHelper {
-    display: none; align-items: center; gap: 8px;
-    margin-top: 8px; padding: 6px 2px;
-  }
-  .import-sel-btn {
-    font-size: 12px; font-weight: 600; color: var(--green);
-    background: var(--green-light); border: none; border-radius: 8px;
-    padding: 4px 10px; cursor: pointer;
-  }
-  .import-sel-btn:hover { filter: brightness(0.96); }
 
   /* ── Reports page ── */
   .report-week-btns {
@@ -2695,20 +2653,20 @@
         <button class="btn btn-icon" onclick="toggleSearch('adminSearchBar','adminSearchInput')" aria-label="Search">
           <i class="ti ti-search"></i>
         </button>
-        <button class="btn" onclick="openJotformSync()" id="jotformSyncBtn">
-          <i class="ti ti-refresh"></i> <span class="btn-label">Sync JotForm</span><span class="jf-badge" id="jotformBadge" style="display:none">0</span>
+        <button class="btn" onclick="openJotformSync()" id="jotformSyncBtn" title="Sync JotForm" aria-label="Sync JotForm">
+          <i class="ti ti-refresh"></i><span class="jf-badge" id="jotformBadge" style="display:none">0</span>
         </button>
         <div class="dropdown-wrap">
-          <button class="btn" onclick="toggleImportMenu(event)" aria-haspopup="true">
-            <i class="ti ti-file-import"></i> <span class="btn-label">Import</span> <i class="ti ti-chevron-down" style="font-size:13px"></i>
+          <button class="btn" onclick="toggleImportMenu(event)" aria-haspopup="true" title="Import" aria-label="Import">
+            <i class="ti ti-file-import"></i> <i class="ti ti-chevron-down" style="font-size:13px"></i>
           </button>
           <div class="dropdown-menu" id="importMenu">
             <button onclick="closeImportMenu();openImport()"><i class="ti ti-upload"></i> Registrations (CSV)</button>
             <button onclick="closeImportMenu();openInvoiceImport()"><i class="ti ti-file-invoice"></i> Past invoices (PDF)</button>
           </div>
         </div>
-        <button class="btn btn-primary admin-only-btn" onclick="openModal()">
-          <i class="ti ti-plus"></i> <span class="btn-label">Add camper</span>
+        <button class="btn btn-primary admin-only-btn" onclick="openModal()" title="Add camper" aria-label="Add camper">
+          <i class="ti ti-plus"></i>
         </button>
       </div>
       <div class="search-reveal" id="adminSearchBar" style="display:none">
@@ -3135,34 +3093,13 @@
       <button class="btn btn-icon" onclick="closeActivityImport()"><i class="ti ti-x"></i></button>
     </div>
     <div class="modal-body">
-      <div class="act-import-tabs">
-        <button class="act-import-tab active" data-tab="url"  onclick="setActImportTab('url')">Web page</button>
-        <button class="act-import-tab"        data-tab="text" onclick="setActImportTab('text')">Paste text</button>
-        <button class="act-import-tab"        data-tab="pdf"  onclick="setActImportTab('pdf')">PDF</button>
-      </div>
-
       <div class="act-import-panel" id="actImportPanel-url">
         <label class="form-label" for="actUrlInput">URL of an activities page</label>
         <input id="actUrlInput" type="url" class="form-input" placeholder="https://example.com/summer-activities">
-        <div class="act-import-hint">Works for most blogs and content sites. Sites with bot protection (Pinterest, Instagram, Facebook, Etsy) or login walls won't work — use Paste text for those.</div>
+        <div class="act-import-hint">Paste the web address of a blog or content page. Sites with bot protection (Pinterest, Instagram, Facebook, Etsy) or login walls won't work.</div>
         <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:10px" onclick="actImportFromUrl()">
           <i class="ti ti-world-download"></i> Fetch &amp; parse
         </button>
-      </div>
-
-      <div class="act-import-panel" id="actImportPanel-text" style="display:none">
-        <label class="form-label" for="actTextInput">Paste page text, email, or any list of activities</label>
-        <textarea id="actTextInput" class="form-input" rows="8" placeholder="Paste anything — bullet lists, paragraphs, emails…"></textarea>
-        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:10px" onclick="actImportFromText()">
-          <i class="ti ti-text-scan-2"></i> Parse text
-        </button>
-      </div>
-
-      <div class="act-import-panel" id="actImportPanel-pdf" style="display:none">
-        <label class="form-label">Upload a PDF</label>
-        <input id="actPdfInput" type="file" accept="application/pdf" onchange="actImportFromPdf(this.files[0])">
-        <div style="font-size:11.5px;color:var(--text-3);margin-top:6px">Choose a file, drag &amp; drop, or paste a copied file.</div>
-        <div class="act-import-hint">Text-based PDFs work best. Scanned images won't parse.</div>
       </div>
 
       <div class="act-import-preview" id="actImportPreview" style="display:none">
@@ -3275,12 +3212,6 @@
         <span style="font-size:12px;color:var(--text-3)" id="importPreviewSub"></span>
       </div>
       <div class="import-preview" id="importPreviewList"></div>
-      <div id="importSelectHelper" style="display:none">
-        <span style="font-size:12px;color:var(--text-2)">Select:</span>
-        <button class="import-sel-btn" onclick="importSelectMissingPhone()">Only missing phone</button>
-        <button class="import-sel-btn" onclick="importSelectAll(true)">All</button>
-        <button class="import-sel-btn" onclick="importSelectAll(false)">None</button>
-      </div>
       <div class="import-progress" id="importProgress" style="display:none">
         <span id="importProgressLabel">Importing…</span>
         <div class="progress-bar"><div class="progress-fill" id="importProgressFill" style="width:0%"></div></div>
@@ -3289,10 +3220,6 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeImport()">Cancel</button>
       <div class="modal-footer-right">
-        <label class="import-update-toggle" title="Overwrite records that already exist, to fill in changed or missing fields like phone numbers">
-          <input type="checkbox" id="importUpdateExisting" onchange="onImportUpdateMasterToggle()">
-          Update existing records
-        </label>
         <button class="btn btn-primary" id="importBtn" onclick="doImport()" style="display:none">
           <i class="ti ti-upload"></i> Import all
         </button>
@@ -6185,7 +6112,6 @@ function buildEnrollmentChart(data) {
 let _activities = []; // local cache, refreshed on demand
 let _actActiveWeek = null; // selected WEEKS[i].start
 let _actActiveDate = null; // selected YYYY-MM-DD
-let _actImportTab = 'url';
 let _actImportPending = []; // staged activities awaiting save
 let _actEditingId = null; // when set, saveActivity updates instead of inserting
 
@@ -7356,9 +7282,6 @@ function openActivityImport() {
   document.getElementById('actImportPreview').style.display = 'none';
   document.getElementById('actImportList').innerHTML = '';
   document.getElementById('actUrlInput').value = '';
-  document.getElementById('actTextInput').value = '';
-  const pdfIn = document.getElementById('actPdfInput'); if (pdfIn) pdfIn.value = '';
-  setActImportTab('url');
   document.getElementById('activityImportOverlay').classList.add('open');
 }
 window.openActivityImport = openActivityImport;
@@ -7366,152 +7289,6 @@ function closeActivityImport() {
   document.getElementById('activityImportOverlay').classList.remove('open');
 }
 window.closeActivityImport = closeActivityImport;
-
-function setActImportTab(tab) {
-  _actImportTab = tab;
-  document.querySelectorAll('.act-import-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  ['url','text','pdf'].forEach(t => {
-    const p = document.getElementById('actImportPanel-' + t);
-    if (p) p.style.display = t === tab ? '' : 'none';
-  });
-}
-window.setActImportTab = setActImportTab;
-
-// ── Core text-to-activities parser ──
-// Generic, format-flexible: handles bullet lists, numbered lists, blank-line
-// separated paragraphs, and lines that look like "10:00 AM — Activity name".
-// Each returned object: { title, description, time, location } (the user
-// confirms/edits location in the preview).
-function parseActivitiesFromText(text) {
-  if (!text) return [];
-  // Normalize whitespace
-  const clean = text
-    .replace(/\r\n/g, '\n')
-    .replace(/\u2022|·|●|◦|▪|■|–|—/g, m => (m === '–' || m === '—') ? '—' : '•')
-    .replace(/[\t ]+/g, ' ');
-
-  const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
-  const bulletRe = /^[•*\-]\s+(.+)$/;
-  const numRe    = /^(\d+)[.)]\s+(.+)$/;
-
-  // Decide the document's structure by counting how many lines look like
-  // section headings (bullets or numbered items). If at least two headings
-  // exist, treat each heading as an activity title and everything between it
-  // and the next heading as that activity's description.
-  const bulletCount = lines.filter(l => bulletRe.test(l)).length;
-  const numCount    = lines.filter(l => numRe.test(l)).length;
-  const useSections = bulletCount >= 2 || numCount >= 2;
-  // Prefer whichever style is more common (mixed lists exist but are rare)
-  const useNumbered = useSections && numCount >= bulletCount;
-
-  let items = [];
-
-  if (useSections) {
-    // Walk every line in order. A heading starts a new item; non-heading lines
-    // get appended to the current item's description until the next heading.
-    let current = null;
-    const flush = () => { if (current && current.title) items.push(current); current = null; };
-    for (const line of lines) {
-      const m = useNumbered ? line.match(numRe) : line.match(bulletRe);
-      if (m) {
-        // New activity heading detected
-        flush();
-        // numRe matches put the body in group 2; bulletRe in group 1
-        const headingBody = useNumbered ? m[2] : m[1];
-        current = { title: headingBody.trim(), descLines: [] };
-      } else if (current) {
-        // Continuation line — belongs to the current activity's description.
-        // Skip lines that are obviously not content (page numbers, "Staff
-        // Notes:" headers, etc.) by checking later.
-        current.descLines.push(line);
-      }
-      // (Lines BEFORE the first heading — like a document title — are ignored.)
-    }
-    flush();
-    // Materialize { title, description } before going through the per-item
-    // refinement step below.
-    items = items.map(it => ({
-      raw: it.title + (it.descLines.length ? '\n' + it.descLines.join('\n') : ''),
-      preTitle: it.title,
-      preDesc:  it.descLines.join('\n').trim()
-    }));
-  } else {
-    // No heading-style structure: fall back to short-line-per-item or
-    // blank-line-separated paragraphs (whichever fits better).
-    const shortLines = lines.filter(l => l.length < 200);
-    let raws;
-    if (shortLines.length >= 2 && shortLines.length <= 60) {
-      raws = shortLines;
-    } else {
-      raws = clean.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
-    }
-    items = raws.map(r => ({ raw: r, preTitle: r, preDesc: '' }));
-  }
-
-  // Refine each item: skip obvious non-activities, extract time, separate
-  // a "title — desc" form inside the heading itself, and clean up edges.
-  return items.map(it => {
-    const raw = it.raw;
-    const titleRaw = (it.preTitle || '').trim();
-
-    // Skip obvious non-activity headings ("Monday", "Week 1", "Day 3", page nums)
-    if (/^(monday|tuesday|wednesday|thursday|friday|week\s*\d+|page\s*\d+|day\s*\d+)\s*[:\-—]?\s*$/i.test(titleRaw)) return null;
-    if (titleRaw.length < 3) return null;
-
-    // Pull a time hint from the heading line (parens etc): "(1 min)", "10am", "9–10"
-    // Looks ONLY at the heading text, not the description, so we don't grab a
-    // stray "3 min" from a tip inside the description.
-    let time = '';
-    const timeMatch = titleRaw.match(/\b(\d{1,2}(:\d{2})?\s*(am|pm)?(\s*[-–—]\s*\d{1,2}(:\d{2})?\s*(am|pm)?)?)\b/i);
-    if (timeMatch && /(\d{1,2}:\d{2}|am|pm)/i.test(timeMatch[1])) {
-      time = timeMatch[1].trim();
-    } else {
-      // Also catch "(N min)" / "(N–M min)" / "(N minute)" durations
-      const durMatch = titleRaw.match(/\(\s*(\d+(?:\s*[-–—]\s*\d+)?\s*(?:min(?:ute)?s?|hr|hour|h))\s*\)/i);
-      if (durMatch) time = durMatch[1].trim();
-    }
-
-    // Compute a clean title: strip a trailing parenthesised time/duration,
-    // then strip a leading time (e.g. "9:00 AM - Morning circle" → title is
-    // "Morning circle", not "9:00 AM"). Without this, a heading like
-    // "9:00 AM - Park walk" would split on the dash and put "9:00 AM" in the
-    // title slot. The time itself goes into the `time` field via timeMatch.
-    let title = titleRaw.replace(/\s*\(\s*\d+(?:\s*[-–—]\s*\d+)?\s*(?:min(?:ute)?s?|hr|hour|h)\s*\)\s*$/i, '').trim();
-    if (time && title.startsWith(time)) {
-      title = title.slice(time.length).trim();
-    } else if (time && timeMatch && title.indexOf(timeMatch[1]) === 0) {
-      title = title.slice(timeMatch[1].length).trim();
-    }
-    title = title.replace(/^[\s\-–—:|.,]+|[\s\-–—:|.,]+$/g, '').trim();
-
-    // Build the description. If the heading line had a "title: desc" or
-    // "title — desc" form, use that. Otherwise, the description is whatever
-    // followed the heading.
-    let description = it.preDesc || '';
-    if (!description) {
-      const splitMatch = title.match(/^(.{3,80}?)\s*[—–:\-]\s+(.+)$/);
-      if (splitMatch && splitMatch[1].split(' ').length <= 12) {
-        title = splitMatch[1].trim();
-        description = splitMatch[2].trim();
-      }
-    }
-
-    return {
-      title: title.slice(0, 200),
-      description: description.slice(0, 1000),
-      time,
-      location: actClassifyLocation(raw)
-    };
-  }).filter(Boolean);
-}
-
-async function actImportFromText() {
-  const text = document.getElementById('actTextInput').value;
-  if (!text.trim()) { showToast('Paste some text first', 'error'); return; }
-  const parsed = parseActivitiesFromText(text);
-  showActImportPreview(parsed, '');
-}
-window.actImportFromText = actImportFromText;
 
 // URL of the camp Cloudflare Worker that fetches arbitrary pages server-side
 // and returns the HTML. Replaces the unreliable public CORS proxies we used
@@ -8118,30 +7895,6 @@ async function actImportFromUrl() {
   }
 }
 window.actImportFromUrl = actImportFromUrl;
-
-async function actImportFromPdf(file) {
-  if (!file) return;
-  try {
-    await loadPdfJs();
-    const buf = await file.arrayBuffer();
-    const doc = await window.pdfjsLib.getDocument({ data: buf }).promise;
-    let text = '';
-    for (let p = 1; p <= doc.numPages; p++) {
-      const page = await doc.getPage(p);
-      const content = await page.getTextContent();
-      text += content.items.map(it => it.str).join(' ') + '\n';
-    }
-    const parsed = parseActivitiesFromText(text);
-    if (!parsed.length) {
-      showToast('PDF read but no activities found. The PDF may be a scanned image.', 'error');
-      return;
-    }
-    showActImportPreview(parsed, '');
-  } catch (e) {
-    showToast('Could not read PDF: ' + (e.message || 'error'), 'error');
-  }
-}
-window.actImportFromPdf = actImportFromPdf;
 
 function showActImportPreview(parsed, sourceUrl) {
   // Two entry paths:
@@ -10013,9 +9766,6 @@ function rCalMonth() {
 
 // ── Import CSV ──
 let importRows = [];
-// Indices (into importRows) of existing rows the admin has chosen to update.
-// Only consulted when the "Update existing records" master toggle is on.
-let _importUpdateSel = new Set();
 
 function openImport() {
   jotformSyncActive = false;
@@ -10025,11 +9775,6 @@ function openImport() {
   document.getElementById('importPreview').style.display = 'none';
   document.getElementById('importBtn').style.display = 'none';
   document.getElementById('importDrop').style.display = 'block';
-  const upd = document.getElementById('importUpdateExisting');
-  if (upd) upd.checked = false;
-  _importUpdateSel = new Set();
-  const selHelper = document.getElementById('importSelectHelper');
-  if (selHelper) selHelper.style.display = 'none';
   importRows = [];
 }
 function closeImport() {
@@ -10136,7 +9881,6 @@ function initFileIntakes() {
     ['invPdfFile',      null],             // invoice PDF(s)
     ['receiptPdfFiles', null],             // receipt PDF(s)
     ['actPhotoFile',    'actPhotoRow'],    // activity photo
-    ['actPdfInput',     null],             // activity import PDF
   ].forEach(([inp, zone]) => wireFileIntake(inp, zone));
 }
 if (document.readyState === 'loading') {
@@ -10584,24 +10328,6 @@ function buildImportRows(csvRows) {
     const dismissBtn = r.submissionId
       ? '<button class="import-dismiss" onclick="onDismissJotformRow(\'' + jsArg(r.submissionId) + '\')" title="Skip this submission permanently">Dismiss</button>'
       : '';
-    // When "Update existing" is on, each already-existing row gets a checkbox
-    // so the admin picks EXACTLY which records to overwrite. Selected indices
-    // are tracked in _importUpdateSel. New rows never show this (they always
-    // import). data-update-row lets us restyle the row when selected.
-    const updateChk = (r.exists && r.data)
-      ? '<label class="import-update-row" title="Update this record"><input type="checkbox" class="import-row-chk" data-idx="' + idx + '" ' + (_importUpdateSel.has(idx) ? 'checked' : '') + ' onchange="onToggleImportRow(' + idx + ', this.checked)"><span>Update</span></label>'
-      : '';
-    // Phone-status badge on existing rows: shows whether an update would fill
-    // in a missing phone, or whether a phone is already on file.
-    let phoneBadge = '';
-    if (r.exists && r.data) {
-      const d = importRowDiff(r);
-      if (d.found) {
-        if (d.phoneFills) phoneBadge = '<span class="import-phone-badge import-phone-missing" title="No phone stored — this update adds ' + esc(d.phoneNow) + '"><i class="ti ti-phone-plus"></i> adds phone</span>';
-        else if (d.phoneWas) phoneBadge = '<span class="import-phone-badge import-phone-ok" title="Phone already on file: ' + esc(d.phoneWas) + '"><i class="ti ti-phone-check"></i> has phone</span>';
-        else phoneBadge = '<span class="import-phone-badge import-phone-none" title="No phone in the stored record or the CSV"><i class="ti ti-phone-off"></i> no phone</span>';
-      }
-    }
     if (r.needsReview) {
       // Catch-all (no rawDaily): the submission didn't match the daily branch
       // OR the weekly branch — most likely cause is a JotForm field label that
@@ -10650,8 +10376,6 @@ function buildImportRows(csvRows) {
         + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
         + '<div class="import-row-weeks">' + esc(r.weekLabel) + ' <span style="opacity:.6">· Daily</span></div>'
         + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
-        + (r.exists ? phoneBadge : '')
-        + (r.exists ? updateChk : '')
         + (r.exists ? dismissBtn : '')
         + '<div style="flex-basis:100%;margin-top:5px;font-size:12px;color:var(--text-2)">'
         +   '<strong>' + esc(dayNames) + '</strong>' + esc(careStr)
@@ -10663,8 +10387,6 @@ function buildImportRows(csvRows) {
       + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
       + '<div class="import-row-weeks">' + r.weekLabel + '</div>'
       + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
-      + (r.exists ? phoneBadge : '')
-      + (r.exists ? updateChk : '')
       + (r.exists ? dismissBtn : '')
       + '</div>';
   }).join('');
@@ -10672,135 +10394,27 @@ function buildImportRows(csvRows) {
   refreshImportPreviewCounts();
 }
 
-// Recomputes the summary line and Import button. The count of records that
-// will actually be updated is driven by the per-row checkboxes (_importUpdateSel),
-// not just the master toggle — so the admin can pick exactly which existing
-// records to overwrite.
+// Recomputes the summary line and Import button. Import only ever adds new
+// records; existing ones are always skipped.
 function refreshImportPreviewCounts() {
-  const updateExisting = !!document.getElementById('importUpdateExisting')?.checked;
   const newCount = importRows.filter(r => r.data && !r.exists).length;
   const existCount = importRows.filter(r => r.data && r.exists).length;
   const reviewCount = importRows.filter(r => r.needsReview).length;
-  // Only existing rows that are BOTH selected and still valid count as updates.
-  const selectedUpdates = updateExisting
-    ? importRows.filter((r, i) => r.data && r.exists && _importUpdateSel.has(i)).length
-    : 0;
   const sub = document.getElementById('importPreviewSub');
   if (sub) {
-    let parts = [newCount + ' new'];
-    if (updateExisting) {
-      const missingPhone = importRows.filter(r => r.data && r.exists && importRowDiff(r).phoneFills).length;
-      parts.push(selectedUpdates + ' selected to update');
-      if (missingPhone) parts.push(missingPhone + ' missing phone');
-    } else {
-      parts.push(existCount + ' already exist (will skip)');
-    }
+    let parts = [newCount + ' new', existCount + ' already exist (will skip)'];
     if (reviewCount) parts.push(reviewCount + ' need review');
     sub.textContent = parts.join(' · ');
   }
-  // Show/hide the per-row Update checkboxes based on the master toggle.
-  document.querySelectorAll('.import-update-row').forEach(el => {
-    el.style.display = updateExisting ? 'inline-flex' : 'none';
-  });
   const btn = document.getElementById('importBtn');
   if (btn) {
-    const willWrite = newCount + selectedUpdates;
-    btn.style.display = willWrite > 0 ? 'flex' : 'none';
-    const label = (updateExisting && selectedUpdates > 0)
-      ? `<i class="ti ti-upload"></i> Import & update (${willWrite})`
-      : `<i class="ti ti-upload"></i> Import all`;
-    btn.innerHTML = label;
+    btn.style.display = newCount > 0 ? 'flex' : 'none';
+    btn.innerHTML = '<i class="ti ti-upload"></i> Import all';
   }
   const drop = document.getElementById('importDrop');
   if (drop) drop.style.display = 'none';
 }
 window.refreshImportPreviewCounts = refreshImportPreviewCounts;
-
-// Master toggle changed. On turning ON, default-select only the existing rows
-// where an update would actually FILL IN A MISSING PHONE — that's the common
-// case (backfilling the phone bug) and avoids overwriting records that don't
-// need it. The admin can still hand-pick others. On turning OFF, clear all.
-function onImportUpdateMasterToggle() {
-  const on = !!document.getElementById('importUpdateExisting')?.checked;
-  _importUpdateSel = new Set();
-  if (on) {
-    importRows.forEach((r, i) => {
-      if (!r.data || !r.exists) return;
-      const d = importRowDiff(r);
-      if (d.phoneFills) _importUpdateSel.add(i); // only rows that add a phone
-    });
-  }
-  document.querySelectorAll('.import-row-chk').forEach(cb => {
-    const idx = parseInt(cb.getAttribute('data-idx'), 10);
-    cb.checked = _importUpdateSel.has(idx);
-  });
-  // Toggle visibility of the "select all/none" helper row.
-  const helper = document.getElementById('importSelectHelper');
-  if (helper) helper.style.display = on ? 'flex' : 'none';
-  refreshImportPreviewCounts();
-}
-window.onImportUpdateMasterToggle = onImportUpdateMasterToggle;
-
-// Select all / none of the existing rows (respects update mode being on).
-function importSelectAll(all) {
-  _importUpdateSel = new Set();
-  if (all) {
-    importRows.forEach((r, i) => { if (r.data && r.exists) _importUpdateSel.add(i); });
-  }
-  document.querySelectorAll('.import-row-chk').forEach(cb => {
-    const idx = parseInt(cb.getAttribute('data-idx'), 10);
-    cb.checked = _importUpdateSel.has(idx);
-  });
-  refreshImportPreviewCounts();
-}
-window.importSelectAll = importSelectAll;
-
-// Select only the rows that would add a missing phone.
-function importSelectMissingPhone() {
-  _importUpdateSel = new Set();
-  importRows.forEach((r, i) => {
-    if (!r.data || !r.exists) return;
-    if (importRowDiff(r).phoneFills) _importUpdateSel.add(i);
-  });
-  document.querySelectorAll('.import-row-chk').forEach(cb => {
-    const idx = parseInt(cb.getAttribute('data-idx'), 10);
-    cb.checked = _importUpdateSel.has(idx);
-  });
-  refreshImportPreviewCounts();
-}
-window.importSelectMissingPhone = importSelectMissingPhone;
-
-// A single row's Update checkbox toggled.
-function onToggleImportRow(idx, checked) {
-  if (checked) _importUpdateSel.add(idx);
-  else _importUpdateSel.delete(idx);
-  refreshImportPreviewCounts();
-}
-window.onToggleImportRow = onToggleImportRow;
-
-// For an existing import row, compare against the live camper record and
-// report what an update would actually change. Used to (a) badge each row so
-// the admin can see which records are missing a phone, and (b) auto-select
-// only the rows that would meaningfully change (e.g. blank phone → filled).
-// Returns { found, phoneWas, phoneNow, phoneFills, anyChange }.
-function importRowDiff(row) {
-  const out = { found: false, phoneWas: '', phoneNow: '', phoneFills: false, anyChange: false };
-  if (!row || !row.data) return out;
-  const idKey = registrationIdentityKey(row.data);
-  const existing = (window.campers || []).find(c => registrationIdentityKey(c) === idKey);
-  if (!existing) return out;
-  out.found = true;
-  const norm = v => String(v == null ? '' : v).trim();
-  out.phoneWas = norm(existing.phone);
-  out.phoneNow = norm(row.data.phone);
-  // "Fills" = stored is blank but the incoming CSV has a value.
-  out.phoneFills = !out.phoneWas && !!out.phoneNow;
-  // Detect any field that differs (so we can show "no change" when identical).
-  const fields = ['first','last','parent','phone','email','address','parent2','phone2','email2','address2','medical','allergies','healthCard'];
-  out.anyChange = fields.some(f => norm(existing[f]) !== norm(row.data[f] == null ? '' : row.data[f]));
-  return out;
-}
-window.importRowDiff = importRowDiff;
 
 // Helper: keep window.campers in sync with a just-written camper doc
 // without creating duplicates if the Firestore snapshot has already landed.
@@ -10811,15 +10425,12 @@ function mirrorCamperInsert(id, data) {
 }
 
 async function doImport() {
-  const updateExisting = !!document.getElementById('importUpdateExisting')?.checked;
-  // New rows always import. Existing rows import only when "Update existing" is
-  // on AND that specific row is checked in _importUpdateSel.
-  const toImport = importRows.filter((r, i) =>
-    r.data && (!r.exists || (updateExisting && _importUpdateSel.has(i))));
+  // Import only ever adds NEW records; existing ones are always skipped.
+  const toImport = importRows.filter(r => r.data && !r.exists);
   if(!toImport.length) return;
   document.getElementById('importBtn').style.display = 'none';
   document.getElementById('importProgress').style.display = 'block';
-  let done = 0, updatedCount = 0;
+  let done = 0;
   const newKeys = new Set();
   const writtenKeys = new Set();
   for(const row of toImport) {
@@ -10827,52 +10438,25 @@ async function doImport() {
       const key = registrationDedupKey(row.data);
       if (writtenKeys.has(key)) { done++; continue; }
       writtenKeys.add(key);
-      const isUpdate = !!row.exists;
 
-      // Find the existing document ID for updates. Records imported before
-      // deterministic IDs existed have RANDOM ids, so we can't assume the
-      // deterministic ID matches — look up the live camper by identity key
-      // first. If found, update THAT doc (preserving its id + createdAt).
-      let targetId = null;
-      if (isUpdate) {
-        const idKey = registrationIdentityKey(row.data);
-        const existing = (window.campers || []).find(c =>
-          registrationIdentityKey(c) === idKey);
-        if (existing) targetId = existing.id;
-      }
-
-      if (isUpdate && targetId) {
-        // Update in place. merge:true fills in changed/missing fields (e.g.
-        // phone) without wiping fields the app set that aren't in the import
-        // (like consent flags). Do NOT touch createdAt.
-        await window._updateDoc(window._doc(window._db, 'campers', targetId), {
-          ...row.data,
-          updatedAt: window._serverTimestamp()
-        });
-        // reflect in memory
-        const mem = (window.campers || []).find(c => c.id === targetId);
-        if (mem) Object.assign(mem, row.data);
-        updatedCount++;
+      // Every imported row is a brand-new record. Existing campers are filtered
+      // out before this loop, so we only ever add.
+      const payload = {
+        ...row.data,
+        createdAt: window._serverTimestamp(),
+        updatedAt: window._serverTimestamp()
+      };
+      const detId = registrationDocId(row.data);
+      let refId;
+      if (detId) {
+        await window._setDoc(window._doc(window._db, 'campers', detId), payload, { merge: true });
+        refId = detId;
       } else {
-        // Brand-new record (or an "update" whose original doc vanished).
-        const payload = {
-          ...row.data,
-          createdAt: window._serverTimestamp(),
-          updatedAt: window._serverTimestamp()
-        };
-        const detId = registrationDocId(row.data);
-        let refId;
-        if (detId) {
-          await window._setDoc(window._doc(window._db, 'campers', detId), payload, { merge: true });
-          refId = detId;
-        } else {
-          const ref = await window._addDoc(window._collection(window._db, 'campers'), payload);
-          refId = ref.id;
-        }
-        mirrorCamperInsert(refId, row.data);
-        // Only NEW campers get an auto-invoice (updates already have one).
-        if (!isUpdate) newKeys.add(camperKey(row.data));
+        const ref = await window._addDoc(window._collection(window._db, 'campers'), payload);
+        refId = ref.id;
       }
+      mirrorCamperInsert(refId, row.data);
+      newKeys.add(camperKey(row.data));
     } catch(e) {
       console.error('Import error for', row.csvName, e);
     }
@@ -10890,9 +10474,8 @@ async function doImport() {
     } catch(e) { console.error('Auto-invoice error for', key, e); }
   }
   const invoiceSuffix = invoiceCount ? `, ${invoiceCount} invoice${invoiceCount===1?'':'s'} generated` : '';
-  const updateSuffix = updatedCount ? `, ${updatedCount} updated` : '';
-  document.getElementById('importProgressLabel').textContent = `Done! ${done} processed${updateSuffix}${invoiceSuffix}.`;
-  showToast(`${done} processed${updateSuffix}${invoiceSuffix}.`);
+  document.getElementById('importProgressLabel').textContent = `Done! ${done} processed${invoiceSuffix}.`;
+  showToast(`${done} processed${invoiceSuffix}.`);
   if (jotformSyncActive) {
     persistJotformConfig({ lastSync: window._jfMaxCreated || '' });
     updateJotformBadge(0);
