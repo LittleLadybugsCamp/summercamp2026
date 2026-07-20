@@ -3458,7 +3458,7 @@ import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.
 import {
   getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   collection, onSnapshot,
-  addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDoc, getDocs, getDocsFromServer
+  addDoc, updateDoc, deleteDoc, doc, serverTimestamp, setDoc, getDoc, getDocs, getDocsFromServer, getDocFromCache
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
@@ -3799,7 +3799,138 @@ function stopDataListeners() {
 
 // Decide what to show based on auth state. Runs on load and on every
 // sign-in / sign-out.
+//
+// The role check (users/{uid}) used to gate startup on a raw server getDoc,
+// and its catch block signed the user out on ANY failure. Two real-world bugs
+// fell out of that: (a) a Wi-Fi blip or a phone waking from background made
+// the getDoc reject → a perfectly valid session was destroyed and the login
+// screen appeared "stuck"; (b) on a degraded connection the getDoc could hang
+// forever (the same Firestore hazard as writes), wedging the login screen on
+// "Signing in…" even though authentication had succeeded.
+//
+// The rules now:
+//   • Sign out ONLY on a definitive answer: the account doc explicitly says
+//     active !== true (any copy), or the SERVER says the doc doesn't exist.
+//   • A cached role doc enters the app instantly (Firestore security rules —
+//     not this client check — are the real access boundary), then re-verifies
+//     against the server in the background.
+//   • Network failure / timeout = indeterminate → keep the session, show a
+//     "waiting for connection" state, and retry with backoff. Never sign out.
+const ROLE_CHECK_TIMEOUT_MS = 8000;
+let _authSeq = 0;          // bumps on every auth state change; stale retries bail
+let _roleRetryTimer = null;
+let _roleRecheckTimer = null;
+
+function _capMs(promise, ms) {
+  let t;
+  const timeout = new Promise((_, rej) => { t = setTimeout(() => rej(new Error('role-check timeout')), ms); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
+}
+
+// Classify one role-doc read. `authoritative` = the snapshot came from the
+// server. Returns 'enter' | 'disabled' | 'indeterminate'.
+function roleDecision(snap, authoritative) {
+  if (!snap) return 'indeterminate';
+  if (snap.exists()) {
+    return snap.data().active === true ? 'enter' : 'disabled';
+  }
+  // Doc missing: only the server can say the account truly isn't provisioned.
+  // A cache miss proves nothing.
+  return authoritative ? 'disabled' : 'indeterminate';
+}
+window._roleDecision = roleDecision; // exposed for console diagnosis
+
+function _bootStatus(msg) {
+  const ls = document.getElementById('loadingScreen');
+  if (ls) { ls.style.display = ''; ls.style.opacity = '1'; }
+  const t = ls ? ls.querySelector('.loading-text') : null;
+  if (t) t.textContent = msg;
+}
+
+function _enterApp(user, ud) {
+  // Normalize the stored role so a stray capital or space (e.g. "Admin ")
+  // still resolves correctly. Anything that isn't exactly admin → employee.
+  const rawRole = (ud.role == null ? '' : String(ud.role)).trim().toLowerCase();
+  window._userRole  = (rawRole === 'admin') ? 'admin' : 'employee';
+  window._userName  = ud.name || user.email;
+  window._userEmail = user.email;
+  if (typeof window.applyRoleUI === 'function') window.applyRoleUI();
+  if (typeof window.hideLogin === 'function') window.hideLogin();
+}
+
+async function _signOutDisabled() {
+  try { await signOut(auth); } catch (e) { console.error(e); }
+  if (typeof window.showLogin === 'function')
+    window.showLogin('Your access has been disabled. Please contact the camp administrator.');
+}
+
+// Re-verify a cache-approved session against the server. Retries quietly
+// until it gets ONE authoritative answer; a definitive "disabled/deleted"
+// signs out, an authoritative OK also refreshes the role in case it changed.
+function _scheduleAuthoritativeRecheck(user, seq, delay = 4000) {
+  if (_roleRecheckTimer) clearTimeout(_roleRecheckTimer);
+  _roleRecheckTimer = setTimeout(async () => {
+    if (seq !== _authSeq) return;
+    let snap = null;
+    try { snap = await _capMs(getDoc(doc(db, 'users', user.uid)), ROLE_CHECK_TIMEOUT_MS); } catch (e) {}
+    if (seq !== _authSeq) return;
+    if (!snap || snap.metadata.fromCache) {
+      // Still no server answer — try again later, capped at every 60s.
+      _scheduleAuthoritativeRecheck(user, seq, Math.min(60000, delay * 2));
+      return;
+    }
+    if (roleDecision(snap, true) !== 'enter') { await _signOutDisabled(); return; }
+    _enterApp(user, snap.data()); // refresh role/name if they changed
+  }, delay);
+}
+
+// Verify the account and enter the app. Retries itself on indeterminate
+// results instead of signing out.
+async function _verifyAndEnter(user, seq, attempt) {
+  // 1) Instant path: the on-disk cache (populated on any previous visit).
+  let cached = null;
+  try { cached = await getDocFromCache(doc(db, 'users', user.uid)); } catch (e) {}
+  if (seq !== _authSeq) return;
+  const cachedCall = roleDecision(cached, false);
+  if (cachedCall === 'enter') {
+    _enterApp(user, cached.data());
+    startDataListeners();               // listeners render from cache immediately
+    _scheduleAuthoritativeRecheck(user, seq);
+    return;
+  }
+  if (cachedCall === 'disabled') { await _signOutDisabled(); return; }
+
+  // 2) No usable cache — ask the server, but never hang the UI on it.
+  let snap = null, failed = null;
+  try { snap = await _capMs(getDoc(doc(db, 'users', user.uid)), ROLE_CHECK_TIMEOUT_MS); }
+  catch (err) { failed = err; }
+  if (seq !== _authSeq) return;
+  const call = roleDecision(snap, !!(snap && !snap.metadata.fromCache));
+  if (call === 'enter') {
+    _enterApp(user, snap.data());
+    startDataListeners();
+    return;
+  }
+  if (call === 'disabled') { await _signOutDisabled(); return; }
+
+  // 3) Indeterminate (offline / degraded / timed out). KEEP the session.
+  if (failed) console.warn('role check unreachable, will retry', failed);
+  if (typeof window.hideLogin === 'function') window.hideLogin();
+  _bootStatus(attempt === 0
+    ? 'Waiting for a connection…'
+    : 'Waiting for a connection… (retrying, your sign-in is saved)');
+  const delay = Math.min(15000, 2000 * Math.pow(2, attempt)); // 2s 4s 8s 15s 15s…
+  _roleRetryTimer = setTimeout(() => {
+    if (seq !== _authSeq) return;
+    _verifyAndEnter(user, seq, attempt + 1);
+  }, delay);
+}
+
 onAuthStateChanged(auth, async (user) => {
+  _authSeq++;
+  const seq = _authSeq;
+  if (_roleRetryTimer)   { clearTimeout(_roleRetryTimer);   _roleRetryTimer = null; }
+  if (_roleRecheckTimer) { clearTimeout(_roleRecheckTimer); _roleRecheckTimer = null; }
   if (!user) {
     stopDataListeners();
     window._userRole = null;
@@ -3808,31 +3939,7 @@ onAuthStateChanged(auth, async (user) => {
     if (typeof window.showLogin === 'function') window.showLogin();
     return;
   }
-  // Signed in — confirm the account is provisioned and active.
-  try {
-    const usnap = await getDoc(doc(db, 'users', user.uid));
-    if (!usnap.exists() || usnap.data().active !== true) {
-      await signOut(auth);
-      if (typeof window.showLogin === 'function')
-        window.showLogin('Your access has been disabled. Please contact the camp administrator.');
-      return;
-    }
-    const ud = usnap.data();
-    // Normalize the stored role so a stray capital or space (e.g. "Admin ")
-    // still resolves correctly. Anything that isn't exactly admin → employee.
-    const rawRole = (ud.role == null ? '' : String(ud.role)).trim().toLowerCase();
-    window._userRole  = (rawRole === 'admin') ? 'admin' : 'employee';
-    window._userName  = ud.name || user.email;
-    window._userEmail = user.email;
-    if (typeof window.applyRoleUI === 'function') window.applyRoleUI();
-    if (typeof window.hideLogin === 'function') window.hideLogin();
-    startDataListeners();
-  } catch (err) {
-    console.error('auth role check failed', err);
-    await signOut(auth);
-    if (typeof window.showLogin === 'function')
-      window.showLogin('Could not verify your access (' + (err.code || err.message || 'error') + '). Please try again.');
-  }
+  await _verifyAndEnter(user, seq, 0);
 });
 
 window._setSynced = function() {};
