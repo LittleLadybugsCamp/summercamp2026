@@ -3324,13 +3324,14 @@
       <div class="form-group"><label class="form-label">Last name *</label><input type="text" id="fLast" placeholder="Johnson"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Age</label><input type="number" id="fAge" placeholder="8" min="3" max="18"></div>
-      <div class="form-group"><label class="form-label">Parent / guardian</label><input type="text" id="fParent" placeholder="Sarah Johnson"></div>
+      <div class="form-group"><label class="form-label">Date of birth</label><input type="date" id="fDob"></div>
+      <div class="form-group"><label class="form-label">Age <span style="color:var(--text-3);font-weight:400">(auto from DOB)</span></label><input type="number" id="fAge" placeholder="8" min="3" max="18"></div>
     </div>
     <div class="form-row">
+      <div class="form-group"><label class="form-label">Parent / guardian</label><input type="text" id="fParent" placeholder="Sarah Johnson"></div>
       <div class="form-group"><label class="form-label">Phone</label><input type="text" id="fPhone" placeholder="(905) 555-0100"></div>
-      <div class="form-group"><label class="form-label">Email</label><input type="text" id="fEmail" placeholder="sarah@email.com"></div>
     </div>
+    <div class="form-group"><label class="form-label">Email</label><input type="text" id="fEmail" placeholder="sarah@email.com"></div>
     <div class="form-group"><label class="form-label">Address</label><input type="text" id="fAddress" placeholder="123 Maple St, Hamilton, ON"></div>
 
     <div class="form-section-label">Medical &amp; allergies</div>
@@ -3979,6 +3980,67 @@ function camperMatchesSearch(g, q) {
   return parts.filter(Boolean).join(' ').toLowerCase().includes(q);
 }
 window.camperMatchesSearch = camperMatchesSearch;
+
+// ── Date of birth & age ──
+// `dob` is stored on every registration doc as YYYY-MM-DD. Age is ALWAYS
+// derived from it at render time so it stays correct as birthdays pass —
+// the legacy hand-typed `age` number is only a fallback for campers with no
+// DOB on file yet.
+function dobToYmd(v) {
+  // Accepts: YYYY-MM-DD (incl. "2018-07-02 00:00:00"), "Jul 2, 2018",
+  // 07/02/2018, 07-02-2018, 2018/7/2, and 2-digit years ("07/02/18").
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  const viaAny = anyDateToYmd(s);
+  if (viaAny) return viaAny;
+  const m = s.match(/^(\d{1,4})[\/\-.](\d{1,2})[\/\-.](\d{1,4})$/);
+  if (!m) return '';
+  const pad = n => String(n).padStart(2, '0');
+  let year, month, day;
+  if (m[1].length === 4) {           // YYYY-M-D
+    year = +m[1]; month = +m[2]; day = +m[3];
+  } else {
+    const a = +m[1], b = +m[2];
+    year = +m[3] < 100 ? 2000 + +m[3] : +m[3];  // kids ⇒ 2-digit years are 20xx
+    if (a > 12)      { day = a; month = b; }     // unambiguous DD/MM
+    else if (b > 12) { month = a; day = b; }     // unambiguous MM/DD
+    else             { month = a; day = b; }     // ambiguous → MM/DD (JotForm NA default)
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) return '';
+  if (year < 1900 || year > new Date().getFullYear()) return '';
+  return year + '-' + pad(month) + '-' + pad(day);
+}
+function ageFromDob(dob) {
+  const m = String(dob || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const now = new Date();
+  let age = now.getFullYear() - (+m[1]);
+  const mo = now.getMonth() + 1, d = now.getDate();
+  if (mo < +m[2] || (mo === +m[2] && d < +m[3])) age--;  // birthday not yet this year
+  return (age >= 0 && age <= 120) ? age : null;
+}
+// "Age 7 (2019-03-14)" — or the legacy static number if no DOB, or ''.
+function ageLabel(c) {
+  if (c && c.dob) {
+    const a = ageFromDob(c.dob);
+    if (a != null) return 'Age ' + a + ' (' + esc(c.dob) + ')';
+  }
+  return (c && c.age) ? 'Age ' + esc(c.age) : '';
+}
+// Earliest registration date across a camper's registrations (regDate from
+// JotForm, falling back to the doc's createdAt — same rule the invoices use).
+function camperRegDate(regs) {
+  let best = '';
+  (regs || []).forEach(r => {
+    const rd = r.regDate || tsToYmd(r.createdAt) || '';
+    if (rd && (!best || rd < best)) best = rd;
+  });
+  return best;
+}
+window.dobToYmd = dobToYmd;
+window.ageFromDob = ageFromDob;
+window.ageLabel = ageLabel;
+window.camperRegDate = camperRegDate;
 // Calendar state: explicit month/week selection (restricted to July & August)
 let selectedCalMonth = '2026-07';  // YYYY-MM
 let selectedCalWeek  = '2026-07-13'; // first Monday of Week 1
@@ -8199,7 +8261,7 @@ function renderRoster() {
         <div class="avatar" style="background:${bg};color:${fg}">${esc(ini)}</div>
         <div>
           <div class="card-name">${esc(g.first)} ${esc(g.last)}</div>
-          <div class="card-sub">${g.age?'Age '+esc(g.age):''}${g.parent?' · '+esc(g.parent):''}</div>
+          <div class="card-sub">${ageLabel(g)}${g.parent?' · '+esc(g.parent):''}</div>
         </div>
       </div>
       <div class="badges">
@@ -8299,7 +8361,7 @@ function rWeekly() {
         <div class="avatar" style="background:${bg};color:${fg}">${esc(ini)}</div>
         <div>
           <div class="card-name">${esc(c.first)} ${esc(c.last)}</div>
-          <div class="card-sub">${c.age?'Age '+esc(c.age):''}${c.parent?' · '+esc(c.parent):''}</div>
+          <div class="card-sub">${ageLabel(c)}${c.parent?' · '+esc(c.parent):''}</div>
         </div>
       </div>
       <div class="badges">
@@ -8958,7 +9020,7 @@ function openDetail(key) {
       <div class="detail-avatar" style="background:${bg};color:${fg}">${esc(ini)}</div>
       <div>
         <div class="detail-name">${esc(c.first)} ${esc(c.last)}</div>
-        <div class="detail-sub">${c.age?'Age '+esc(c.age)+' · ':''}${regs.length} ${regs.length===1?'week registered':'weeks registered'}</div>
+        <div class="detail-sub">${ageLabel(c)?ageLabel(c)+' · ':''}${regs.length} ${regs.length===1?'week registered':'weeks registered'}</div>
       </div>
       <button class="detail-close" onclick="closeDetail()"><i class="ti ti-x"></i></button>
     </div>
@@ -8982,6 +9044,11 @@ function openDetail(key) {
         : `<button class="btn-link-subtle" onclick="openRefundModal('${c.id}')"><i class="ti ti-receipt-refund"></i> Mark as refunded</button>`}
     </div>` : ''}
     <div class="detail-section" style="margin-top:16px">
+      <div class="detail-section-title">Camper info</div>
+      ${ageLabel(c)?`<div class="detail-row"><i class="ti ti-id"></i><span><strong>Age:</strong> ${ageLabel(c).replace(/^Age /,'')}</span></div>`:''}
+      ${camperRegDate(regs)?`<div class="detail-row"><i class="ti ti-calendar-event"></i><span><strong>Registered:</strong> ${esc(camperRegDate(regs))}</span></div>`:''}
+    </div>
+    <div class="detail-section">
       <div class="detail-section-title">Contact</div>
       ${c.parent?`<div class="detail-row"><i class="ti ti-user"></i><span>${esc(c.parent)}</span></div>`:''}
       ${c.phone?`<div class="detail-row"><i class="ti ti-phone"></i><span>${esc(c.phone)}</span></div>`:''}
@@ -9345,6 +9412,7 @@ function openModal(id=null, mode='full') {
   document.getElementById('fFirst').value = c?.first||'';
   document.getElementById('fLast').value = c?.last||'';
   document.getElementById('fAge').value = c?.age||'';
+  document.getElementById('fDob').value = c?.dob||'';
   document.getElementById('fParent').value = c?.parent||'';
   document.getElementById('fPhone').value = c?.phone||'';
   document.getElementById('fEmail').value = c?.email||'';
@@ -9434,6 +9502,7 @@ async function saveCamper() {
   const sharedData = {
     first, last,
     age: +document.getElementById('fAge').value||null,
+    dob: document.getElementById('fDob').value || null,
     parent: document.getElementById('fParent').value.trim(),
     phone: document.getElementById('fPhone').value.trim(),
     email: document.getElementById('fEmail').value.trim(),
@@ -9566,7 +9635,7 @@ async function saveCamper() {
         showToast('Already registered for that week.', 'error'); return;
       }
       // Copy personal fields from the existing camper, set this week's schedule
-      const personalFields = ['first','last','age','parent','phone','email','address','allergies','medical','healthCard','notes','parent2','phone2','email2','address2','ec1Name','ec1Phone','ec1Rel','ec2Name','ec2Phone','ec2Rel','pickup'];
+      const personalFields = ['first','last','age','dob','parent','phone','email','address','allergies','medical','healthCard','notes','parent2','phone2','email2','address2','ec1Name','ec1Phone','ec1Rel','ec2Name','ec2Phone','ec2Rel','pickup'];
       const newReg = {};
       personalFields.forEach(f => { if (editing[f] !== undefined && editing[f] !== null) newReg[f] = editing[f]; });
       newReg.type = cType;
@@ -10225,6 +10294,17 @@ function buildImportRows(csvRows) {
     ], { includes: ['phone', 'mobile', 'cell'], exclude: ['secondary', 'emergency', 'contact #', 'contact 1', 'contact 2', 'contact#'] }) || '';
     const address = row['Mailing address'] || '';
 
+    // Child's date of birth. The exact JotForm label hasn't been verified
+    // against a live export, so match known phrasings first, then fall back
+    // to any column mentioning birth/DOB (rowFind handles case/space/BOM
+    // drift, the same defence that fixed the phone-label breakage).
+    const dobRaw = rowFind(row, [
+      "Child's date of birth", "Child's Date of Birth", 'Date of birth',
+      'Date of Birth', 'DOB', "Camper's date of birth", 'Child date of birth',
+      'Birth date', 'Birthdate', 'Birthday'
+    ], { includes: ['birth', 'dob'], exclude: ['place of birth'] }) || '';
+    const dob = dobToYmd(dobRaw);
+
     const has2nd = (row["Do you want to add a second parent/guardian's contact info?"] || '').toLowerCase() === 'yes';
     const parent2  = has2nd ? (row['Secondary parent/guardian name'] || '') : '';
     const email2   = has2nd ? (row['Secondary parent email address'] || '') : '';
@@ -10272,7 +10352,7 @@ function buildImportRows(csvRows) {
       // dedup key. An entry "exists" if its key is already in the database OR
       // already queued earlier in this same batch.
       const weeklyData = {
-        first, last, age: null,
+        first, last, age: null, dob,
         parent, email, phone, address,
         parent2, email2, phone2, address2,
         ec1Name, ec1Phone, ec1Rel, ec2Name, ec2Phone, ec2Rel,
@@ -10313,7 +10393,7 @@ function buildImportRows(csvRows) {
       const wantPost = parsed.post || (row[dailyPostCol] || '').toLowerCase() === 'post-care';
 
       const commonData = {
-        first, last, age: null,
+        first, last, age: null, dob,
         parent, email, phone, address,
         parent2, email2, phone2, address2,
         ec1Name, ec1Phone, ec1Rel, ec2Name, ec2Phone, ec2Rel,
@@ -10780,6 +10860,12 @@ function jotformAnswerToRow(answers) {
         row[label] = String(value.full || [value.area, value.phone].filter(Boolean).join(' ')).trim();
       } else if ('first' in value || 'last' in value) {
         row[label] = [value.prefix, value.first, value.middle, value.last, value.suffix].filter(Boolean).join(' ').trim();
+      } else if ('datetime' in value || (('year' in value) && ('month' in value || 'day' in value))) {
+        // JotForm date widget (control_datetime): {year, month, day} or
+        // {datetime: 'YYYY-MM-DD HH:MM:SS'}. Without this branch it fell
+        // into the matrix handler and the label never mapped.
+        row[label] = String(value.datetime ||
+          [value.year, value.month, value.day].filter(Boolean).join('-')).trim();
       } else if ('addr_line1' in value || 'city' in value || 'postal' in value || 'state' in value) {
         row[label] = [value.addr_line1, value.addr_line2, value.city, value.state, value.postal, value.country].filter(Boolean).join(' ').trim();
       } else {
