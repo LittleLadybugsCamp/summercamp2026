@@ -1024,6 +1024,12 @@
   .modal-week-btn.active .mwb-dates { color: rgba(255,255,255,0.85); }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .form-group { margin-bottom: 12px; }
+  /* Read-only value shown in place of an input (e.g. auto-computed age). */
+  .form-static {
+    padding: 9px 11px; font-size: 14px; color: var(--text);
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; min-height: 20px; line-height: 20px;
+  }
   .form-label { font-size: 12.5px; color: var(--text-2); margin-bottom: 5px; display: block; font-weight: 500; letter-spacing: -0.01em; }
   .type-toggle { display: flex; gap: 8px; }
   .type-toggle {
@@ -3324,8 +3330,8 @@
       <div class="form-group"><label class="form-label">Last name *</label><input type="text" id="fLast" placeholder="Johnson"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Date of birth</label><input type="date" id="fDob"></div>
-      <div class="form-group"><label class="form-label">Age <span style="color:var(--text-3);font-weight:400">(auto from DOB)</span></label><input type="number" id="fAge" placeholder="8" min="3" max="18"></div>
+      <div class="form-group"><label class="form-label">Date of birth</label><input type="date" id="fDob" oninput="updateAgeDisplay()"></div>
+      <div class="form-group"><label class="form-label">Age</label><div id="fAgeDisplay" class="form-static">—</div></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Parent / guardian</label><input type="text" id="fParent" placeholder="Sarah Johnson"></div>
@@ -4019,11 +4025,31 @@ function ageFromDob(dob) {
   if (mo < +m[2] || (mo === +m[2] && d < +m[3])) age--;  // birthday not yet this year
   return (age >= 0 && age <= 120) ? age : null;
 }
-// "Age 7 (2019-03-14)" — or the legacy static number if no DOB, or ''.
+// Format a stored YYYY-MM-DD date of birth for display as DD-MON-YYYY
+// (e.g. "02-Jul-2018"). Storage stays ISO; this is display-only.
+function dobDisplay(ymd) {
+  const m = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return esc(ymd || '');
+  const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][(+m[2]) - 1];
+  if (!mon) return esc(ymd);
+  return m[3] + '-' + mon + '-' + m[1];
+}
+window.dobDisplay = dobDisplay;
+
+// "Age 7 (02-Jul-2018)" — or the legacy static number if no DOB, or ''.
 function ageLabel(c) {
   if (c && c.dob) {
     const a = ageFromDob(c.dob);
-    if (a != null) return 'Age ' + a + ' (' + esc(c.dob) + ')';
+    if (a != null) return 'Age ' + a + ' (' + dobDisplay(c.dob) + ')';
+  }
+  return (c && c.age) ? 'Age ' + esc(c.age) : '';
+}
+// "Age 7" without the bracketed DOB — for the quick cards; the detail view
+// keeps the full ageLabel with the date of birth.
+function ageShort(c) {
+  if (c && c.dob) {
+    const a = ageFromDob(c.dob);
+    if (a != null) return 'Age ' + a;
   }
   return (c && c.age) ? 'Age ' + esc(c.age) : '';
 }
@@ -4040,6 +4066,21 @@ function camperRegDate(regs) {
 window.dobToYmd = dobToYmd;
 window.ageFromDob = ageFromDob;
 window.ageLabel = ageLabel;
+window.ageShort = ageShort;
+
+// Refresh the read-only Age display in the edit modal. Called on load and
+// whenever the DOB picker changes. Falls back to a legacy stored age only
+// when there's no DOB and no camper edit in progress can supply a DOB.
+function updateAgeDisplay(c) {
+  const el = document.getElementById('fAgeDisplay');
+  if (!el) return;
+  const dob = document.getElementById('fDob')?.value || (c && c.dob) || '';
+  const a = dob ? ageFromDob(dob) : null;
+  if (a != null) { el.textContent = 'Age ' + a; return; }
+  if (c && c.age != null && !dob) { el.textContent = 'Age ' + c.age + ' (no DOB on file)'; return; }
+  el.textContent = dob ? 'Enter a valid date of birth' : '—';
+}
+window.updateAgeDisplay = updateAgeDisplay;
 window.camperRegDate = camperRegDate;
 // Calendar state: explicit month/week selection (restricted to July & August)
 let selectedCalMonth = '2026-07';  // YYYY-MM
@@ -8261,7 +8302,7 @@ function renderRoster() {
         <div class="avatar" style="background:${bg};color:${fg}">${esc(ini)}</div>
         <div>
           <div class="card-name">${esc(g.first)} ${esc(g.last)}</div>
-          <div class="card-sub">${ageLabel(g)}${g.parent?' · '+esc(g.parent):''}</div>
+          <div class="card-sub">${ageShort(g)}${g.parent?' · '+esc(g.parent):''}</div>
         </div>
       </div>
       <div class="badges">
@@ -8361,7 +8402,7 @@ function rWeekly() {
         <div class="avatar" style="background:${bg};color:${fg}">${esc(ini)}</div>
         <div>
           <div class="card-name">${esc(c.first)} ${esc(c.last)}</div>
-          <div class="card-sub">${ageLabel(c)}${c.parent?' · '+esc(c.parent):''}</div>
+          <div class="card-sub">${ageShort(c)}${c.parent?' · '+esc(c.parent):''}</div>
         </div>
       </div>
       <div class="badges">
@@ -9411,8 +9452,8 @@ function openModal(id=null, mode='full') {
 
   document.getElementById('fFirst').value = c?.first||'';
   document.getElementById('fLast').value = c?.last||'';
-  document.getElementById('fAge').value = c?.age||'';
   document.getElementById('fDob').value = c?.dob||'';
+  updateAgeDisplay(c);
   document.getElementById('fParent').value = c?.parent||'';
   document.getElementById('fPhone').value = c?.phone||'';
   document.getElementById('fEmail').value = c?.email||'';
@@ -9501,8 +9542,16 @@ async function saveCamper() {
   // Gather shared personal info
   const sharedData = {
     first, last,
-    age: +document.getElementById('fAge').value||null,
     dob: document.getElementById('fDob').value || null,
+    age: (function(){
+      const _d = document.getElementById('fDob').value;
+      const _a = _d ? ageFromDob(_d) : null;
+      if (_a != null) return _a;
+      // No DOB → preserve whatever age the record already had (legacy campers
+      // that were entered before DOB existed). Never re-introduces manual entry.
+      const _prev = editingId ? (window.campers || []).find(x => x.id === editingId) : null;
+      return _prev && _prev.age != null ? _prev.age : null;
+    })(),
     parent: document.getElementById('fParent').value.trim(),
     phone: document.getElementById('fPhone').value.trim(),
     email: document.getElementById('fEmail').value.trim(),
