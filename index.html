@@ -3226,6 +3226,9 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeImport()">Cancel</button>
       <div class="modal-footer-right">
+        <button class="btn btn-ghost" id="importDismissAllBtn" onclick="dismissAllJotformRows()" style="display:none" title="Permanently skip every submission shown here on future syncs. You can still import any of them later from a CSV.">
+          <i class="ti ti-eye-off"></i> Dismiss all
+        </button>
         <button class="btn btn-primary" id="importBtn" onclick="doImport()" style="display:none">
           <i class="ti ti-upload"></i> Import all
         </button>
@@ -6078,20 +6081,21 @@ function camperKey(c) {
 // week even if stray dupes exist in the database. The real fix (dedup at
 // import) prevents new ones.
 //
-// IMPORTANT: this uses an IDENTITY key (name + parent email + week + type),
-// NOT the submissionId-based key. Two documents for the same real child+week
-// can have different submissionIds (e.g. one from a JotForm sync, one from a
-// CSV file import, or two JotForm submissions for the same kid). Using identity
-// catches all of those. The tradeoff: two genuinely different children with the
-// same name AND same parent email AND same week+type would merge — but that's a
-// single family registering the same child twice, which IS a duplicate.
+// IMPORTANT: this uses a PERSON+WEEK key (name + week), NOT the
+// submissionId-based key and NOT email/type. Two documents for the same real
+// child+week can differ in submissionId (sync vs CSV vs manual), in email
+// (parent used a different address on the form than what's stored, or a
+// manual add has none), and in type (a registration edited from daily to
+// weekly). All of those are the SAME enrollment — a child attends a given
+// week once — and every one of these divergences has produced real duplicate
+// docs. The tradeoff: two different children with the exact same full name in
+// the same week would merge — but camperKey (first|last) already merges them
+// everywhere else in the app, so this introduces no new ambiguity.
 function registrationIdentityKey(c) {
   const fl = (c.first || '').toLowerCase().trim();
   const ll = (c.last || '').toLowerCase().trim();
-  const em = (c.email || '').toLowerCase().trim();
   const wk = c.weekStart || '';
-  const type = c.type || '';
-  return `${fl}|${ll}|${em}|${wk}|${type}`;
+  return `${fl}|${ll}|${wk}`;
 }
 window.registrationIdentityKey = registrationIdentityKey;
 
@@ -6156,7 +6160,7 @@ function renderStats() {
   const totalUnique = groups.length;
   const weeklyUnique = groups.filter(g => g.registrations.some(r => r.type==='weekly')).length;
   const dailyUnique  = groups.filter(g => g.registrations.some(r => r.type==='daily')).length;
-  const totalRegs = window.campers.filter(c => !c.refunded && !c.archived).length;
+  const totalRegs = dedupeRegistrations(window.campers.filter(c => !c.refunded && !c.archived)).length;
   document.getElementById('statsGrid').innerHTML = `
     <div class="stat-card">
       <div class="stat-card-head">
@@ -9701,8 +9705,23 @@ async function saveCamper() {
     } else {
       // ── New camper (full) — create one registration per selected week ──
       if(!first||!last) { showToast("Please enter the camper's name.", 'error'); return; }
-      const weeks = [...modalSelectedWeeks];
+      let weeks = [...modalSelectedWeeks];
       if(!weeks.length) { showToast('Please select at least one week.', 'error'); return; }
+      // Duplicate guard: if a child with this exact name already has a live
+      // (non-refunded) registration for a selected week, skip that week — the
+      // schedule editor is the way to change an existing week. Without this,
+      // re-adding an existing camper minted a second doc for the same week.
+      const dupKey = first.toLowerCase().trim() + '|' + last.toLowerCase().trim();
+      const alreadyWeeks = weeks.filter(ws =>
+        (window.campers || []).some(x => camperKey(x) === dupKey && x.weekStart === ws && !x.refunded));
+      if (alreadyWeeks.length) {
+        weeks = weeks.filter(ws => !alreadyWeeks.includes(ws));
+        if (!weeks.length) {
+          showToast(`${first} ${last} is already registered for ${alreadyWeeks.length === 1 ? 'that week' : 'all of those weeks'} — use Edit schedule to change it.`, 'error');
+          return;
+        }
+        showToast(`Skipped ${alreadyWeeks.length} week${alreadyWeeks.length === 1 ? '' : 's'} ${first} is already registered for.`, 'error');
+      }
       // Strip per week: Monday is a real camp day in most weeks but a holiday
       // in Week 4, so the same picks must be filtered against each week.
       await Promise.all(weeks.map(ws =>
@@ -9817,12 +9836,16 @@ function rCalWeek() {
   const wMon = new Date(mondayStr + 'T00:00:00');
   const days = [0,1,2,3,4].map(i => { const d=new Date(wMon); d.setDate(d.getDate()+i); return d; });
   const today = dStr(new Date());
-  const filt = window.campers.filter(c => {
-    if (c.refunded) return false;
+  // Dedupe is essential here: stray duplicate docs for the same child+week
+  // used to render (and count) twice on the calendar, because this view read
+  // raw window.campers while every other view went through the dedupe net.
+  // Archived campers are also excluded, matching the month view.
+  const filt = dedupeRegistrations(window.campers.filter(c => {
+    if (c.refunded || c.archived) return false;
     if(cF!=='all'&&c.type!==cF) return false;
     if(!c.weekStart) return false;
     return c.weekStart === selectedCalWeek;
-  });
+  }));
   document.getElementById('calGrid').className = 'cal-grid';
   document.getElementById('calGrid').innerHTML = days.map((d,i) => {
     const ds = dStr(d);
@@ -9881,9 +9904,9 @@ function rCalMonth() {
         return { dateStr: dStr(date), dayIdx: d, camper: c };
       });
   }
-  const allEntries = window.campers
-    .filter(c => !c.refunded && !c.archived && (cF==='all' || c.type===cF))
-    .flatMap(campDates);
+  const allEntries = dedupeRegistrations(
+      window.campers.filter(c => !c.refunded && !c.archived && (cF==='all' || c.type===cF))
+    ).flatMap(campDates);
 
   const byDate = {};
   allEntries.forEach(e => {
@@ -10289,10 +10312,12 @@ function buildImportRows(csvRows) {
   // invisible to the per-row existence test.
   const batchKeys = new Set();
   // Pre-seed with keys already in the database so cross-sync duplicates are
-  // caught too. We add BOTH the submissionId-aware key AND the identity key
-  // (name+email+week+type) for every existing camper, so an incoming JotForm
-  // submission is recognized as a duplicate of an existing CSV-imported camper
-  // (and vice versa) even though their submissionId-based keys differ.
+  // caught too. We add BOTH the submissionId-aware key AND the person+week
+  // identity key (name+week) for every existing camper, so an incoming JotForm
+  // submission is recognized as already-registered even when the stored doc
+  // was added manually, came from a CSV, or has since been EDITED in the app
+  // (different email, different type, different days — still the same child
+  // in the same week, so still "exists").
   const addBothKeys = (c) => {
     batchKeys.add(registrationDedupKey(c));
     if (typeof registrationIdentityKey === 'function') batchKeys.add(registrationIdentityKey(c));
@@ -10300,9 +10325,11 @@ function buildImportRows(csvRows) {
   (window.campers || []).forEach(addBothKeys);
   // Each CSV row may register for multiple weeks → create one camper entry per week
   csvRows.forEach(row => {
-    // Skip submissions the admin has explicitly dismissed in a prior sync
-    // (per-submission ignore list — see jotformDismissed config). Identified
-    // by JotForm's stable submission ID, so genuinely new entries are unaffected.
+    // Skip submissions the admin has explicitly dismissed on a prior sync
+    // (per-submission ignore list — see the jotformDismissed config).
+    // IMPORTANT: this only ever affects JotForm *syncs*. A manual CSV row has
+    // no __submissionId, so this filter is a no-op for CSV import — that's the
+    // deliberate escape hatch for re-importing a dismissed registration.
     const submissionId = row.__submissionId || '';
     if (submissionId && isJotformSubmissionDismissed(submissionId)) return;
 
@@ -10548,6 +10575,14 @@ function buildImportRows(csvRows) {
   });
 
   // Show preview
+  renderImportPreview();
+}
+
+// Renders the staged importRows into the preview list. Split out of
+// buildImportRows so dismiss actions can re-render without re-fetching source
+// data.
+function renderImportPreview() {
+  if (!importRows.length) { closeImport(); return; }
   const importable = importRows.filter(r => r.data && !r.exists);
   document.getElementById('importPreviewTitle').textContent = importRows.length + ' registrations found';
   const newCount = importable.length;
@@ -10612,7 +10647,7 @@ function buildImportRows(csvRows) {
         + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
         + '<div class="import-row-weeks">' + esc(r.weekLabel) + ' <span style="opacity:.6">· Daily</span></div>'
         + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
-        + (r.exists ? dismissBtn : '')
+        + dismissBtn
         + '<div style="flex-basis:100%;margin-top:5px;font-size:12px;color:var(--text-2)">'
         +   '<strong>' + esc(dayNames) + '</strong>' + esc(careStr)
         +   (r.unmatched && r.unmatched.length ? '<span style="color:#b45309"> · couldn\'t match: ' + esc(r.unmatched.join(', ')) + '</span>' : '')
@@ -10623,12 +10658,13 @@ function buildImportRows(csvRows) {
       + '<div class="import-row-name">' + esc(r.csvName) + '</div>'
       + '<div class="import-row-weeks">' + r.weekLabel + '</div>'
       + '<span class="import-status ' + (r.exists ? 'import-status-exists' : 'import-status-new') + '">' + (r.exists ? 'Exists' : 'New') + '</span>'
-      + (r.exists ? dismissBtn : '')
+      + dismissBtn
       + '</div>';
   }).join('');
   document.getElementById('importPreview').style.display = 'block';
   refreshImportPreviewCounts();
 }
+window.renderImportPreview = renderImportPreview;
 
 // Recomputes the summary line and Import button. Import only ever adds new
 // records; existing ones are always skipped.
@@ -10649,6 +10685,12 @@ function refreshImportPreviewCounts() {
   }
   const drop = document.getElementById('importDrop');
   if (drop) drop.style.display = 'none';
+  // "Dismiss all" is offered whenever any shown row carries a JotForm
+  // submission ID (i.e. came from a sync). CSV rows have no submissionId, so
+  // this button simply won't appear for a manual CSV import.
+  const dismissable = importRows.filter(r => r.submissionId).length;
+  const dAll = document.getElementById('importDismissAllBtn');
+  if (dAll) dAll.style.display = dismissable > 0 ? 'flex' : 'none';
 }
 window.refreshImportPreviewCounts = refreshImportPreviewCounts;
 
@@ -11105,36 +11147,30 @@ async function jotformPoll() {
 async function onDismissJotformRow(submissionId) {
   if (!submissionId) return;
   await dismissJotformSubmission(submissionId);
-  // Filter the staged rows in-place so other rows still on screen aren't lost
+  // Drop this submission's row(s) from the live preview, then re-render.
   importRows = importRows.filter(r => String(r.submissionId || '') !== String(submissionId));
-  showToast('Submission dismissed — it won\u2019t appear again.');
-  // If there's nothing left in the preview, close it; otherwise re-render
-  const stillImportable = importRows.filter(r => r.data && !r.exists).length;
-  const stillReview     = importRows.filter(r => r.needsReview).length;
-  const stillExists     = importRows.filter(r => r.exists).length;
-  if (!importRows.length) { closeImport(); return; }
-  // Re-render the preview counts and list
-  document.getElementById('importPreviewTitle').textContent = importRows.length + ' registrations found';
-  const subParts = [stillImportable + ' new', stillExists + ' already exist (will skip)'];
-  if (stillReview) subParts.push(stillReview + ' need review');
-  document.getElementById('importPreviewSub').textContent = subParts.join(' · ');
-  // Re-trigger the existing renderer by calling buildImportRows? No — that
-  // would re-fetch state. The cheapest path is to remove the matching DOM
-  // nodes; or, simplest and safest, just trigger another sync to rebuild
-  // the preview from cached submissions. But the cached path isn't exposed,
-  // so we just remove the rows in the DOM and let counts update above.
-  const list = document.getElementById('importPreviewList');
-  if (list) {
-    // Find rows by walking children and removing those whose dismiss button
-    // matched this submission ID. Cheaper than a full re-render.
-    [...list.children].forEach(node => {
-      const btn = node.querySelector && node.querySelector('.import-dismiss[onclick*="' + submissionId + '"]');
-      if (btn) node.remove();
-    });
-  }
-  document.getElementById('importBtn').style.display = stillImportable > 0 ? 'flex' : 'none';
+  showToast('Submission dismissed \u2014 it won\u2019t appear again.');
+  renderImportPreview(); // closes the importer if nothing's left
 }
 window.onDismissJotformRow = onDismissJotformRow;
+
+// "Dismiss all" — permanently skip EVERY submission currently in the preview
+// (new and existing alike) on future syncs. Records all their IDs at once,
+// then closes the importer. Manual CSV import of any of them still works,
+// because CSV rows carry no submission ID and so bypass the dismiss filter.
+async function dismissAllJotformRows() {
+  const ids = [...new Set(importRows.map(r => String(r.submissionId || '')).filter(Boolean))];
+  if (!ids.length) { showToast('Nothing to dismiss.', 'error'); return; }
+  const ok = confirm('Dismiss all ' + ids.length + ' submission' + (ids.length === 1 ? '' : 's') +
+    ' shown here? They won\u2019t appear in future JotForm syncs. You can still import any of them later from a CSV.');
+  if (!ok) return;
+  for (const id of ids) await dismissJotformSubmission(id);
+  importRows = importRows.filter(r => !r.submissionId); // keep any CSV rows
+  showToast(ids.length + ' submission' + (ids.length === 1 ? '' : 's') + ' dismissed — they won\u2019t appear again.');
+  if (!importRows.length) { closeImport(); return; }
+  renderImportPreview();
+}
+window.dismissAllJotformRows = dismissAllJotformRows;
 
 function startJotformAutoPoll() {
   // Clear ALL pending timers so re-entry can't schedule two parallel polls.
