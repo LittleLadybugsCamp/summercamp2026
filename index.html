@@ -1494,6 +1494,16 @@
   .ls-editor p { margin: 4px 0; }
   .ls-save-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
   .ls-saved-note { font-size: 12px; color: var(--text-3); }
+  /* Learning-note camper picker (Reports "+" modal) */
+  .ln-pick-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+  .ln-pick-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; text-align: left; padding: 10px 12px; border: 1px solid var(--border);
+    background: var(--surface); border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--text);
+  }
+  .ln-pick-item:hover { background: var(--surface2); border-color: var(--green); }
+  .ln-pick-flag { font-size: 11.5px; color: var(--green); display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+  .ln-pick-flag i { font-size: 13px; }
   .detail-section-title { font-size: 12.5px; font-weight: 600; color: var(--text-3); margin-bottom: 10px; letter-spacing: -0.01em; }
   .detail-row { display: flex; gap: 9px; margin-bottom: 7px; font-size: 13.5px; align-items: flex-start; }
   .detail-row i { color: var(--text-3); font-size: 15px; margin-top: 1px; flex-shrink: 0; width: 16px; }
@@ -2616,7 +2626,8 @@
           <button class="admin-tab active" data-rtab="email" onclick="showReportTab('email',this)"><i class="ti ti-mail"></i> Email</button>
           <button class="admin-tab" data-rtab="consent" onclick="showReportTab('consent',this)"><i class="ti ti-checklist"></i> Consent</button>
           <button class="admin-tab" data-rtab="allergies" onclick="showReportTab('allergies',this)"><i class="ti ti-alert-triangle"></i> Allergies</button>
-          <button class="admin-tab" data-rtab="notes" onclick="showReportTab('notes',this)"><i class="ti ti-notes"></i> Notes</button>
+          <button class="admin-tab" data-rtab="notes" onclick="showReportTab('notes',this)"><i class="ti ti-notes"></i> Parental Notes</button>
+          <button class="admin-tab" data-rtab="learning" onclick="showReportTab('learning',this)"><i class="ti ti-bulb"></i> Learning Style/Notes</button>
         </div>
 
         <!-- Email hub -->
@@ -2670,8 +2681,17 @@
 
         <!-- Notes report -->
         <div id="rtab-notes" style="display:none">
-          <div class="report-intro">Campers whose registration includes special notes or interests (the "anything else we should know" field).</div>
+          <div class="report-intro">Parental notes from registration — the "anything else we should know" field parents fill in on the form.</div>
           <div id="notesReportBody"><div class="report-empty">Loading…</div></div>
+        </div>
+
+        <!-- Learning Style / Notes report (staff-authored) -->
+        <div id="rtab-learning" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+            <div class="report-intro" style="flex:1;min-width:200px">Staff-authored notes on each camper's learning style and interests. Add or edit them here, or from any camper's detail card.</div>
+            <button class="btn btn-primary btn-sm" onclick="openLearningNotePicker()" title="Add a note for a camper"><i class="ti ti-plus"></i> Add / edit note</button>
+          </div>
+          <div id="learningReportBody"><div class="report-empty">Loading…</div></div>
         </div>
       </div>
     </div>
@@ -3302,6 +3322,16 @@
 <!-- Detail Panel -->
 <div class="detail-overlay" id="detailOverlay" onclick="if(event.target===this)closeDetail()">
   <div class="detail-panel" id="detailPanel"></div>
+</div>
+
+<div class="modal-overlay" id="lnOverlay" onclick="if(event.target===this)closeLearningNote()">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title" id="lnModalTitle">Learning Style / Notes</span>
+      <button class="modal-close" onclick="closeLearningNote()"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="lnModalBody" style="padding:4px 2px"></div>
+  </div>
 </div>
 
 <div class="modal-overlay" id="invoiceOverlay" onclick="if(event.target===this)closeInvoice()">
@@ -4198,6 +4228,7 @@ function renderReports() {
   if (tab === 'consent') renderConsentReport();
   else if (tab === 'allergies') renderAllergyReport();
   else if (tab === 'notes') renderNotesReport();
+  else if (tab === 'learning') renderLearningNotesReport();
   // 'email' tab needs no render — it's the buttons themselves.
 }
 window.renderReports = renderReports;
@@ -4223,13 +4254,14 @@ window.selectEmailWeek = selectEmailWeek;
 function showReportTab(name, btn) {
   document.querySelectorAll('#page-reports .admin-tab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['email', 'consent', 'allergies', 'notes'].forEach(t => {
+  ['email', 'consent', 'allergies', 'notes', 'learning'].forEach(t => {
     const el = document.getElementById('rtab-' + t);
     if (el) el.style.display = (t === name) ? '' : 'none';
   });
   if (name === 'consent') renderConsentReport();
   else if (name === 'allergies') renderAllergyReport();
   else if (name === 'notes') renderNotesReport();
+  else if (name === 'learning') renderLearningNotesReport();
 }
 window.showReportTab = showReportTab;
 
@@ -4469,6 +4501,105 @@ function renderNotesReport() {
     : '<div class="report-empty">No campers with special notes.</div>';
 }
 window.renderNotesReport = renderNotesReport;
+
+// Learning Style / Notes report — staff-authored notes (learningNotes), shown
+// as sanitized HTML. Clicking a name opens that camper's editor modal.
+function renderLearningNotesReport() {
+  const body = document.getElementById('learningReportBody');
+  if (!body) return;
+  const byChild = new Map();
+  (window.campers || []).filter(c => !c.refunded && !c.archived).forEach(c => {
+    const k = camperKey(c);
+    if (!k || k === '|') return;
+    const html = (c.learningNotes && String(c.learningNotes).trim()) || '';
+    const cur = byChild.get(k) || { key: k, name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(), notes: '' };
+    // Keep the longest note found across the child's week docs (they're synced,
+    // but a partial legacy state could differ).
+    if (html && html.length > cur.notes.length) cur.notes = html;
+    byChild.set(k, cur);
+  });
+  const rows = [...byChild.values()].filter(r => r.notes).sort((a, b) => a.name.localeCompare(b.name));
+  body.innerHTML = rows.length
+    ? `<div class="report-summary">${rows.length} camper${rows.length === 1 ? '' : 's'} with learning notes</div>` +
+      rows.map(r => `
+        <div class="report-row report-row-text">
+          <button class="report-name report-name-btn" onclick="openLearningNoteEditor('${jsArg(r.key)}')" title="Edit this note"><i class="ti ti-bulb" style="color:var(--green);font-size:14px"></i> ${esc(r.name)}</button>
+          <span class="report-text">${lsSanitize(r.notes)}</span>
+        </div>`).join('')
+    : '<div class="report-empty">No learning-style notes yet. Tap “Add / edit note” to start one.</div>';
+}
+window.renderLearningNotesReport = renderLearningNotesReport;
+
+// ── Learning-note modal (opened from the Reports "+" button or a name) ──
+// The "+" opens a searchable list of all campers; picking one swaps the modal
+// to the shared editor for that child. The editor is byte-for-byte the same
+// component used in the detail slide-over (learningNotesEditorHtml), so notes
+// added here behave identically and save to the same field.
+function openLearningNotePicker() {
+  const body = document.getElementById('lnModalBody');
+  document.getElementById('lnModalTitle').textContent = 'Add / edit a learning note';
+  body.innerHTML = ''
+    + '<div class="form-group" style="margin-bottom:10px">'
+    +   '<input type="text" id="lnPickSearch" class="form-input" placeholder="Search campers by name…" autocomplete="off" oninput="renderLearningNotePickList(this.value)">'
+    + '</div>'
+    + '<div id="lnPickList" class="ln-pick-list"></div>';
+  renderLearningNotePickList('');
+  document.getElementById('lnOverlay').classList.add('open');
+  setTimeout(() => { const s = document.getElementById('lnPickSearch'); if (s) s.focus(); }, 50);
+}
+window.openLearningNotePicker = openLearningNotePicker;
+
+// Build the picker list. One row per child (deduped by camperKey), filtered by
+// the search box, flagging who already has a note.
+function renderLearningNotePickList(q) {
+  const list = document.getElementById('lnPickList');
+  if (!list) return;
+  const query = (q || '').toLowerCase().trim();
+  const byChild = new Map();
+  (window.campers || []).filter(c => !c.refunded && !c.archived).forEach(c => {
+    const k = camperKey(c);
+    if (!k || k === '|') return;
+    if (!byChild.has(k)) {
+      byChild.set(k, {
+        key: k,
+        name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(),
+        hasNote: !!(c.learningNotes && String(c.learningNotes).trim())
+      });
+    } else if (c.learningNotes && String(c.learningNotes).trim()) {
+      byChild.get(k).hasNote = true;
+    }
+  });
+  let rows = [...byChild.values()].sort((a, b) => a.name.localeCompare(b.name));
+  if (query) rows = rows.filter(r => r.name.toLowerCase().includes(query));
+  list.innerHTML = rows.length
+    ? rows.map(r =>
+        '<button type="button" class="ln-pick-item" onclick="openLearningNoteEditor(\'' + jsArg(r.key) + '\')">'
+        + '<span>' + esc(r.name) + '</span>'
+        + (r.hasNote ? '<span class="ln-pick-flag"><i class="ti ti-bulb"></i> has note</span>' : '')
+        + '</button>').join('')
+    : '<div class="report-empty" style="padding:18px">No campers match.</div>';
+}
+window.renderLearningNotePickList = renderLearningNotePickList;
+
+function openLearningNoteEditor(key) {
+  const regs = (window.campers || []).filter(c => camperKey(c) === key);
+  if (!regs.length) { showToast('Camper not found', 'error'); return; }
+  const c = regs[0];
+  document.getElementById('lnModalTitle').textContent =
+    'Learning Style / Notes — ' + ((c.first || '') + ' ' + (c.last || '')).trim();
+  // Prefix 'lnm' → its own editor/save-note ids, independent of the detail
+  // panel's 'ls' instance (they can even be open at once).
+  document.getElementById('lnModalBody').innerHTML =
+    learningNotesEditorHtml(key, c.learningNotes || '', 'lnm');
+  document.getElementById('lnOverlay').classList.add('open');
+  setTimeout(() => { const ed = document.getElementById('lnmEditor'); if (ed) ed.focus(); }, 50);
+}
+window.openLearningNoteEditor = openLearningNoteEditor;
+
+function closeLearningNote() {
+  document.getElementById('lnOverlay').classList.remove('open');
+}
+window.closeLearningNote = closeLearningNote;
 
 // Admin page is restricted to admins via their signed-in role. The login
 // itself is the gate, so no separate admin password is needed.
@@ -9211,7 +9342,7 @@ function openDetail(key) {
       }).join('')}
     </div>
 
-    ${c.notes?`<div class="detail-section"><div class="detail-section-title">Notes &amp; interests</div><div style="font-size:13px;color:var(--text-2);white-space:pre-wrap">${esc(c.notes)}</div></div>`:''}
+    ${c.notes?`<div class="detail-section"><div class="detail-section-title">Parental Notes</div><div style="font-size:13px;color:var(--text-2);white-space:pre-wrap">${esc(c.notes)}</div></div>`:''}
     ${c.parent2?`<div class="detail-section">
       <div class="detail-section-title">Second parent / guardian</div>
       <div class="detail-row"><i class="ti ti-user"></i><span>${esc(c.parent2)}</span></div>
@@ -9235,21 +9366,7 @@ function openDetail(key) {
     </div>`:''}
     <div class="detail-section" style="border-bottom:none">
       <div class="detail-section-title">Learning Style / Notes</div>
-      <div class="ls-toolbar" role="toolbar" aria-label="Formatting">
-        <button type="button" class="ls-tb-btn" title="Bold" onmousedown="lsFmt(event,'bold')"><b>B</b></button>
-        <button type="button" class="ls-tb-btn" title="Italic" onmousedown="lsFmt(event,'italic')"><i>I</i></button>
-        <button type="button" class="ls-tb-btn" title="Underline" onmousedown="lsFmt(event,'underline')"><u>U</u></button>
-        <button type="button" class="ls-tb-btn" title="Bulleted list" onmousedown="lsFmt(event,'insertUnorderedList')"><i class="ti ti-list"></i></button>
-        <button type="button" class="ls-tb-btn" title="Numbered list" onmousedown="lsFmt(event,'insertOrderedList')"><i class="ti ti-list-numbers"></i></button>
-        <button type="button" class="ls-tb-btn" title="Clear formatting" onmousedown="lsFmt(event,'removeFormat')"><i class="ti ti-clear-formatting"></i></button>
-      </div>
-      <div id="lsEditor" class="ls-editor" contenteditable="true"
-           data-placeholder="Add notes on this camper's learning style, interests, or anything staff should know…"
-           onkeydown="lsEditorKeydown(event)">${lsSanitize(c.learningNotes || '')}</div>
-      <div class="ls-save-row">
-        <button class="btn btn-primary btn-sm" onclick="saveLearningNotes('${jsArg(camperKey(c))}', this)"><i class="ti ti-device-floppy"></i> Save notes</button>
-        <span class="ls-saved-note" id="lsSavedNote"></span>
-      </div>
+      ${learningNotesEditorHtml(camperKey(c), c.learningNotes || '', 'ls')}
     </div>
   `;
   document.getElementById('detailOverlay').classList.add('open');
@@ -9265,13 +9382,42 @@ function closeDetail() {
 
 // Apply a formatting command without the button stealing focus from the
 // editor (onmousedown + preventDefault keeps the caret/selection intact).
-function lsFmt(ev, cmd) {
+// `edId` is the id of the editor the toolbar belongs to.
+function lsFmt(ev, cmd, edId) {
   ev.preventDefault();
-  const ed = document.getElementById('lsEditor');
+  const ed = document.getElementById(edId || 'lsEditor');
   if (ed) ed.focus();
   try { document.execCommand(cmd, false, null); } catch (e) {}
 }
 window.lsFmt = lsFmt;
+
+// Build the Learning Style / Notes editor (toolbar + contenteditable + Save).
+// Reused in the camper detail slide-over and the Reports "add note" modal, so
+// every id is namespaced by `prefix` to allow two independent instances.
+function learningNotesEditorHtml(key, currentHtml, prefix) {
+  const p = prefix || 'ls';
+  const edId = p + 'Editor';
+  const noteId = p + 'SavedNote';
+  const btn = (title, cmd, label) =>
+    '<button type="button" class="ls-tb-btn" title="' + title + '" onmousedown="lsFmt(event,\'' + cmd + '\',\'' + edId + '\')">' + label + '</button>';
+  return ''
+    + '<div class="ls-toolbar" role="toolbar" aria-label="Formatting">'
+    +   btn('Bold', 'bold', '<b>B</b>')
+    +   btn('Italic', 'italic', '<i>I</i>')
+    +   btn('Underline', 'underline', '<u>U</u>')
+    +   btn('Bulleted list', 'insertUnorderedList', '<i class="ti ti-list"></i>')
+    +   btn('Numbered list', 'insertOrderedList', '<i class="ti ti-list-numbers"></i>')
+    +   btn('Clear formatting', 'removeFormat', '<i class="ti ti-clear-formatting"></i>')
+    + '</div>'
+    + '<div id="' + edId + '" class="ls-editor" contenteditable="true"'
+    +   ' data-placeholder="Add notes on this camper\'s learning style, interests, or anything staff should know…"'
+    +   ' onkeydown="lsEditorKeydown(event)">' + lsSanitize(currentHtml || '') + '</div>'
+    + '<div class="ls-save-row">'
+    +   '<button class="btn btn-primary btn-sm" onclick="saveLearningNotes(\'' + jsArg(key) + '\', this, \'' + p + '\')"><i class="ti ti-device-floppy"></i> Save notes</button>'
+    +   '<span class="ls-saved-note" id="' + noteId + '"></span>'
+    + '</div>';
+}
+window.learningNotesEditorHtml = learningNotesEditorHtml;
 
 // Enter continues a list. Native contenteditable already does this inside
 // <li> (Enter makes the next bullet/number; Enter on an empty item exits the
@@ -9327,8 +9473,9 @@ function lsSanitize(html) {
 }
 window.lsSanitize = lsSanitize;
 
-async function saveLearningNotes(key, btn) {
-  const ed = document.getElementById('lsEditor');
+async function saveLearningNotes(key, btn, prefix) {
+  const p = prefix || 'ls';
+  const ed = document.getElementById(p + 'Editor');
   if (!ed) return;
   // Treat a visually-empty editor (only <br>/whitespace) as blank.
   const clean = lsSanitize(ed.innerHTML);
@@ -9336,7 +9483,7 @@ async function saveLearningNotes(key, btn) {
   const value = isEmpty ? '' : clean;
   const regs = (window.campers || []).filter(c => camperKey(c) === key);
   if (!regs.length) { showToast('Camper not found', 'error'); return; }
-  const note = document.getElementById('lsSavedNote');
+  const note = document.getElementById(p + 'SavedNote');
   if (btn) btn.disabled = true;
   if (note) note.textContent = 'Saving…';
   const prev = regs.map(r => r.learningNotes);
@@ -9351,6 +9498,10 @@ async function saveLearningNotes(key, btn) {
     ));
     if (note) note.textContent = 'Saved';
     showToast('Notes saved');
+    // Keep the Reports Learning-Notes list current if it's on screen.
+    if (typeof renderLearningNotesReport === 'function') {
+      try { renderLearningNotesReport(); } catch (e) {}
+    }
     setTimeout(() => { if (note) note.textContent = ''; }, 2500);
   } catch (e) {
     regs.forEach((r, i) => { r.learningNotes = prev[i]; }); // revert
