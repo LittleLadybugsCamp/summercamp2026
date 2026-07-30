@@ -1471,6 +1471,29 @@
   .detail-close:hover { background: rgba(60,60,67,0.15); color: var(--text); }
   .detail-section { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 0.5px solid var(--border); }
   .detail-section:last-child { border-bottom: none; }
+  /* ── Learning Style / Notes rich-text editor (camper detail) ── */
+  .ls-toolbar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .ls-tb-btn {
+    min-width: 30px; height: 30px; padding: 0 7px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text-2); border-radius: 7px; cursor: pointer;
+    font-size: 14px; display: inline-flex; align-items: center; justify-content: center;
+    font-family: Georgia, serif; line-height: 1;
+  }
+  .ls-tb-btn:hover { background: var(--surface2); color: var(--text); }
+  .ls-tb-btn:active { transform: scale(.95); }
+  .ls-tb-btn i { font-size: 16px; }
+  .ls-editor {
+    min-height: 120px; max-height: 340px; overflow-y: auto; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+    font-size: 14px; line-height: 1.5; color: var(--text); outline: none;
+  }
+  .ls-editor:focus { border-color: var(--green); }
+  .ls-editor:empty::before { content: attr(data-placeholder); color: var(--text-3); }
+  .ls-editor ul, .ls-editor ol { margin: 4px 0; padding-left: 24px; }
+  .ls-editor li { margin: 2px 0; }
+  .ls-editor p { margin: 4px 0; }
+  .ls-save-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .ls-saved-note { font-size: 12px; color: var(--text-3); }
   .detail-section-title { font-size: 12.5px; font-weight: 600; color: var(--text-3); margin-bottom: 10px; letter-spacing: -0.01em; }
   .detail-row { display: flex; gap: 9px; margin-bottom: 7px; font-size: 13.5px; align-items: flex-start; }
   .detail-row i { color: var(--text-3); font-size: 15px; margin-top: 1px; flex-shrink: 0; width: 16px; }
@@ -3692,7 +3715,7 @@ function startDataListeners() {
     const adm = document.getElementById('page-admin');
     if (typeof window.renderAdmin === 'function' && adm && adm.classList.contains('active')) window.renderAdmin();
     const rep = document.getElementById('page-reports');
-    if (typeof window.renderReports === 'function' && rep && rep.classList.contains('active') && window._userRole === 'admin') window.renderReports();
+    if (typeof window.renderReports === 'function' && rep && rep.classList.contains('active')) window.renderReports();
   }
   _unsubscribers.push(onSnapshot(campersRef, (snapshot) => {
     window.campers = [];
@@ -4163,11 +4186,7 @@ function syncWeekBtnActive(containerId, weekStart) {
 }
 
 function renderReports() {
-  if (window._userRole !== 'admin') {
-    showToast('Reports are restricted to administrators', 'error');
-    showPage('roster');
-    return;
-  }
+  // Reports is available to all signed-in staff (admins + employees).
   // Build both week-button rows once, refresh active states each visit.
   buildReportWeekButtons('consentWeekBtns', selectConsentWeek);
   buildReportWeekButtons('emailWeekBtns', selectEmailWeek);
@@ -4564,8 +4583,9 @@ function hideLogin() {
 // Show/hide UI based on the signed-in user's role.
 function applyRoleUI() {
   const isAdmin = window._userRole === 'admin';
-  // Employees don't see the Admin page at all
-  ['adminNavItem', 'adminNavItemMobile', 'adminNavItemTop', 'reportsNavItemTop', 'reportsNavItemMobile'].forEach(id => {
+  // Employees don't see the Admin page — but Reports is now open to everyone
+  // (consent, allergies, notes and week email lists are day-to-day staff tools).
+  ['adminNavItem', 'adminNavItemMobile', 'adminNavItemTop'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = isAdmin ? '' : 'none';
   });
@@ -9213,12 +9233,134 @@ function openDetail(key) {
       <div class="detail-section-title">Authorized pickup persons</div>
       <div class="detail-row"><i class="ti ti-walk"></i><span>${esc(c.pickup)}</span></div>
     </div>`:''}
+    <div class="detail-section" style="border-bottom:none">
+      <div class="detail-section-title">Learning Style / Notes</div>
+      <div class="ls-toolbar" role="toolbar" aria-label="Formatting">
+        <button type="button" class="ls-tb-btn" title="Bold" onmousedown="lsFmt(event,'bold')"><b>B</b></button>
+        <button type="button" class="ls-tb-btn" title="Italic" onmousedown="lsFmt(event,'italic')"><i>I</i></button>
+        <button type="button" class="ls-tb-btn" title="Underline" onmousedown="lsFmt(event,'underline')"><u>U</u></button>
+        <button type="button" class="ls-tb-btn" title="Bulleted list" onmousedown="lsFmt(event,'insertUnorderedList')"><i class="ti ti-list"></i></button>
+        <button type="button" class="ls-tb-btn" title="Numbered list" onmousedown="lsFmt(event,'insertOrderedList')"><i class="ti ti-list-numbers"></i></button>
+        <button type="button" class="ls-tb-btn" title="Clear formatting" onmousedown="lsFmt(event,'removeFormat')"><i class="ti ti-clear-formatting"></i></button>
+      </div>
+      <div id="lsEditor" class="ls-editor" contenteditable="true"
+           data-placeholder="Add notes on this camper's learning style, interests, or anything staff should know…"
+           onkeydown="lsEditorKeydown(event)">${lsSanitize(c.learningNotes || '')}</div>
+      <div class="ls-save-row">
+        <button class="btn btn-primary btn-sm" onclick="saveLearningNotes('${jsArg(camperKey(c))}', this)"><i class="ti ti-device-floppy"></i> Save notes</button>
+        <span class="ls-saved-note" id="lsSavedNote"></span>
+      </div>
+    </div>
   `;
   document.getElementById('detailOverlay').classList.add('open');
 }
 function closeDetail() {
   document.getElementById('detailOverlay').classList.remove('open');
 }
+
+// ── Learning Style / Notes: lightweight rich-text editor ──
+// Editable by everyone (admins + employees). Stored as sanitized HTML on the
+// camper's `learningNotes` field, written to every one of the child's
+// registration docs so all weeks agree (same pattern as consent).
+
+// Apply a formatting command without the button stealing focus from the
+// editor (onmousedown + preventDefault keeps the caret/selection intact).
+function lsFmt(ev, cmd) {
+  ev.preventDefault();
+  const ed = document.getElementById('lsEditor');
+  if (ed) ed.focus();
+  try { document.execCommand(cmd, false, null); } catch (e) {}
+}
+window.lsFmt = lsFmt;
+
+// Enter continues a list. Native contenteditable already does this inside
+// <li> (Enter makes the next bullet/number; Enter on an empty item exits the
+// list) across Safari/Chrome — so we only step in to keep a *non-list* Enter
+// from creating divs with inconsistent spacing, inserting a clean line break
+// instead. Inside a list we let the browser handle it.
+function lsEditorKeydown(ev) {
+  if (ev.key !== 'Enter' || ev.shiftKey) return;
+  const sel = window.getSelection && window.getSelection();
+  let node = sel && sel.anchorNode;
+  while (node && node !== ev.currentTarget) {
+    const tag = node.nodeName ? node.nodeName.toLowerCase() : '';
+    if (tag === 'li' || tag === 'ul' || tag === 'ol') return; // let the browser continue the list
+    node = node.parentNode;
+  }
+}
+window.lsEditorKeydown = lsEditorKeydown;
+
+// Whitelist sanitizer — stored notes are re-rendered as HTML into the panel,
+// so anything that isn't a known formatting tag is stripped (defends against
+// stored markup being used to inject script/handlers). Allows only the tags
+// the toolbar can produce, and drops every attribute.
+function lsSanitize(html) {
+  if (!html) return '';
+  const allowed = new Set(['B','STRONG','I','EM','U','UL','OL','LI','P','BR','DIV','SPAN']);
+  const tpl = document.createElement('div');
+  tpl.innerHTML = String(html);
+  const walk = (node) => {
+    let child = node.firstChild;
+    while (child) {
+      const next = child.nextSibling;
+      if (child.nodeType === 1) { // element
+        if (!allowed.has(child.nodeName)) {
+          // Unwrap disallowed element: promote its children in place, then
+          // re-process from the first promoted child so nested disallowed
+          // tags (e.g. <tbody> inside a stripped <table>) are caught too.
+          const first = child.firstChild;
+          while (child.firstChild) node.insertBefore(child.firstChild, child);
+          node.removeChild(child);
+          child = first || next;
+          continue;
+        }
+        [...child.attributes].forEach(a => child.removeAttribute(a.name)); // strip all attrs
+        walk(child);
+      } else if (child.nodeType !== 3) {
+        node.removeChild(child); // drop comments etc.
+      }
+      child = next;
+    }
+  };
+  walk(tpl);
+  return tpl.innerHTML;
+}
+window.lsSanitize = lsSanitize;
+
+async function saveLearningNotes(key, btn) {
+  const ed = document.getElementById('lsEditor');
+  if (!ed) return;
+  // Treat a visually-empty editor (only <br>/whitespace) as blank.
+  const clean = lsSanitize(ed.innerHTML);
+  const isEmpty = !clean.replace(/<br\s*\/?>/gi, '').replace(/&nbsp;/gi, '').replace(/<[^>]+>/g, '').trim();
+  const value = isEmpty ? '' : clean;
+  const regs = (window.campers || []).filter(c => camperKey(c) === key);
+  if (!regs.length) { showToast('Camper not found', 'error'); return; }
+  const note = document.getElementById('lsSavedNote');
+  if (btn) btn.disabled = true;
+  if (note) note.textContent = 'Saving…';
+  const prev = regs.map(r => r.learningNotes);
+  regs.forEach(r => { r.learningNotes = value; }); // optimistic in-memory
+  try {
+    await Promise.all(regs.map(r =>
+      withWriteTimeout(
+        window._updateDoc(window._doc(window._db, 'campers', r.id),
+          { learningNotes: value, updatedAt: window._serverTimestamp() }),
+        'saving learning notes'
+      )
+    ));
+    if (note) note.textContent = 'Saved';
+    showToast('Notes saved');
+    setTimeout(() => { if (note) note.textContent = ''; }, 2500);
+  } catch (e) {
+    regs.forEach((r, i) => { r.learningNotes = prev[i]; }); // revert
+    if (note) note.textContent = '';
+    showToast('Could not save notes: ' + (e.code || e.message || 'error'), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.saveLearningNotes = saveLearningNotes;
 
 // ── Consent toggles ──
 // Consent (splash pad / photo) is per-CHILD, but camper data lives on
@@ -9733,7 +9875,7 @@ async function saveCamper() {
         showToast('Already registered for that week.', 'error'); return;
       }
       // Copy personal fields from the existing camper, set this week's schedule
-      const personalFields = ['first','last','age','dob','parent','phone','email','address','allergies','medical','healthCard','notes','parent2','phone2','email2','address2','ec1Name','ec1Phone','ec1Rel','ec2Name','ec2Phone','ec2Rel','pickup'];
+      const personalFields = ['first','last','age','dob','parent','phone','email','address','allergies','medical','healthCard','notes','learningNotes','parent2','phone2','email2','address2','ec1Name','ec1Phone','ec1Rel','ec2Name','ec2Phone','ec2Rel','pickup'];
       const newReg = {};
       personalFields.forEach(f => { if (editing[f] !== undefined && editing[f] !== null) newReg[f] = editing[f]; });
       newReg.type = cType;
