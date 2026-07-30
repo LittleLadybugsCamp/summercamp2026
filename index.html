@@ -8935,42 +8935,7 @@ function doPrint() {
     .filter(c => c.weekStart === weeklyWk && !c.refunded && !c.archived && (c.campDays || []).includes(dayIdx)))
     .sort((a,b) => ((a.last||'')+(a.first||'')).localeCompare((b.last||'')+(b.first||'')));
 
-  const rowsHtml = campers.length
-    ? campers.map(c =>
-        '<tr><td class="name-cell">' + esc(c.first || '') + ' ' + esc(c.last || '') +
-        '</td><td class="time-cell"></td><td class="time-cell"></td></tr>'
-      ).join('')
-    : '<tr><td colspan="3" class="empty">No campers attending.</td></tr>';
-
-  const dateTimePrinted = new Date().toLocaleString('en-CA', { dateStyle:'long', timeStyle:'short' });
-
-  // Build minimal standalone HTML — system fonts only, no external resources = instant render
-  const printHtml = '<!DOCTYPE html><html><head><title>' + esc(title) + ' — ' + esc(subtitle) + '</title>' +
-    '<style>' +
-      '@page { size: letter portrait; margin: 0.6in; }' +
-      'body { font-family: Georgia, "Times New Roman", serif; color: #000; margin: 0; padding: 0; -webkit-print-color-adjust: exact; }' +
-      'h1 { font-size: 26pt; font-weight: 500; letter-spacing: -0.02em; margin: 0 0 4pt 0; }' +
-      'h2 { font-size: 14pt; font-weight: 400; color: #444; margin: 0 0 4pt 0; }' +
-      '.meta { font-size: 10pt; color: #888; margin-bottom: 22pt; font-family: -apple-system, system-ui, sans-serif; }' +
-      '.list { width: 100%; border-collapse: collapse; }' +
-      '.list thead th { font-size: 9.5pt; font-weight: 600; color: #555; letter-spacing: 0.5pt; text-transform: uppercase; text-align: left; padding: 6pt 8pt; border-bottom: 1pt solid #555; border-right: 0.5pt solid #bbb; font-family: -apple-system, system-ui, sans-serif; }' +
-      '.list tbody td { padding: 0 8pt; height: 32pt; vertical-align: middle; border-bottom: 0.5pt solid #bbb; border-right: 0.5pt solid #bbb; }' +
-      '.list tbody td:last-child, .list thead th:last-child { border-right: none; }' +
-      '.list .name-cell { font-size: 13pt; font-family: -apple-system, system-ui, "Helvetica Neue", sans-serif; }' +
-      '.list .time-cell { width: 110pt; }' +
-      '.list tr { break-inside: avoid; page-break-inside: avoid; }' +
-      '.empty { font-size: 13pt; color: #888; font-style: italic; padding: 20pt; text-align: center; border-bottom: none !important; }' +
-      '.footer { margin-top: 22pt; padding-top: 8pt; border-top: 0.5pt solid #ccc; font-size: 10pt; color: #777; text-align: right; font-family: -apple-system, system-ui, sans-serif; }' +
-    '</style></head><body>' +
-    '<h1>' + esc(title) + '</h1>' +
-    '<h2>' + esc(subtitle) + '</h2>' +
-    '<div class="meta">' + esc(dateLine) + '</div>' +
-    '<table class="list">' +
-      '<thead><tr><th>Name</th><th>Sign in time</th><th>Sign out time</th></tr></thead>' +
-      '<tbody>' + rowsHtml + '</tbody>' +
-    '</table>' +
-    '<div class="footer">' + campers.length + ' camper' + (campers.length === 1 ? '' : 's') + ' · Printed ' + esc(dateTimePrinted) + '</div>' +
-    '</body></html>';
+  const html = buildSignInSheetHtml(title, subtitle, dateLine, campers.map(c => (c.first || '') + ' ' + (c.last || '')));
 
   closePrintModal();
 
@@ -8984,7 +8949,7 @@ function doPrint() {
 
   const doc = iframe.contentDocument || iframe.contentWindow.document;
   doc.open();
-  doc.write(printHtml);
+  doc.write(html);
   doc.close();
 
   iframe.contentWindow.focus();
@@ -8993,6 +8958,86 @@ function doPrint() {
   // Clean up the iframe after print dialog closes
   setTimeout(() => { if (iframe && iframe.parentNode) iframe.remove(); }, 2000);
 }
+
+// Build the printable sign-in sheet as a fully self-paginated document.
+//
+// Why manual pagination: the URL that used to appear in the footer (and the
+// "Page 1 of 1") are the BROWSER's print furniture, drawn into the page
+// margins — a web page can't remove the URL while keeping the browser's page
+// numbers. So the sheet zeroes the @page margin (which suppresses all browser
+// furniture), lays out each letter-size page itself, and draws its own
+// footer: camper total bottom-left, "Page N of M" bottom-right. Owning the
+// pages also lets every sheet pad its final page with blank rows for
+// walk-up/late daily registrations to be written in by hand.
+//
+// Row capacities are derived from letter geometry (792pt tall, 0.6in visual
+// margins via padding, 32.5pt per row) with slack for font-metric drift:
+// page 1 carries the full header (16 rows), continuation pages a one-line
+// header (18 rows).
+const SIGNIN_ROWS_PAGE1 = 20;
+const SIGNIN_ROWS_CONT  = 21;
+function buildSignInSheetHtml(title, subtitle, dateLine, names) {
+  const count = names.length;
+  // Slice names into pages, then pad the LAST page to capacity with blanks.
+  const pages = [];
+  if (count <= SIGNIN_ROWS_PAGE1) {
+    pages.push(names.slice());
+  } else {
+    pages.push(names.slice(0, SIGNIN_ROWS_PAGE1));
+    for (let i = SIGNIN_ROWS_PAGE1; i < count; i += SIGNIN_ROWS_CONT) {
+      pages.push(names.slice(i, i + SIGNIN_ROWS_CONT));
+    }
+  }
+  const lastCap = pages.length === 1 ? SIGNIN_ROWS_PAGE1 : SIGNIN_ROWS_CONT;
+  const last = pages[pages.length - 1];
+  while (last.length < lastCap) last.push(null); // null = blank write-in row
+
+  const rowHtml = (name) =>
+    '<tr><td class="name-cell">' + (name === null ? '' : esc(name)) +
+    '</td><td class="time-cell"></td><td class="time-cell"></td></tr>';
+
+  const thead = '<thead><tr><th>Name</th><th>Sign in time</th><th>Sign out time</th></tr></thead>';
+  const countLabel = count + ' camper' + (count === 1 ? '' : 's');
+
+  const pageHtml = pages.map((rows, pi) => {
+    // Single-line header to save vertical space: title left, "date — week"
+    // right-aligned on the same baseline. Continuation pages get the same bar
+    // with a "(continued)" note on the right.
+    const rightText = pi === 0
+      ? esc(subtitle) + ' — ' + esc(dateLine)
+      : esc(subtitle) + ' — ' + esc(dateLine) + ' (continued)';
+    const header = '<div class="head-bar"><h1>' + esc(title) + '</h1>'
+      + '<div class="head-meta">' + rightText + '</div></div>';
+    return '<div class="sheet">'
+      + header
+      + '<table class="list">' + thead + '<tbody>' + rows.map(rowHtml).join('') + '</tbody></table>'
+      + '<div class="sheet-footer"><span>' + countLabel + '</span><span>Page ' + (pi + 1) + ' of ' + pages.length + '</span></div>'
+      + '</div>';
+  }).join('');
+
+  return '<!DOCTYPE html><html><head><title>' + esc(title) + ' — ' + esc(subtitle) + '</title>' +
+    '<style>' +
+      // margin:0 removes the browser's own header/footer (URL, its page
+      // numbers); the visual margin is the .sheet padding instead.
+      '@page { size: letter portrait; margin: 0; }' +
+      'html, body { margin: 0; padding: 0; }' +
+      'body { font-family: Georgia, "Times New Roman", serif; color: #000; -webkit-print-color-adjust: exact; }' +
+      '.sheet { width: 8.5in; height: 11in; box-sizing: border-box; padding: 0.6in; position: relative; page-break-after: always; overflow: hidden; }' +
+      '.sheet:last-child { page-break-after: auto; }' +
+      'h1 { font-size: 22pt; font-weight: 500; letter-spacing: -0.02em; margin: 0; line-height: 1.1; }' +
+      '.head-bar { display: flex; align-items: baseline; justify-content: space-between; gap: 16pt; margin: 0 0 14pt 0; border-bottom: 1pt solid #ddd; padding-bottom: 8pt; }' +
+      '.head-meta { font-size: 11pt; color: #444; text-align: right; white-space: nowrap; font-family: -apple-system, system-ui, sans-serif; }' +
+      '.list { width: 100%; border-collapse: collapse; }' +
+      '.list thead th { font-size: 9.5pt; font-weight: 600; color: #555; letter-spacing: 0.5pt; text-transform: uppercase; text-align: left; padding: 5pt 8pt; border-bottom: 1pt solid #555; border-right: 0.5pt solid #bbb; font-family: -apple-system, system-ui, sans-serif; }' +
+      '.list tbody td { padding: 0 8pt; height: 30pt; vertical-align: middle; border-bottom: 0.5pt solid #bbb; border-right: 0.5pt solid #bbb; }' +
+      '.list tbody td:last-child, .list thead th:last-child { border-right: none; }' +
+      '.list .name-cell { font-size: 13pt; font-family: -apple-system, system-ui, "Helvetica Neue", sans-serif; }' +
+      '.list .time-cell { width: 110pt; }' +
+      '.list tr { break-inside: avoid; page-break-inside: avoid; }' +
+      '.sheet-footer { position: absolute; left: 0.6in; right: 0.6in; bottom: 0.45in; display: flex; justify-content: space-between; font-size: 10pt; color: #777; font-family: -apple-system, system-ui, sans-serif; border-top: 0.5pt solid #ccc; padding-top: 6pt; }' +
+    '</style></head><body>' + pageHtml + '</body></html>';
+}
+window.buildSignInSheetHtml = buildSignInSheetHtml;
 
 // ── Search reveal toggle ──
 function toggleSearch(barId, inputId) {
