@@ -194,11 +194,22 @@
   /* ── Today's Notes card (Dashboard) ── */
   .today-note {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 18px 20px; margin-bottom: 22px;
+    border-radius: 14px; padding: 20px 20px 22px; margin-bottom: 22px;
   }
-  .today-note-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .today-note-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
   .today-note-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--green); }
   .today-note-title i { font-size: 17px; }
+  .tn-d-short { display: none; }
+  @media (max-width: 560px) {
+    /* Phone layout: title alone on ONE line up top (compact date), button on
+       its own row underneath, and a roomier card so it doesn't feel cramped. */
+    .today-note { padding: 20px 16px 22px; }
+    .today-note-head { flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+    .today-note-title { white-space: nowrap; font-size: 12.5px; letter-spacing: .03em; }
+    .tn-d-long { display: none; }
+    .tn-d-short { display: inline; }
+    .today-note-body, .today-note-empty { min-height: 24px; }
+  }
   .today-note-body { font-size: 14.5px; line-height: 1.55; color: var(--text); }
   .today-note-body ul, .today-note-body ol { margin: 4px 0; padding-left: 24px; }
   .today-note-body li { margin: 2px 0; }
@@ -6511,15 +6522,18 @@ function renderTodaysNote() {
   if (!el) return;
   const ymd = todayYmdLocal();
   const note = dailyNoteFor(ymd);
-  const prettyDate = new Date(ymd + 'T00:00:00').toLocaleDateString('en-CA',
-    { weekday: 'long', month: 'long', day: 'numeric' });
+  const d = new Date(ymd + 'T00:00:00');
+  // Two date renderings: full for wide screens, compact for phones — CSS
+  // swaps them so the title always fits on ONE line.
+  const dateLong = d.toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+  const dateShort = d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
   const body = note
     ? `<div class="today-note-body">${lsSanitize(note)}</div>`
     : `<div class="today-note-empty">No notifications for today.</div>`;
   el.innerHTML = `
     <div class="today-note-head">
-      <div class="today-note-title"><i class="ti ti-bell"></i> Notifications For Today – ${esc(prettyDate)}</div>
-      <button class="btn btn-sm" onclick="goToNotifications()"><i class="ti ti-arrow-right"></i> Show all notifications</button>
+      <div class="today-note-title"><i class="ti ti-bell"></i> Notifications For Today – <span class="tn-d-long">${esc(dateLong)}</span><span class="tn-d-short">${esc(dateShort)}</span></div>
+      <button class="btn btn-sm" onclick="goToNotifications()"><i class="ti ti-arrow-right"></i> Show all</button>
     </div>
     ${body}`;
 }
