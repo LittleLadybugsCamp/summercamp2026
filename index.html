@@ -199,16 +199,20 @@
   .today-note-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
   .today-note-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--green); }
   .today-note-title i { font-size: 17px; }
+  /* The banner has no height cap — it grows to fit however many notes the day
+     has, on desktop and phone alike, so nothing scrolls inside it. */
+  .today-note-foot { display: flex; justify-content: flex-start; margin-top: 14px; }
   .tn-d-short { display: none; }
   @media (max-width: 560px) {
-    /* Phone layout: title alone on ONE line up top (compact date), button on
-       its own row underneath, and a roomier card so it doesn't feel cramped. */
-    .today-note { padding: 20px 16px 22px; }
-    .today-note-head { flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+    /* Phone layout: title alone on ONE line up top (compact date), note text
+       below, button on its own row at the bottom. */
+    .today-note { padding: 20px 16px 20px; }
+    .today-note-head { margin-bottom: 12px; }
     .today-note-title { white-space: nowrap; font-size: 12.5px; letter-spacing: .03em; }
     .tn-d-long { display: none; }
     .tn-d-short { display: inline; }
-    .today-note-body, .today-note-empty { min-height: 24px; }
+    .today-note-foot { margin-top: 16px; }
+    .today-note-foot .btn { width: 100%; justify-content: center; }
   }
   .today-note-body { font-size: 14.5px; line-height: 1.55; color: var(--text); }
   .today-note-body ul, .today-note-body ol { margin: 4px 0; padding-left: 24px; }
@@ -253,7 +257,11 @@
   }
   .notes-search:focus { border-color: var(--green); }
   /* ── Notifications tab (Staff) ── */
-  .notif-day-list { max-height: 62vh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 2px; }
+  /* No inner scroll region: the day cards grow with their text and the PAGE
+     scrolls. A nested scroller inside a scrolling page meant two scrollbars
+     and made long notes hard to reach. Auto-scroll-to-today still works — it
+     just scrolls the page now. */
+  .notif-day-list { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 2px; }
   .notif-day { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--surface); }
   .notif-day.notif-today { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-light); }
   .notif-day-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
@@ -1539,9 +1547,12 @@
   .ls-tb-btn:active { transform: scale(.95); }
   .ls-tb-btn i { font-size: 16px; }
   .ls-editor {
-    min-height: 120px; max-height: 340px; overflow-y: auto; padding: 10px 12px;
+    /* Grows with its content on every screen size — no inner scrollbar, since
+       a scroll region nested inside a scrolling page is awkward to type in and
+       hides text. The page (or the day list) scrolls instead. */
+    min-height: 160px; height: auto; overflow: visible; padding: 12px 14px;
     border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
-    font-size: 14px; line-height: 1.5; color: var(--text); outline: none;
+    font-size: 14px; line-height: 1.55; color: var(--text); outline: none;
   }
   .ls-editor:focus { border-color: var(--green); }
   .ls-editor:empty::before { content: attr(data-placeholder); color: var(--text-3); }
@@ -4228,9 +4239,20 @@ function showPage(id, btn) {
 // per-week-registration. Refunded campers are excluded everywhere.
 
 // Currently selected week in the consent report ('all' or a week start date).
-let _consentWeek = 'all';
+// null = not yet initialised; resolved to the CURRENT camp week on first use
+// (see ensureReportWeekDefaults) so these sections open on today's week like
+// Weekly Roster, Calendar and Notifications do. Once the user picks a week —
+// including "All weeks" — their choice sticks for the session.
+let _consentWeek = null;
 // Currently selected week in the Email hub.
-let _emailWeek = 'all';
+let _emailWeek = null;
+
+function ensureReportWeekDefaults() {
+  const cur = (typeof currentCampWeekStart === 'function' && currentCampWeekStart()) || 'all';
+  if (_consentWeek === null) _consentWeek = cur;
+  if (_emailWeek === null) _emailWeek = cur;
+}
+window.ensureReportWeekDefaults = ensureReportWeekDefaults;
 
 // Build a week-button row (All weeks + Week 1..N) into the given container,
 // wiring each button to onSelect(weekStart). Same .week-btn pattern as the
@@ -4272,6 +4294,7 @@ function renderReports() {
   // Build both week-button rows once, refresh active states each visit.
   buildReportWeekButtons('consentWeekBtns', selectConsentWeek);
   buildReportWeekButtons('emailWeekBtns', selectEmailWeek);
+  ensureReportWeekDefaults();
   syncWeekBtnActive('consentWeekBtns', _consentWeek);
   syncWeekBtnActive('emailWeekBtns', _emailWeek);
   // Render whichever tab is active.
@@ -4372,6 +4395,7 @@ function emailGroupsForWeek(weekStart) {
 // One unified copier for the Email hub's big buttons.
 // kind: 'all' | 'new' | 'splash' | 'photo'
 async function copyReportEmails(kind, btnEl) {
+  ensureReportWeekDefaults();
   const week = _emailWeek || 'all';
   if (kind === 'new' && week === 'all') {
     showToast('Pick a specific week first — "new campers" compares against earlier weeks', 'error');
@@ -4488,6 +4512,7 @@ function consentGroupsForWeek(weekStart) {
 function renderConsentReport() {
   const body = document.getElementById('consentReportBody');
   if (!body) return;
+  ensureReportWeekDefaults();
   const rows = consentGroupsForWeek(_consentWeek || 'all');
   if (!rows.length) {
     body.innerHTML = '<div class="report-empty">No campers found for this week.</div>';
@@ -6533,9 +6558,11 @@ function renderTodaysNote() {
   el.innerHTML = `
     <div class="today-note-head">
       <div class="today-note-title"><i class="ti ti-bell"></i> Notifications For Today – <span class="tn-d-long">${esc(dateLong)}</span><span class="tn-d-short">${esc(dateShort)}</span></div>
-      <button class="btn btn-sm" onclick="goToNotifications()"><i class="ti ti-arrow-right"></i> Show all</button>
     </div>
-    ${body}`;
+    ${body}
+    <div class="today-note-foot">
+      <button class="btn btn-sm" onclick="goToNotifications()"><i class="ti ti-arrow-right"></i> Show all</button>
+    </div>`;
 }
 window.renderTodaysNote = renderTodaysNote;
 
