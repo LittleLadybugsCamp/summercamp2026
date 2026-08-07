@@ -6660,10 +6660,6 @@ function renderNotifDayList() {
       </div>
     </div>`;
   }).join('');
-
-  // Auto-scroll to today if it's in this week.
-  const todayEl = wrap.querySelector('.notif-today');
-  if (todayEl) setTimeout(() => { try { todayEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {} }, 60);
 }
 window.renderNotifDayList = renderNotifDayList;
 
