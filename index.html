@@ -8655,6 +8655,10 @@ window._setActivities = function(arr) { _activities = arr || []; };
 
 // ── Roster ──
 function renderRoster() {
+  // The "Notifications For Today" banner sits at the top of this page (the
+  // landing page). Rendering it here — not just from the Dashboard — is what
+  // makes it appear on first load instead of only after visiting Dashboard.
+  if (typeof renderTodaysNote === 'function') renderTodaysNote();
   // Group by name, then filter
   const groups = groupCampers().filter(g => {
     if (sQ && !camperMatchesSearch(g, sQ)) return false;
@@ -10750,8 +10754,14 @@ function initFileIntakes() {
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initFileIntakes);
+  // Paint the "Notifications For Today" banner immediately at boot (it shows
+  // its empty state until the dailyNotes snapshot arrives and re-renders it).
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof renderTodaysNote === 'function') renderTodaysNote();
+  });
 } else {
   initFileIntakes();
+  if (typeof renderTodaysNote === 'function') renderTodaysNote();
 }
 
 function handleImportDrop(e) {
