@@ -191,22 +191,64 @@
   }
   .wx-banner a:hover { opacity: 1; }
 
-  /* Current conditions card on the Dashboard */
-  .wx-now {
-    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  /* ── Today's Notes card (Dashboard) ── */
+  .today-note {
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 14px 18px; margin-bottom: 20px;
+    border-radius: 14px; padding: 18px 20px; margin-bottom: 22px;
   }
-  .wx-now-main { display: flex; align-items: center; gap: 12px; }
-  .wx-now-icon { font-size: 30px; color: var(--green); }
-  .wx-now-temp { font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
-  .wx-now-cond { font-size: 13px; color: var(--text-2); margin-top: 3px; }
-  .wx-now-stats { display: flex; gap: 20px; flex-wrap: wrap; margin-left: auto; }
-  .wx-stat-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-3); }
-  .wx-stat-value { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 2px; }
-  .wx-stat-value.wx-hot { color: var(--coral); }
-  .wx-now-src { font-size: 11px; color: var(--text-3); width: 100%; }
-  .wx-now-src a { color: var(--text-3); text-decoration: underline; }
+  .today-note-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .today-note-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--green); }
+  .today-note-title i { font-size: 17px; }
+  .today-note-body { font-size: 14.5px; line-height: 1.55; color: var(--text); }
+  .today-note-body ul, .today-note-body ol { margin: 4px 0; padding-left: 24px; }
+  .today-note-body li { margin: 2px 0; }
+  .today-note-body p { margin: 4px 0; }
+  .today-note-empty { font-size: 14px; color: var(--text-3); font-style: italic; }
+  /* Color-coded note cards in the camper detail (Parental vs Staff) */
+  .note-card { border-radius: 10px; padding: 12px 14px 10px; margin-bottom: 10px; border: 1px solid transparent; }
+  .note-card:last-child { margin-bottom: 0; }
+  .note-card-parent { background: #FEF6E7; border-color: #F5E4C3; }   /* warm amber = from the family */
+  .note-card-staff  { background: #EAF2EC; border-color: #CFE1D4; }   /* sage green = from staff */
+  .note-card-body { font-size: 13.5px; line-height: 1.5; color: var(--text); white-space: pre-wrap; }
+  .note-card-staff .note-card-body { white-space: normal; }
+  .note-card-body ul, .note-card-body ol { margin: 4px 0; padding-left: 22px; white-space: normal; }
+  .note-card-body li { margin: 2px 0; }
+  .note-card-empty { color: var(--text-3); font-style: italic; }
+  .note-card-label { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .note-card-parent .note-card-label { color: #A16207; }
+  .note-card-staff  .note-card-label { color: var(--green); }
+  .note-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+  .note-card-foot .note-card-label { margin-top: 0; }
+  /* Combined Notes report rows (Staff tab) */
+  .report-note-row { padding: 12px 0 14px; border-bottom: 1px solid var(--border-light); }
+  .report-note-row:last-child { border-bottom: none; }
+  .report-note-row .report-name-btn { margin-bottom: 8px; }
+  /* Notes sub-view tabs + search (Staff → Notes) */
+  .notes-subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 10px; }
+  .notes-subtab {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 13px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--surface); color: var(--text-2); font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .notes-subtab i { font-size: 15px; }
+  .notes-subtab:hover { background: var(--surface2); color: var(--text); }
+  .notes-subtab.active { background: var(--green); border-color: var(--green); color: #fff; }
+  .notes-search-wrap { position: relative; margin-bottom: 14px; }
+  .notes-search-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 17px; pointer-events: none; }
+  .notes-search {
+    width: 100%; box-sizing: border-box; padding: 10px 12px 10px 38px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+    font-size: 14px; color: var(--text); outline: none;
+  }
+  .notes-search:focus { border-color: var(--green); }
+  /* ── Notifications tab (Staff) ── */
+  .notif-day-list { max-height: 62vh; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 2px; }
+  .notif-day { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--surface); }
+  .notif-day.notif-today { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-light); }
+  .notif-day-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .notif-day-name { font-size: 15px; font-weight: 700; color: var(--text); }
+  .notif-today-badge { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #fff; background: var(--green); padding: 2px 8px; border-radius: 999px; vertical-align: middle; }
+  .notif-closed { font-size: 12px; color: var(--text-3); font-style: italic; }
 
   /* ── Desktop floating top nav ─────────────────────────────────────── */
   /* Hidden by default (mobile uses the bottom nav). On desktop it replaces
@@ -1094,7 +1136,10 @@
   }
   .report-controls-right { display: flex; gap: 8px; flex-wrap: wrap; }
   .report-intro {
-    font-size: 13px; color: var(--text-2); margin: 14px 0 12px; max-width: 640px; line-height: 1.5;
+    /* Larger, more prominent, and free to use the full column width — it wraps
+       only when the viewport itself is too narrow (phones), not at a fixed cap. */
+    font-size: 16px; color: var(--text); font-weight: 500;
+    margin: 16px 0 16px; line-height: 1.55; max-width: none;
   }
   .report-summary {
     font-size: 13px; color: var(--text-2); margin-bottom: 10px;
@@ -2097,6 +2142,7 @@
   @media (max-width: 560px) {
     .emp-row { flex-wrap: wrap; }
     .emp-actions { width: 100%; justify-content: flex-end; }
+    .report-intro { font-size: 15px; }
   }
 
   /* ── Admin tabs ── */
@@ -2449,7 +2495,7 @@
           <i class="ti ti-calendar-week"></i><span>Calendar</span>
         </button>
         <button class="nav-item" data-page="reports" id="reportsNavItemTop" onclick="showPage('reports',this)">
-          <i class="ti ti-report-analytics"></i><span>Reports</span>
+          <i class="ti ti-report-analytics"></i><span>Staff</span>
         </button>
         <button class="nav-item" data-page="admin" id="adminNavItemTop" onclick="requestAdmin(this)">
           <i class="ti ti-lock"></i><span>Admin</span>
@@ -2552,7 +2598,7 @@
         </button>
       </div>
       <div style="padding:28px var(--page-pad-x)">
-        <div id="wxNow" class="wx-now" style="display:none"></div>
+        <div id="todaysNote" class="today-note"></div>
         <div class="stats-grid" id="statsGrid"></div>
         <div class="camper-grid" id="camperGrid"></div>
       </div>
@@ -2619,19 +2665,26 @@
     <!-- Reports page (admin-only) -->
     <div id="page-reports" class="page">
       <div class="top-bar top-bar-heading">
-        <h1 class="page-heading">Reports</h1>
+        <h1 class="page-heading">Staff</h1>
       </div>
       <div style="padding: 6px var(--page-pad-x) 28px">
         <div class="admin-tabs">
-          <button class="admin-tab active" data-rtab="email" onclick="showReportTab('email',this)"><i class="ti ti-mail"></i> Email</button>
+          <button class="admin-tab active" data-rtab="notif" onclick="showReportTab('notif',this)"><i class="ti ti-bell"></i> Notifications</button>
+          <button class="admin-tab" data-rtab="email" onclick="showReportTab('email',this)"><i class="ti ti-mail"></i> Email</button>
           <button class="admin-tab" data-rtab="consent" onclick="showReportTab('consent',this)"><i class="ti ti-checklist"></i> Consent</button>
           <button class="admin-tab" data-rtab="allergies" onclick="showReportTab('allergies',this)"><i class="ti ti-alert-triangle"></i> Allergies</button>
-          <button class="admin-tab" data-rtab="notes" onclick="showReportTab('notes',this)"><i class="ti ti-notes"></i> Parental Notes</button>
-          <button class="admin-tab" data-rtab="learning" onclick="showReportTab('learning',this)"><i class="ti ti-bulb"></i> Learning Style/Notes</button>
+          <button class="admin-tab" data-rtab="notes" onclick="showReportTab('notes',this)"><i class="ti ti-notes"></i> Notes</button>
+        </div>
+
+        <!-- Notifications (per-day staff notes) -->
+        <div id="rtab-notif">
+          <div class="report-intro">Daily notes and important notifications for staff. Pick a week, then write a note under each day. Anything saved for <strong>today</strong> also shows on the Dashboard. Visible and editable by all staff.</div>
+          <div class="report-week-btns" id="notifWeekBtns"></div>
+          <div id="notifDayList" class="notif-day-list"><div class="report-empty">Loading…</div></div>
         </div>
 
         <!-- Email hub -->
-        <div id="rtab-email">
+        <div id="rtab-email" style="display:none">
           <div class="report-intro">Pick a week, then tap an option — the email addresses are copied to your clipboard and shown below, ready to paste into BCC. Secondary parents are included where "Include in email lists" is on.</div>
           <div class="report-week-btns" id="emailWeekBtns"></div>
           <div class="email-actions-grid">
@@ -2679,19 +2732,22 @@
           <div id="allergyReportBody"><div class="report-empty">Loading…</div></div>
         </div>
 
-        <!-- Notes report -->
+        <!-- Notes report (parental + staff) -->
         <div id="rtab-notes" style="display:none">
-          <div class="report-intro">Parental notes from registration — the "anything else we should know" field parents fill in on the form.</div>
-          <div id="notesReportBody"><div class="report-empty">Loading…</div></div>
-        </div>
-
-        <!-- Learning Style / Notes report (staff-authored) -->
-        <div id="rtab-learning" style="display:none">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
-            <div class="report-intro" style="flex:1;min-width:200px">Staff-authored notes on each camper's learning style and interests. Add or edit them here, or from any camper's detail card.</div>
-            <button class="btn btn-primary btn-sm" onclick="openLearningNotePicker()" title="Add a note for a camper"><i class="ti ti-plus"></i> Add / edit note</button>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+            <div class="report-intro" style="flex:1;min-width:200px;margin:16px 0">Camper notes — <strong>Staff Notes</strong> on learning style and interests, and <strong>Parental Notes</strong> from registration. Add or edit staff notes here, or from any camper's detail card.</div>
+            <button class="btn btn-primary btn-sm" onclick="openLearningNotePicker()" title="Add a staff note for a camper"><i class="ti ti-plus"></i> Add / edit staff note</button>
           </div>
-          <div id="learningReportBody"><div class="report-empty">Loading…</div></div>
+          <div class="notes-subtabs">
+            <button class="notes-subtab active" data-notesview="staff" onclick="selectNotesView('staff',this)"><i class="ti ti-bulb"></i> Staff Notes</button>
+            <button class="notes-subtab" data-notesview="parental" onclick="selectNotesView('parental',this)"><i class="ti ti-home"></i> Parental Notes</button>
+            <button class="notes-subtab" data-notesview="all" onclick="selectNotesView('all',this)"><i class="ti ti-notes"></i> All Notes</button>
+          </div>
+          <div class="notes-search-wrap">
+            <i class="ti ti-search"></i>
+            <input type="text" id="notesSearchInput" class="notes-search" placeholder="Search by camper name…" autocomplete="off" oninput="notesSearchQ=this.value.toLowerCase();renderNotesReport()">
+          </div>
+          <div id="notesReportBody"><div class="report-empty">Loading…</div></div>
         </div>
       </div>
     </div>
@@ -3014,7 +3070,7 @@
       </button>
       <button class="mobile-nav-btn nav-item" data-page="reports" id="reportsNavItemMobile" onclick="showPage('reports',this)">
         <i class="ti ti-report-analytics"></i>
-        Reports
+        Staff
       </button>
       <button class="mobile-nav-btn nav-item" data-page="admin" id="adminNavItemMobile" onclick="requestAdmin(this)">
         <i class="ti ti-lock"></i>
@@ -3334,37 +3390,6 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="invoiceOverlay" onclick="if(event.target===this)closeInvoice()">
-  <div class="modal" style="max-width:440px">
-    <div class="modal-header">
-      <span class="modal-title" id="invoiceTitle">Generate invoice</span>
-      <button class="modal-close" onclick="closeInvoice()"><i class="ti ti-x"></i></button>
-    </div>
-    <div id="invoiceBody" style="padding:4px 2px">
-      <div class="sync-note" style="display:flex">
-        <i class="ti ti-info-circle"></i>
-        <span id="invoiceSummary"></span>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Invoice number</label>
-        <input type="text" id="fInvoiceNumber" placeholder="e.g. 1042" autocomplete="off">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Invoice date</label>
-        <input type="date" id="fInvoiceDate">
-      </div>
-      <label class="invoice-format-toggle">
-        <input type="checkbox" id="fInvoiceAsWord">
-        <span>Download as Word document (.doc) instead</span>
-      </label>
-      <div style="margin-top:8px;font-size:12.5px;color:var(--text-3)" id="invoiceTotalsPreview"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeInvoice()">Cancel</button>
-      <button class="btn btn-primary" id="invoiceGenBtn" onclick="generateInvoiceFiles()"><i class="ti ti-download"></i> <span id="invoiceGenBtnLabel">Download PDF</span></button>
-    </div>
-  </div>
-</div>
 
 <!-- Add/Edit Modal -->
 <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
@@ -3562,6 +3587,7 @@ window._doc = doc;
 window._serverTimestamp = serverTimestamp;
 window._collection = collection;
 window._setDoc = setDoc;
+window.onSnapshot = onSnapshot;
 window._getDoc = getDoc;
 window._getDocs = getDocs;
 
@@ -3829,6 +3855,21 @@ function startDataListeners() {
       window.renderActivities();
     }
   }, (err) => console.error('dayThemes snapshot error', err)));
+
+  // Daily Notifications: a single shared doc `dailyNotes/all` holding a map of
+  // date → rich-text HTML. Employee-readable AND writable (same shape as
+  // dayThemes), streamed so edits appear on every device live.
+  _unsubscribers.push(onSnapshot(doc(db, 'dailyNotes', 'all'), (snap) => {
+    _dailyNotes = (snap.exists() && snap.data().notes) ? snap.data().notes : {};
+    _dailyNotesLoaded = true;
+    if (typeof renderTodaysNote === 'function') renderTodaysNote();
+    const rep = document.getElementById('page-reports');
+    const notifPanel = document.getElementById('rtab-notif');
+    if (rep && rep.classList.contains('active') && notifPanel && notifPanel.style.display !== 'none'
+        && typeof renderNotifDayList === 'function') {
+      renderNotifDayList();
+    }
+  }, (err) => console.error('dailyNotes snapshot error', err)));
 
   // Materials checkbox state — a single doc holds a map of {"date|item-key": true}
   // for each checked-off material item. Server-side so admin devices stay in
@@ -4224,11 +4265,11 @@ function renderReports() {
   syncWeekBtnActive('emailWeekBtns', _emailWeek);
   // Render whichever tab is active.
   const active = document.querySelector('#page-reports .admin-tab.active');
-  const tab = active ? active.getAttribute('data-rtab') : 'email';
-  if (tab === 'consent') renderConsentReport();
+  const tab = active ? active.getAttribute('data-rtab') : 'notif';
+  if (tab === 'notif') renderNotificationsReport();
+  else if (tab === 'consent') renderConsentReport();
   else if (tab === 'allergies') renderAllergyReport();
   else if (tab === 'notes') renderNotesReport();
-  else if (tab === 'learning') renderLearningNotesReport();
   // 'email' tab needs no render — it's the buttons themselves.
 }
 window.renderReports = renderReports;
@@ -4254,14 +4295,20 @@ window.selectEmailWeek = selectEmailWeek;
 function showReportTab(name, btn) {
   document.querySelectorAll('#page-reports .admin-tab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['email', 'consent', 'allergies', 'notes', 'learning'].forEach(t => {
+  ['notif', 'email', 'consent', 'allergies', 'notes'].forEach(t => {
     const el = document.getElementById('rtab-' + t);
     if (el) el.style.display = (t === name) ? '' : 'none';
   });
-  if (name === 'consent') renderConsentReport();
+  if (name === 'notif') renderNotificationsReport();
+  else if (name === 'consent') renderConsentReport();
   else if (name === 'allergies') renderAllergyReport();
-  else if (name === 'notes') renderNotesReport();
-  else if (name === 'learning') renderLearningNotesReport();
+  else if (name === 'notes') {
+    // Clear any stale search so the list isn't unexpectedly filtered on return.
+    notesSearchQ = '';
+    const si = document.getElementById('notesSearchInput');
+    if (si) si.value = '';
+    renderNotesReport();
+  }
 }
 window.showReportTab = showReportTab;
 
@@ -4478,6 +4525,24 @@ function renderAllergyReport() {
 window.renderAllergyReport = renderAllergyReport;
 
 // Notes: every child with a non-empty notes/interests field (any week).
+// Combined Notes report — one row per camper who has EITHER a parental note
+// (c.notes) or a staff note (c.learningNotes), showing both as the same
+// color-coded cards used in the camper detail slide-over. Clicking the name
+// opens the camper; each card carries its "Parental Note" / "Staff Note" label,
+// and the staff card has an inline Edit button.
+let notesView = 'staff';     // 'staff' | 'parental' | 'all' — default staff
+let notesSearchQ = '';       // lowercase name filter
+
+function selectNotesView(view, btn) {
+  notesView = view;
+  document.querySelectorAll('#rtab-notes .notes-subtab').forEach(b =>
+    b.classList.toggle('active', b.dataset.notesview === view));
+  renderNotesReport();
+}
+window.selectNotesView = selectNotesView;
+
+// Notes report. Three views: Staff (learningNotes only), Parental (c.notes
+// only), All (both, combined). A name search filters within the current view.
 function renderNotesReport() {
   const body = document.getElementById('notesReportBody');
   if (!body) return;
@@ -4485,50 +4550,64 @@ function renderNotesReport() {
   (window.campers || []).filter(c => !c.refunded && !c.archived).forEach(c => {
     const k = camperKey(c);
     if (!k || k === '|') return;
-    const txt = (c.notes && String(c.notes).trim()) || '';
-    const cur = byChild.get(k) || { key: k, name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(), notes: '' };
-    if (txt && txt.length > cur.notes.length) cur.notes = txt;
+    const parental = (c.notes && String(c.notes).trim()) || '';
+    const staff = (c.learningNotes && String(c.learningNotes).trim()) || '';
+    const cur = byChild.get(k) || { key: k, name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(), parental: '', staff: '' };
+    // Keep the longest of each across the child's week docs (they're synced,
+    // but a partial legacy state could differ).
+    if (parental.length > cur.parental.length) cur.parental = parental;
+    if (staff.length > cur.staff.length) cur.staff = staff;
     byChild.set(k, cur);
   });
-  const rows = [...byChild.values()].filter(r => r.notes).sort((a, b) => a.name.localeCompare(b.name));
-  body.innerHTML = rows.length
-    ? `<div class="report-summary">${rows.length} camper${rows.length === 1 ? '' : 's'} with notes</div>` +
-      rows.map(r => `
-        <div class="report-row report-row-text">
-          <button class="report-name report-name-btn" onclick="openDetail('${jsArg(r.key)}')" title="Open camper details"><i class="ti ti-note" style="color:var(--purple);font-size:14px"></i> ${esc(r.name)}</button>
-          <span class="report-text">${esc(r.notes)}</span>
-        </div>`).join('')
-    : '<div class="report-empty">No campers with special notes.</div>';
+
+  const q = (notesSearchQ || '').trim();
+  let rows = [...byChild.values()]
+    // Only keep campers who have a note relevant to the current view.
+    .filter(r => notesView === 'staff' ? r.staff
+               : notesView === 'parental' ? r.parental
+               : (r.staff || r.parental))
+    .filter(r => !q || r.name.toLowerCase().includes(q))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const parentalCard = r => r.parental ? `<div class="note-card note-card-parent">
+      <div class="note-card-body">${esc(r.parental)}</div>
+      <div class="note-card-label"><i class="ti ti-home"></i> Parental Note</div>
+    </div>` : '';
+  const staffCard = r => `<div class="note-card note-card-staff">
+      <div class="note-card-body">${r.staff ? lsSanitize(r.staff) : '<span class="note-card-empty">No staff note yet.</span>'}</div>
+      <div class="note-card-foot">
+        <span class="note-card-label"><i class="ti ti-bulb"></i> Staff Note</span>
+        <button class="btn btn-sm btn-ghost" onclick="openLearningNoteEditor('${jsArg(r.key)}')"><i class="ti ti-edit"></i> ${r.staff ? 'Edit' : 'Add'}</button>
+      </div>
+    </div>`;
+
+  if (!rows.length) {
+    const emptyMsg = q
+      ? 'No campers match “' + esc(q) + '”.'
+      : (notesView === 'staff' ? 'No staff notes yet. Tap “Add / edit staff note” to start one.'
+         : notesView === 'parental' ? 'No parental notes on file.'
+         : 'No camper notes yet.');
+    body.innerHTML = '<div class="report-empty">' + emptyMsg + '</div>';
+    return;
+  }
+
+  const label = notesView === 'staff' ? 'with staff notes'
+              : notesView === 'parental' ? 'with parental notes'
+              : 'with notes';
+  body.innerHTML =
+    `<div class="report-summary">${rows.length} camper${rows.length === 1 ? '' : 's'} ${label}</div>` +
+    rows.map(r => `
+      <div class="report-note-row">
+        <button class="report-name report-name-btn" onclick="openDetail('${jsArg(r.key)}')" title="Open camper details"><i class="ti ti-user" style="color:var(--green);font-size:14px"></i> ${esc(r.name)}</button>
+        ${notesView === 'staff' ? staffCard(r)
+          : notesView === 'parental' ? parentalCard(r)
+          : (parentalCard(r) + staffCard(r))}
+      </div>`).join('');
 }
 window.renderNotesReport = renderNotesReport;
-
-// Learning Style / Notes report — staff-authored notes (learningNotes), shown
-// as sanitized HTML. Clicking a name opens that camper's editor modal.
-function renderLearningNotesReport() {
-  const body = document.getElementById('learningReportBody');
-  if (!body) return;
-  const byChild = new Map();
-  (window.campers || []).filter(c => !c.refunded && !c.archived).forEach(c => {
-    const k = camperKey(c);
-    if (!k || k === '|') return;
-    const html = (c.learningNotes && String(c.learningNotes).trim()) || '';
-    const cur = byChild.get(k) || { key: k, name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(), notes: '' };
-    // Keep the longest note found across the child's week docs (they're synced,
-    // but a partial legacy state could differ).
-    if (html && html.length > cur.notes.length) cur.notes = html;
-    byChild.set(k, cur);
-  });
-  const rows = [...byChild.values()].filter(r => r.notes).sort((a, b) => a.name.localeCompare(b.name));
-  body.innerHTML = rows.length
-    ? `<div class="report-summary">${rows.length} camper${rows.length === 1 ? '' : 's'} with learning notes</div>` +
-      rows.map(r => `
-        <div class="report-row report-row-text">
-          <button class="report-name report-name-btn" onclick="openLearningNoteEditor('${jsArg(r.key)}')" title="Edit this note"><i class="ti ti-bulb" style="color:var(--green);font-size:14px"></i> ${esc(r.name)}</button>
-          <span class="report-text">${lsSanitize(r.notes)}</span>
-        </div>`).join('')
-    : '<div class="report-empty">No learning-style notes yet. Tap “Add / edit note” to start one.</div>';
-}
-window.renderLearningNotesReport = renderLearningNotesReport;
+// Kept as an alias: saveLearningNotes() calls this to refresh the list after an
+// edit, and the tab now lives under "notes".
+window.renderLearningNotesReport = renderNotesReport;
 
 // ── Learning-note modal (opened from the Reports "+" button or a name) ──
 // The "+" opens a searchable list of all campers; picking one swaps the modal
@@ -4586,15 +4665,15 @@ function openLearningNoteEditor(key) {
   if (!regs.length) { showToast('Camper not found', 'error'); return; }
   const c = regs[0];
   document.getElementById('lnModalTitle').textContent =
-    'Learning Style / Notes — ' + ((c.first || '') + ' ' + (c.last || '')).trim();
-  // Prefix 'lnm' → its own editor/save-note ids, independent of the detail
-  // panel's 'ls' instance (they can even be open at once).
+    'Staff Note — ' + ((c.first || '') + ' ' + (c.last || '')).trim();
   document.getElementById('lnModalBody').innerHTML =
     learningNotesEditorHtml(key, c.learningNotes || '', 'lnm');
   document.getElementById('lnOverlay').classList.add('open');
   setTimeout(() => { const ed = document.getElementById('lnmEditor'); if (ed) ed.focus(); }, 50);
 }
 window.openLearningNoteEditor = openLearningNoteEditor;
+// The camper detail slide-over's "Staff Note" edit button uses the same editor.
+window.openStaffNoteEditor = openLearningNoteEditor;
 
 function closeLearningNote() {
   document.getElementById('lnOverlay').classList.remove('open');
@@ -5483,10 +5562,18 @@ function invoiceTaxOf(total) {
 // Build income rows derived from invoices (admin records) — NOT stored in the
 // finances collection, so there's no duplicate data and the two tabs stay in
 // sync automatically. One row per generated/uploaded invoice.
+//
+// REFUNDS: a refunded camper's collected money REMAINS income (they really
+// paid it); a separate negative "Refund" row then subtracts exactly the
+// recorded refundedAmount. So refunding $813.49 of a $1,696.13 payment moves
+// total income down by $813.49 — not by the whole $1,696.13, which is the bug
+// this replaced (refunded campers used to be skipped entirely). Legacy
+// refunds recorded before the amount field existed have no refundedAmount; for
+// those we assume the full collected sum was returned, which reproduces their
+// old net-zero contribution instead of silently inflating income.
 function invoiceIncomeRows() {
   const rows = [];
   if (!window.adminData) return rows;
-  // Camper keys that have been refunded — their invoices don't count as income.
   const refundedKeys = new Set(
     (window.campers || []).filter(c => c.refunded === true).map(c => camperKey(c))
   );
@@ -5502,7 +5589,6 @@ function invoiceIncomeRows() {
     const total = parseFloat(rec.totalAmount);
     const invNum = (rec.invoiceNumber || '').toString().trim();
     if (!(total > 0) || !invNum) continue;
-    if (rec.camperKey && refundedKeys.has(rec.camperKey)) continue;
     // Income reflects money actually COLLECTED, not billed:
     //   paid in full → the full total; otherwise → amount paid so far.
     const collected = rec.paidInFull ? total : (parseFloat(rec.amountPaid) || 0);
@@ -5519,6 +5605,22 @@ function invoiceIncomeRows() {
       amount: collected,
       tax: invoiceTaxOf(collected)
     });
+    if (rec.camperKey && refundedKeys.has(rec.camperKey)) {
+      const raw = parseFloat(rec.refundedAmount);
+      const refundAmt = Number.isFinite(raw) ? raw : collected; // legacy → full
+      if (refundAmt > 0) {
+        rows.push({
+          invoiceRow: true,
+          refund: true,
+          key: rec.camperKey,
+          date: tsToYmd(rec.refundedAt) || date,
+          invoiceNumber: invNum,
+          hasPdf: !!rec.hasInvoicePdf,
+          amount: -refundAmt,
+          tax: -invoiceTaxOf(refundAmt)
+        });
+      }
+    }
   }
   return rows;
 }
@@ -5567,8 +5669,8 @@ async function renderFinances(refetch = true) {
     // ── Merge invoice-income rows with stored entries, newest first ──
     const merged = [
       ...invoiceRows.map(r => ({
-        invoiceRow: true, key: r.key, date: r.date, type: 'income',
-        category: 'Invoice', invoiceNumber: r.invoiceNumber, hasPdf: r.hasPdf, amount: r.amount
+        invoiceRow: true, refund: !!r.refund, key: r.key, date: r.date, type: 'income',
+        category: r.refund ? 'Refund' : 'Invoice', invoiceNumber: r.invoiceNumber, hasPdf: r.hasPdf, amount: r.amount
       })),
       ...stored.map(t => ({ ...t, invoiceRow: false }))
     ].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
@@ -5581,15 +5683,22 @@ async function renderFinances(refetch = true) {
     }
     body.innerHTML = shown.map(t => {
       if (t.invoiceRow) {
+        const linkText = (t.refund ? 'Refund — Invoice ' : 'Invoice ') + escapeHtml(t.invoiceNumber);
         const desc = t.hasPdf
-          ? `<span class="fin-receipt-link" onclick="viewInvoicePdf('${jsArg(t.key)}')"><i class="ti ti-file-invoice"></i> Invoice ${escapeHtml(t.invoiceNumber)}</span>`
-          : `Invoice ${escapeHtml(t.invoiceNumber)}`;
+          ? `<span class="fin-receipt-link" onclick="viewInvoicePdf('${jsArg(t.key)}')"><i class="ti ti-file-invoice"></i> ${linkText}</span>`
+          : linkText;
+        const badge = t.refund
+          ? '<span class="fin-type expense">Refund</span>'
+          : '<span class="fin-type income">Income</span>';
+        const amt = t.refund
+          ? `<td class="fin-amt expense">−${finMoney(Math.abs(t.amount))}</td>`
+          : `<td class="fin-amt income">${finMoney(t.amount)}</td>`;
         return `<tr>
           <td>${escapeHtml(fmtFinDate(t.date))}</td>
-          <td><span class="fin-type income">Income</span></td>
-          <td>Invoice</td>
+          <td>${badge}</td>
+          <td>${escapeHtml(t.category)}</td>
           <td>${desc}</td>
-          <td class="fin-amt income">${finMoney(t.amount)}</td>
+          ${amt}
           <td><span style="color:var(--text-3)">—</span></td>
           <td style="text-align:right"><span class="fin-locked" title="From the Payments tab — edit it there">🔒</span></td>
         </tr>`;
@@ -6211,6 +6320,31 @@ function fmtWk(s) {
   return d.toLocaleDateString('en-CA', {month:'short', day:'numeric'});
 }
 
+// Today's date as a local YYYY-MM-DD (never UTC — see dStr).
+function todayYmdLocal() { return dStr(new Date()); }
+window.todayYmdLocal = todayYmdLocal;
+
+// The WEEKS entry that "today" falls in, for auto-navigation. If today is
+// inside a camp week (Mon–Fri of that week, using mondayDate when set), return
+// it. Otherwise return the nearest UPCOMING week; if the whole summer is over,
+// the last week. Always returns a valid WEEKS[i].start.
+function currentCampWeekStart() {
+  if (typeof WEEKS === 'undefined' || !WEEKS.length) return '';
+  const today = todayYmdLocal();
+  // Inside a week? (Mon..Fri inclusive)
+  for (const wk of WEEKS) {
+    const monStr = wk.mondayDate || wk.start;
+    const mon = new Date(monStr + 'T00:00:00');
+    const fri = new Date(mon); fri.setDate(fri.getDate() + 4);
+    if (today >= dStr(mon) && today <= dStr(fri)) return wk.start;
+  }
+  // Else nearest upcoming week start.
+  const upcoming = WEEKS.find(wk => (wk.mondayDate || wk.start) >= today);
+  if (upcoming) return upcoming.start;
+  return WEEKS[WEEKS.length - 1].start; // summer's over → last week
+}
+window.currentCampWeekStart = currentCampWeekStart;
+
 // ── Week label helper ──
 function weekLabel(weekStart) {
   if (!weekStart) return '';
@@ -6356,9 +6490,177 @@ function dashboardWeekData() {
   });
 }
 
+// ── Daily Notifications (per-day staff notes) ──
+// A shared map of date (YYYY-MM-DD) → sanitized rich-text HTML, stored in one
+// doc `dailyNotes/all` (same access shape as dayThemes — readable AND writable
+// by all staff). Edited in the Staff → Notifications tab (a box per camp day);
+// today's entry also surfaces on the Dashboard banner. Kept live via a
+// snapshot listener so every device stays current.
+let _dailyNotes = {};        // { 'YYYY-MM-DD': html }
+let _dailyNotesLoaded = false;
+let _notifWeek = '';         // selected week in the Notifications tab
+
+function dailyNoteFor(ymd) {
+  const v = _dailyNotes && _dailyNotes[ymd];
+  return (v && String(v).trim()) ? v : '';
+}
+
+// ── Dashboard banner: "Notifications For Today – <date>" ──
+function renderTodaysNote() {
+  const el = document.getElementById('todaysNote');
+  if (!el) return;
+  const ymd = todayYmdLocal();
+  const note = dailyNoteFor(ymd);
+  const prettyDate = new Date(ymd + 'T00:00:00').toLocaleDateString('en-CA',
+    { weekday: 'long', month: 'long', day: 'numeric' });
+  const body = note
+    ? `<div class="today-note-body">${lsSanitize(note)}</div>`
+    : `<div class="today-note-empty">No notifications for today.</div>`;
+  el.innerHTML = `
+    <div class="today-note-head">
+      <div class="today-note-title"><i class="ti ti-bell"></i> Notifications For Today – ${esc(prettyDate)}</div>
+      <button class="btn btn-sm" onclick="goToNotifications()"><i class="ti ti-arrow-right"></i> Show all notifications</button>
+    </div>
+    ${body}`;
+}
+window.renderTodaysNote = renderTodaysNote;
+
+// Dashboard "Show all notifications" → Staff tab, Notifications section, on
+// the current week.
+function goToNotifications() {
+  showPage('reports');
+  // showReportTab lives on window; select the notifications tab + its button.
+  const btn = document.querySelector('#page-reports .admin-tab[data-rtab="notif"]');
+  showReportTab('notif', btn || null);
+}
+window.goToNotifications = goToNotifications;
+
+// ── Notifications tab (Staff) ──
+function renderNotificationsReport() {
+  // Build the week-button row once.
+  const btnRow = document.getElementById('notifWeekBtns');
+  if (btnRow && btnRow.children.length === 0 && typeof WEEKS !== 'undefined') {
+    WEEKS.forEach(wk => {
+      const parts = wk.label.split(' (');
+      const name = parts[0];
+      const dates = parts[1] ? parts[1].replace(')', '') : '';
+      const b = document.createElement('button');
+      b.className = 'week-btn';
+      b.dataset.weekStart = wk.start;
+      b.onclick = () => selectNotifWeek(wk.start);
+      b.innerHTML = '<div class="week-btn-label">' + esc(name) + '</div>' +
+                    (dates ? '<div class="week-btn-dates">' + esc(dates) + '</div>' : '');
+      btnRow.appendChild(b);
+    });
+  }
+  // Default to the current camp week on first open.
+  if (!_notifWeek) _notifWeek = (typeof currentCampWeekStart === 'function' && currentCampWeekStart()) || (WEEKS[0] && WEEKS[0].start) || '';
+  if (btnRow) btnRow.querySelectorAll('.week-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.weekStart === _notifWeek));
+
+  renderNotifDayList();
+}
+window.renderNotificationsReport = renderNotificationsReport;
+
+function selectNotifWeek(weekStart) {
+  _notifWeek = weekStart;
+  document.querySelectorAll('#notifWeekBtns .week-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.weekStart === weekStart));
+  renderNotifDayList();
+}
+window.selectNotifWeek = selectNotifWeek;
+
+// The scrolling list of days for the selected week, each with an editable
+// rich-text box. Holiday days are shown but marked closed. Auto-scrolls to
+// today when today is in the selected week.
+function renderNotifDayList() {
+  const wrap = document.getElementById('notifDayList');
+  if (!wrap) return;
+  const wk = (typeof WEEKS !== 'undefined') ? WEEKS.find(w => w.start === _notifWeek) : null;
+  if (!wk) { wrap.innerHTML = '<div class="report-empty">Pick a week.</div>'; return; }
+  const monStr = wk.mondayDate || wk.start;
+  const mon = new Date(monStr + 'T00:00:00');
+  const holidays = wk.holidayDays || [];
+  const today = todayYmdLocal();
+  const dayFull = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+
+  wrap.innerHTML = [0,1,2,3,4].map(i => {
+    const d = new Date(mon); d.setDate(d.getDate() + i);
+    const ymd = dStr(d);
+    const isHoliday = holidays.includes(i);
+    const isToday = ymd === today;
+    const dateStr = d.toLocaleDateString('en-CA', { month: 'long', day: 'numeric' });
+    const note = dailyNoteFor(ymd);
+    const edId = 'ndn_' + ymd;   // editor id per day
+    if (isHoliday) {
+      return `<div class="notif-day${isToday?' notif-today':''}" data-ymd="${ymd}">
+        <div class="notif-day-head"><span class="notif-day-name">${dayFull[i]}, ${esc(dateStr)}</span>
+          <span class="notif-closed">Closed — holiday</span></div>
+      </div>`;
+    }
+    return `<div class="notif-day${isToday?' notif-today':''}" data-ymd="${ymd}">
+      <div class="notif-day-head">
+        <span class="notif-day-name">${dayFull[i]}, ${esc(dateStr)}${isToday?' <span class=\"notif-today-badge\">Today</span>':''}</span>
+      </div>
+      <div class="ls-toolbar" role="toolbar" aria-label="Formatting">
+        <button type="button" class="ls-tb-btn" title="Bold" onmousedown="lsFmt(event,'bold','${edId}')"><b>B</b></button>
+        <button type="button" class="ls-tb-btn" title="Italic" onmousedown="lsFmt(event,'italic','${edId}')"><i>I</i></button>
+        <button type="button" class="ls-tb-btn" title="Underline" onmousedown="lsFmt(event,'underline','${edId}')"><u>U</u></button>
+        <button type="button" class="ls-tb-btn" title="Bulleted list" onmousedown="lsFmt(event,'insertUnorderedList','${edId}')"><i class="ti ti-list"></i></button>
+        <button type="button" class="ls-tb-btn" title="Numbered list" onmousedown="lsFmt(event,'insertOrderedList','${edId}')"><i class="ti ti-list-numbers"></i></button>
+        <button type="button" class="ls-tb-btn" title="Clear formatting" onmousedown="lsFmt(event,'removeFormat','${edId}')"><i class="ti ti-clear-formatting"></i></button>
+      </div>
+      <div id="${edId}" class="ls-editor" contenteditable="true"
+           data-placeholder="Notes and important notifications for ${dayFull[i]}…"
+           onkeydown="lsEditorKeydown(event)">${lsSanitize(note)}</div>
+      <div class="ls-save-row">
+        <button class="btn btn-primary btn-sm" onclick="saveDailyNote('${ymd}', this)"><i class="ti ti-device-floppy"></i> Save</button>
+        <span class="ls-saved-note" id="${edId}_note"></span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Auto-scroll to today if it's in this week.
+  const todayEl = wrap.querySelector('.notif-today');
+  if (todayEl) setTimeout(() => { try { todayEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {} }, 60);
+}
+window.renderNotifDayList = renderNotifDayList;
+
+async function saveDailyNote(ymd, btn) {
+  const ed = document.getElementById('ndn_' + ymd);
+  if (!ed) return;
+  const clean = lsSanitize(ed.innerHTML);
+  const isEmpty = !clean.replace(/<br\s*\/?>/gi, '').replace(/&nbsp;/gi, '').replace(/<[^>]+>/g, '').trim();
+  const value = isEmpty ? '' : clean;
+  const note = document.getElementById('ndn_' + ymd + '_note');
+  if (btn) btn.disabled = true;
+  if (note) note.textContent = 'Saving…';
+  const prev = _dailyNotes[ymd];
+  _dailyNotes[ymd] = value; // optimistic
+  try {
+    // One doc holds the whole map; merge just this date's key.
+    await withWriteTimeout(
+      window._setDoc(window._doc(window._db, 'dailyNotes', 'all'),
+        { notes: { [ymd]: value }, updatedAt: window._serverTimestamp() }, { merge: true }),
+      'saving daily notification');
+    if (note) note.textContent = 'Saved';
+    showToast('Notification saved for all staff.');
+    if (ymd === todayYmdLocal()) renderTodaysNote(); // refresh dashboard banner
+    setTimeout(() => { if (note) note.textContent = ''; }, 2500);
+  } catch (e) {
+    _dailyNotes[ymd] = prev; // revert
+    if (note) note.textContent = '';
+    showToast('Could not save: ' + (e.code || e.message || 'error'), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+window.saveDailyNote = saveDailyNote;
+
 function renderDashboard() {
   const page = document.getElementById('page-dashboard');
   if (!page) return;
+  renderTodaysNote();
   const data = dashboardWeekData();
 
   // Weekly enrollment table
@@ -7663,12 +7965,11 @@ window.closeActivityImport = closeActivityImport;
 const CAMP_URL_FETCHER = 'https://campurlfetcher.littleladybugscamp.workers.dev';
 
 // ════════════════════ WEATHER (Environment Canada) ════════════════════
-// Two tiers, deliberately:
-//   1. ADVISORY BANNER — only shown when EC has an active alert for the camp's
-//      forecast region. Silence the rest of the time so it never becomes
-//      wallpaper that staff stop noticing.
-//   2. CURRENT CONDITIONS — a quiet card on the Dashboard with the numbers that
-//      actually drive camp decisions: temperature, humidex, and UV index.
+// ADVISORY BANNER only — shown when EC has an active alert for the camp's
+// forecast region, and silent the rest of the time so it never becomes
+// wallpaper that staff stop noticing. (A current-conditions card used to live
+// on the Dashboard here; it was removed in favour of "Today's Notes". Only the
+// EC alert system remains.)
 //
 // This is an AWARENESS NUDGE, not a safety system. If the fetch fails we say so
 // explicitly rather than showing nothing, because a silent failure would read
@@ -7690,34 +7991,9 @@ const WX_REGION = 'on33';
 const WX_ALERT_FEED = `https://weather.gc.ca/rss/alerts/${WX_LAT}_${WX_LON}_e.xml`;
 const WX_ALERT_FEED_FALLBACK = `https://weather.gc.ca/rss/battleboard/${WX_REGION}_e.xml`;
 const WX_ALERT_PAGE = `https://weather.gc.ca/warnings/report_e.html?${WX_REGION}=`;
-const WX_FORECAST_PAGE = `https://weather.gc.ca/en/location/index.html?coords=${WX_LAT},${WX_LON}`;
 const WX_REFRESH_MS = 15 * 60 * 1000;  // re-check every 15 minutes
 
-// Open-Meteo WMO weather codes → short label + Tabler icon.
-const WX_CODES = {
-  0:['Clear','ti-sun'], 1:['Mainly clear','ti-sun'], 2:['Partly cloudy','ti-cloud'], 3:['Overcast','ti-cloud'],
-  45:['Fog','ti-mist'], 48:['Freezing fog','ti-mist'],
-  51:['Light drizzle','ti-cloud-rain'], 53:['Drizzle','ti-cloud-rain'], 55:['Heavy drizzle','ti-cloud-rain'],
-  56:['Freezing drizzle','ti-cloud-rain'], 57:['Freezing drizzle','ti-cloud-rain'],
-  61:['Light rain','ti-cloud-rain'], 63:['Rain','ti-cloud-rain'], 65:['Heavy rain','ti-cloud-storm'],
-  66:['Freezing rain','ti-cloud-rain'], 67:['Freezing rain','ti-cloud-storm'],
-  71:['Light snow','ti-snowflake'], 73:['Snow','ti-snowflake'], 75:['Heavy snow','ti-snowflake'],
-  77:['Snow grains','ti-snowflake'],
-  80:['Showers','ti-cloud-rain'], 81:['Showers','ti-cloud-rain'], 82:['Heavy showers','ti-cloud-storm'],
-  85:['Snow showers','ti-snowflake'], 86:['Snow showers','ti-snowflake'],
-  95:['Thunderstorm','ti-bolt'], 96:['Thunderstorm w/ hail','ti-bolt'], 99:['Thunderstorm w/ hail','ti-bolt'],
-};
 
-// Humidex, the Canadian standard EC quotes in heat warnings. Computed from
-// temperature + dew point per the Environment Canada formula. Only meaningful
-// above ~20°C; below that EC doesn't report it.
-function wxHumidex(tempC, dewC) {
-  if (typeof tempC !== 'number' || typeof dewC !== 'number') return null;
-  if (tempC < 20) return null;
-  const e = 6.11 * Math.exp(5417.7530 * ((1 / 273.16) - (1 / (273.15 + dewC))));
-  const h = tempC + 0.5555 * (e - 10);
-  return (h > tempC) ? Math.round(h) : null;
-}
 
 // Fetch a URL directly; if that's blocked (EC doesn't send CORS headers), retry
 // through the camp's Cloudflare Worker, which adds them.
@@ -7827,55 +8103,10 @@ function wxRenderBanner(alerts, errorMsg) {
   requestAnimationFrame(setH);
 }
 
-function wxRenderNow(data) {
-  const el = document.getElementById('wxNow');
-  if (!el) return;
-  if (!data) { el.style.display = 'none'; return; }
-  const [label, icon] = WX_CODES[data.code] || ['—', 'ti-cloud'];
-  const hx = wxHumidex(data.temp, data.dew);
-  // EC treats humidex 40+ as the point where heat becomes a real risk.
-  const hxHot = (hx != null && hx >= 35) ? ' wx-hot' : '';
-  const uvHot = (data.uv != null && data.uv >= 8) ? ' wx-hot' : '';
-  el.innerHTML = `
-    <div class="wx-now-main">
-      <i class="ti ${icon} wx-now-icon"></i>
-      <div>
-        <div class="wx-now-temp">${Math.round(data.temp)}°C</div>
-        <div class="wx-now-cond">${esc(label)} · Caledonia</div>
-      </div>
-    </div>
-    <div class="wx-now-stats">
-      ${hx != null ? `<div><div class="wx-stat-label">Humidex</div><div class="wx-stat-value${hxHot}">${hx}</div></div>` : ''}
-      ${data.uv != null ? `<div><div class="wx-stat-label">UV index</div><div class="wx-stat-value${uvHot}">${Math.round(data.uv)}</div></div>` : ''}
-      ${data.wind != null ? `<div><div class="wx-stat-label">Wind</div><div class="wx-stat-value">${Math.round(data.wind)} km/h</div></div>` : ''}
-    </div>
-    <div class="wx-now-src">Conditions via Open-Meteo (Environment Canada model) · <a href="${WX_FORECAST_PAGE}" target="_blank" rel="noopener">Full EC forecast</a></div>`;
-  el.style.display = 'flex';
-}
 
 async function wxRefresh() {
-  // Conditions — Open-Meteo is CORS-enabled and needs no API key (important:
-  // this file is public on GitHub, so a keyed API would leak its key).
-  try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${WX_LAT}&longitude=${WX_LON}` +
-      `&current=temperature_2m,dew_point_2m,weather_code,wind_speed_10m` +
-      `&daily=uv_index_max&timezone=America/Toronto&forecast_days=1`;
-    const r = await fetch(url, { cache: 'no-store' });
-    if (!r.ok) throw new Error('conditions ' + r.status);
-    const j = await r.json();
-    wxRenderNow({
-      temp: j.current?.temperature_2m,
-      dew:  j.current?.dew_point_2m,
-      code: j.current?.weather_code,
-      wind: j.current?.wind_speed_10m,
-      uv:   j.daily?.uv_index_max?.[0],
-    });
-  } catch (e) {
-    console.warn('Weather conditions unavailable:', e.message);
-    wxRenderNow(null);   // just hide the card; the banner carries the safety load
-  }
-  // Alerts — the part that actually matters. Try the coords feed first; if it
-  // is unavailable, fall back to the region feed rather than showing nothing.
+  // EC advisory alerts only. Try the coords feed first; if it's unavailable,
+  // fall back to the region feed rather than showing nothing.
   try {
     let xml, usedFallback = false;
     try {
@@ -8575,8 +8806,9 @@ function populateWeekButtons() {
   const container = document.getElementById('weekButtons');
   if (!container || typeof WEEKS === 'undefined' || WEEKS.length === 0) return;
 
-  // Auto-select Week 1 if nothing is selected yet
-  if (!weeklyWk) weeklyWk = WEEKS[0].start;
+  // Auto-select the current camp week if nothing is selected yet (falls back
+  // to Week 1 when today is outside the whole summer, via currentCampWeekStart).
+  if (!weeklyWk) weeklyWk = (typeof currentCampWeekStart === 'function' && currentCampWeekStart()) || WEEKS[0].start;
 
   // Only build the DOM once
   if (container.children.length === 0) {
@@ -9272,10 +9504,15 @@ function openDetail(key) {
       <button class="btn" style="flex:1;justify-content:center" onclick="closeDetail();openModal('${c.id}','personal')">
         <i class="ti ti-edit"></i> Edit details
       </button>
-      ${c.archived ? '' : `<button class="btn btn-primary" style="flex:1;justify-content:center" onclick="openInvoice('${c.id}')">
-        <i class="ti ti-file-invoice"></i> Print invoice
+      ${c.archived ? '' : `<button class="btn btn-primary" style="flex:1;justify-content:center" onclick="printStoredInvoice('${c.id}')">
+        <i class="ti ti-printer"></i> Print invoice
       </button>`}
-    </div>` : ''}
+    </div>
+    ${c.archived ? '' : `<div style="margin-top:8px">
+      <button class="btn" style="width:100%;justify-content:center" onclick="downloadStoredInvoiceWord('${c.id}')">
+        <i class="ti ti-file-type-doc"></i> Download Word
+      </button>
+    </div>`}` : ''}
     ${window._userRole === 'admin' ? `<div style="text-align:right;margin-top:8px;display:flex;gap:14px;justify-content:flex-end;flex-wrap:wrap">
       ${c.archived
         ? `<button class="btn-link-subtle" onclick="toggleArchiveCamper('${jsArg(camperKey(c))}', false)"><i class="ti ti-archive-off"></i> Restore from archive</button>`
@@ -9342,7 +9579,6 @@ function openDetail(key) {
       }).join('')}
     </div>
 
-    ${c.notes?`<div class="detail-section"><div class="detail-section-title">Parental Notes</div><div style="font-size:13px;color:var(--text-2);white-space:pre-wrap">${esc(c.notes)}</div></div>`:''}
     ${c.parent2?`<div class="detail-section">
       <div class="detail-section-title">Second parent / guardian</div>
       <div class="detail-row"><i class="ti ti-user"></i><span>${esc(c.parent2)}</span></div>
@@ -9365,8 +9601,18 @@ function openDetail(key) {
       <div class="detail-row"><i class="ti ti-walk"></i><span>${esc(c.pickup)}</span></div>
     </div>`:''}
     <div class="detail-section" style="border-bottom:none">
-      <div class="detail-section-title">Learning Style / Notes</div>
-      ${learningNotesEditorHtml(camperKey(c), c.learningNotes || '', 'ls')}
+      <div class="detail-section-title">Notes</div>
+      ${c.notes ? `<div class="note-card note-card-parent">
+        <div class="note-card-body">${esc(c.notes)}</div>
+        <div class="note-card-label"><i class="ti ti-home"></i> Parental Note</div>
+      </div>` : ''}
+      <div class="note-card note-card-staff">
+        <div class="note-card-body" id="lsStaffView">${(c.learningNotes && c.learningNotes.trim()) ? lsSanitize(c.learningNotes) : '<span class="note-card-empty">No staff note yet.</span>'}</div>
+        <div class="note-card-foot">
+          <span class="note-card-label"><i class="ti ti-bulb"></i> Staff Note</span>
+          <button class="btn btn-sm btn-ghost" onclick="openStaffNoteEditor('${jsArg(camperKey(c))}')"><i class="ti ti-edit"></i> ${(c.learningNotes && c.learningNotes.trim()) ? 'Edit' : 'Add'}</button>
+        </div>
+      </div>
     </div>
   `;
   document.getElementById('detailOverlay').classList.add('open');
@@ -9394,10 +9640,14 @@ window.lsFmt = lsFmt;
 // Build the Learning Style / Notes editor (toolbar + contenteditable + Save).
 // Reused in the camper detail slide-over and the Reports "add note" modal, so
 // every id is namespaced by `prefix` to allow two independent instances.
-function learningNotesEditorHtml(key, currentHtml, prefix) {
+// Core builder: toolbar + contenteditable + a Save button whose onclick is
+// supplied by the caller. `prefix` namespaces the ids so several editors can
+// coexist. Used by both the camper Learning-Notes editor and Today's Notes.
+function lsEditorCoreHtml(currentHtml, prefix, saveOnclick, placeholder) {
   const p = prefix || 'ls';
   const edId = p + 'Editor';
   const noteId = p + 'SavedNote';
+  const ph = placeholder || 'Add notes here…';
   const btn = (title, cmd, label) =>
     '<button type="button" class="ls-tb-btn" title="' + title + '" onmousedown="lsFmt(event,\'' + cmd + '\',\'' + edId + '\')">' + label + '</button>';
   return ''
@@ -9410,14 +9660,23 @@ function learningNotesEditorHtml(key, currentHtml, prefix) {
     +   btn('Clear formatting', 'removeFormat', '<i class="ti ti-clear-formatting"></i>')
     + '</div>'
     + '<div id="' + edId + '" class="ls-editor" contenteditable="true"'
-    +   ' data-placeholder="Add notes on this camper\'s learning style, interests, or anything staff should know…"'
+    +   ' data-placeholder="' + esc(ph) + '"'
     +   ' onkeydown="lsEditorKeydown(event)">' + lsSanitize(currentHtml || '') + '</div>'
     + '<div class="ls-save-row">'
-    +   '<button class="btn btn-primary btn-sm" onclick="saveLearningNotes(\'' + jsArg(key) + '\', this, \'' + p + '\')"><i class="ti ti-device-floppy"></i> Save notes</button>'
+    +   '<button class="btn btn-primary btn-sm" onclick="' + saveOnclick + '"><i class="ti ti-device-floppy"></i> Save</button>'
     +   '<span class="ls-saved-note" id="' + noteId + '"></span>'
     + '</div>';
 }
+window.lsEditorCoreHtml = lsEditorCoreHtml;
+
+function learningNotesEditorHtml(key, currentHtml, prefix) {
+  const p = prefix || 'ls';
+  const save = 'saveLearningNotes(\'' + jsArg(key) + '\', this, \'' + p + '\')';
+  return lsEditorCoreHtml(currentHtml, p, save,
+    'Add notes on this camper\'s learning style, interests, or anything staff should know…');
+}
 window.learningNotesEditorHtml = learningNotesEditorHtml;
+
 
 // Enter continues a list. Native contenteditable already does this inside
 // <li> (Enter makes the next bullet/number; Enter on an empty item exits the
@@ -9498,10 +9757,17 @@ async function saveLearningNotes(key, btn, prefix) {
     ));
     if (note) note.textContent = 'Saved';
     showToast('Notes saved');
-    // Keep the Reports Learning-Notes list current if it's on screen.
-    if (typeof renderLearningNotesReport === 'function') {
-      try { renderLearningNotesReport(); } catch (e) {}
+    // Keep the Staff → Notes list current if it's on screen.
+    if (typeof renderNotesReport === 'function') {
+      try { renderNotesReport(); } catch (e) {}
     }
+    // Refresh the camper detail slide-over's staff-note card if it's showing.
+    const staffView = document.getElementById('lsStaffView');
+    if (staffView) {
+      staffView.innerHTML = value ? lsSanitize(value) : '<span class="note-card-empty">No staff note yet.</span>';
+    }
+    // When editing from the modal (prefix 'lnm'), close it on success.
+    if (p === 'lnm' && typeof closeLearningNote === 'function') closeLearningNote();
     setTimeout(() => { if (note) note.textContent = ''; }, 2500);
   } catch (e) {
     regs.forEach((r, i) => { r.learningNotes = prev[i]; }); // revert
@@ -10107,6 +10373,7 @@ async function deleteCamper() {
 
 // ── Calendar ──
 let calView = 'month'; // 'week' or 'month'
+let _calInitialized = false; // first rCal() jumps to the current week
 
 function selectCalMonth(monthStr) {
   calView = 'month';
@@ -10163,7 +10430,19 @@ function populateCalWeekButtons() {
 }
 
 function rCal() {
+  // On first open, jump to the current camp week (week view) so staff land on
+  // today automatically — same behaviour as Activities and Weekly Roster.
+  if (!_calInitialized) {
+    _calInitialized = true;
+    const cur = (typeof currentCampWeekStart === 'function') ? currentCampWeekStart() : '';
+    if (cur) {
+      selectedCalWeek = cur;
+      selectedCalMonth = cur.slice(0, 7);
+      calView = 'week';
+    }
+  }
   populateCalWeekButtons();
+  updateCalButtonActive();
   if(calView==='week') rCalWeek(); else rCalMonth();
 }
 
@@ -11668,7 +11947,6 @@ window.rateForDailyRegistration = rateForDailyRegistration;
 const DAILY_CAMP_PRICE = 55, DAILY_CARE_PRICE = 10;
 const ETRANSFER_EMAIL = 'littleladybugscamp@gmail.com';
 
-let invoiceCamperKey = null;
 
 // Format a single daily date label, e.g. "Mon, Jul 27"
 function fmtDailyDate(weekStart, dayIdx) {
@@ -11787,107 +12065,111 @@ function isCamperArchived(keyOrId) {
   return regs.length > 0 && regs.every(c => c.archived);
 }
 
-function openInvoice(keyOrId) {
-  if (window._userRole !== 'admin') { showToast('Admin only', 'error'); return; }
-  if (isCamperArchived(keyOrId)) { showToast('This camper is archived — unarchive to manage invoices', 'error'); return; }
-  // Accept either a group key ("first|last") or a single camper id
-  let key = keyOrId;
-  if (keyOrId && !keyOrId.includes('|')) {
-    const c = window.campers.find(x => x.id === keyOrId);
-    if (c) key = camperKey(c);
-  }
-  invoiceCamperKey = key;
+// ── Single source of truth for a camper's invoice ──
+// The canonical invoice is the PDF stored in the `invoices` collection, with
+// its number and date on the admin record. Every "print" or "download Word"
+// action goes through here: if no invoice exists yet, one is generated and
+// saved to the Invoices section FIRST, so the pop-over and the Admin tab always
+// reference the exact same document (same number, same date, same line items).
+// Returns { invNum, invDateIso, data } or null if nothing is chargeable.
+async function ensureStoredInvoice(key) {
+  const id = adminId(key);
+  const existing = (window.adminData && window.adminData.get(id)) || {};
   const data = buildInvoiceData(key);
-  if (!data) { showToast('No registration data found.', 'error'); return; }
-  closeDetail();
-  document.getElementById('invoiceTitle').textContent = 'Invoice — ' + data.childName;
-  const weeksAttending = data.weekCount;
-  document.getElementById('invoiceSummary').textContent =
-    `${data.childName} · ${weeksAttending} week${weeksAttending===1?'':'s'}. Enter the invoice number, then download.`;
-  document.getElementById('fInvoiceNumber').value = '';
-  document.getElementById('fInvoiceDate').value = dStr(new Date());
-  // Default to PDF; reset checkbox each time the modal opens
-  const wordCb = document.getElementById('fInvoiceAsWord');
-  wordCb.checked = false;
-  document.getElementById('invoiceGenBtnLabel').textContent = 'Download PDF';
-  wordCb.onchange = () => {
-    document.getElementById('invoiceGenBtnLabel').textContent =
-      wordCb.checked ? 'Download Word' : 'Download PDF';
-  };
-  document.getElementById('invoiceTotalsPreview').innerHTML =
-    `Subtotal: <strong>${money(data.subtotal)}</strong> &nbsp;·&nbsp; HST (13%): <strong>${money(data.hst)}</strong> &nbsp;·&nbsp; Grand total: <strong>${money(data.grand)}</strong>`;
-  document.getElementById('invoiceOverlay').classList.add('open');
-  setTimeout(() => document.getElementById('fInvoiceNumber').focus(), 50);
-}
+  if (!data || !data.lineItems.length || !data.grand) return null;
 
-function closeInvoice() {
-  document.getElementById('invoiceOverlay').classList.remove('open');
-  invoiceCamperKey = null;
-}
+  // Already has a saved PDF → reuse its number and date verbatim.
+  if (existing.hasInvoicePdf && existing.invoiceNumber) {
+    const invDateIso = /^\d{4}-\d{2}-\d{2}$/.test(existing.invoiceDate || '')
+      ? existing.invoiceDate : dStr(new Date());
+    return { invNum: existing.invoiceNumber, invDateIso, data };
+  }
 
-function fmtInvoiceDate(iso) {
-  if (!iso) return '';
-  const [y,m,d] = iso.split('-').map(Number);
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  return `${months[m-1]} ${d}, ${y}`;
-}
-
-async function generateInvoiceFiles() {
-  const data = buildInvoiceData(invoiceCamperKey);
-  if (!data) { showToast('No data.', 'error'); return; }
-  const invNum = document.getElementById('fInvoiceNumber').value.trim();
-  if (!invNum) { showToast('Please enter an invoice number.', 'error'); document.getElementById('fInvoiceNumber').focus(); return; }
-  const invDate = fmtInvoiceDate(document.getElementById('fInvoiceDate').value);
+  // None yet → generate + save exactly like autoGenerateInvoiceForKey, then
+  // return its identifiers so the caller renders the same document.
+  const invNum = existing.invoiceNumber || nextInvoiceNumber();
+  const invDateIso = /^\d{4}-\d{2}-\d{2}$/.test(existing.invoiceDate || '')
+    ? existing.invoiceDate : dStr(new Date());
+  const invDate = fmtInvoiceDate(invDateIso);
   const footer = invoiceFooterText(data.payMethod, data.hasDaily);
   const safeName = (data.childName || 'camper').replace(/[^a-z0-9]+/gi, '_');
+  const filename = `Invoice_${safeName}_${invNum}.pdf`;
+  const pdfDoc = buildInvoicePDF(data, invNum, invDate, footer, filename);
+  const dataUri = pdfDoc.output('datauristring');
+  await saveInvoicePdf(key, invNum, filename, dataUri);
 
-  const btn = document.getElementById('invoiceGenBtn');
-  btn.disabled = true;
-  const wantWord = document.getElementById('fInvoiceAsWord').checked;
+  const patch = { invoiceNumber: invNum, totalAmount: data.grand, invoiceDate: invDateIso };
+  if (!existing.paymentMethod && data.payMethod) {
+    const pm = normalizePaymentMethod(data.payMethod);
+    if (pm) patch.paymentMethod = pm;
+  }
+  const finalMethod = patch.paymentMethod || normalizePaymentMethod(existing.paymentMethod);
+  if (finalMethod === 'Credit' && existing.paidInFull !== true) patch.paidInFull = true;
+  await updateAdminFieldBulk(key, patch);
+  window.adminData.set(id, { ...(window.adminData.get(id) || {}), camperKey: key, hasInvoicePdf: true, ...patch });
+  if (typeof window.renderAdmin === 'function') { try { window.renderAdmin(); } catch (e) {} }
+  return { invNum, invDateIso, data };
+}
+window.ensureStoredInvoice = ensureStoredInvoice;
+
+// Print the camper's canonical invoice. Generates+saves it first if needed,
+// then opens the STORED PDF (the same bytes shown in the Invoices section) in
+// a new tab and triggers the print dialog.
+async function printStoredInvoice(keyOrId) {
+  if (isCamperArchived(keyOrId)) { showToast('This camper is archived — unarchive to manage invoices', 'error'); return; }
+  let key = keyOrId;
+  if (keyOrId && !String(keyOrId).includes('|')) {
+    const c = (window.campers || []).find(x => x.id === keyOrId);
+    if (c) key = camperKey(c);
+  }
+  // Open the tab synchronously inside the click gesture (Safari popup rule).
+  const win = window.open('', '_blank');
   try {
-    const pdfFilename = `Invoice_${safeName}_${invNum}.pdf`;
-    // Always build the PDF — it's stored in Admin so the saved-PDF link works
-    // regardless of which format the user downloaded.
-    const pdfDoc = buildInvoicePDF(data, invNum, invDate, footer, pdfFilename);
-    if (wantWord) {
-      buildInvoiceWord(data, invNum, invDate, footer, `Invoice_${safeName}_${invNum}.doc`);
+    const ensured = await ensureStoredInvoice(key);
+    if (!ensured) { if (win) win.close(); showToast('Nothing to invoice for this camper.', 'error'); return; }
+    const snap = await window._getDoc(window._doc(window._db, 'invoices', adminId(key)));
+    if (!snap.exists()) { if (win) win.close(); showToast('Could not load the saved invoice.', 'error'); return; }
+    const blob = dataUriToBlob(snap.data().pdfDataUri);
+    const url = URL.createObjectURL(blob);
+    if (win) {
+      win.location = url;
+      // Kick off printing once the PDF has loaded in the new tab.
+      win.onload = () => { try { win.focus(); win.print(); } catch (e) {} };
     } else {
-      pdfDoc.save(pdfFilename);
+      window.open(url, '_blank');
     }
-
-    // Auto-save to the Admin page: store the PDF and update the payment row
-    try {
-      const dataUri = pdfDoc.output('datauristring');
-      await saveInvoicePdf(invoiceCamperKey, invNum, pdfFilename, dataUri);
-      const existing = window.adminData.get(adminId(invoiceCamperKey)) || {};
-      const rawDate = document.getElementById('fInvoiceDate').value;
-      const patch = { invoiceNumber: invNum, totalAmount: data.grand,
-        invoiceDate: /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : dStr(new Date()) };
-      if (!existing.paymentMethod && data.payMethod) {
-        const pm = normalizePaymentMethod(data.payMethod);
-        if (pm) patch.paymentMethod = pm;
-      }
-      // Credit-card invoices are paid by Stripe up front — auto-check paidInFull.
-      const finalMethod = patch.paymentMethod || normalizePaymentMethod(existing.paymentMethod);
-      if (finalMethod === 'Credit' && existing.paidInFull !== true) {
-        patch.paidInFull = true;
-      }
-      await updateAdminFieldBulk(invoiceCamperKey, patch);
-    } catch (saveErr) {
-      console.error('Invoice save error', saveErr);
-      showToast('Invoice downloaded, but saving to Admin failed: ' + saveErr.message, 'error');
-      closeInvoice();
-      return;
-    }
-
-    showToast(`Invoice downloaded as ${wantWord?'Word':'PDF'} and saved to Admin.`);
-    closeInvoice();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) {
-    showToast('Error generating invoice: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
+    if (win) { try { win.close(); } catch (e2) {} }
+    showToast('Error opening invoice: ' + (e.message || 'error'), 'error');
   }
 }
+window.printStoredInvoice = printStoredInvoice;
+
+// Download the camper's canonical invoice AS Word — WITHOUT minting a new
+// invoice. It reuses the stored invoice's number and date (generating the
+// canonical PDF first if none exists), so the .doc is the same document in a
+// different format, never a second invoice.
+async function downloadStoredInvoiceWord(keyOrId) {
+  if (isCamperArchived(keyOrId)) { showToast('This camper is archived — unarchive to manage invoices', 'error'); return; }
+  let key = keyOrId;
+  if (keyOrId && !String(keyOrId).includes('|')) {
+    const c = (window.campers || []).find(x => x.id === keyOrId);
+    if (c) key = camperKey(c);
+  }
+  try {
+    const ensured = await ensureStoredInvoice(key);
+    if (!ensured) { showToast('Nothing to invoice for this camper.', 'error'); return; }
+    const { invNum, invDateIso, data } = ensured;
+    const footer = invoiceFooterText(data.payMethod, data.hasDaily);
+    const safeName = (data.childName || 'camper').replace(/[^a-z0-9]+/gi, '_');
+    buildInvoiceWord(data, invNum, fmtInvoiceDate(invDateIso), footer, `Invoice_${safeName}_${invNum}.doc`);
+    showToast(`Word copy of invoice ${invNum} downloaded.`);
+  } catch (e) {
+    showToast('Error creating Word invoice: ' + (e.message || 'error'), 'error');
+  }
+}
+window.downloadStoredInvoiceWord = downloadStoredInvoiceWord;
 
 // ---- PDF (jsPDF) ----
 function buildInvoicePDF(data, invNum, invDate, footer, filename) {
@@ -12320,18 +12602,30 @@ function renderAdmin() {
     </tr>`;
   }).join('');
 
-  // Totals (refunded excluded). Paid-in-full counts as fully paid. ARCHIVED
-  // campers count only what was actually collected — invoiced is capped at
-  // the collected amount so they contribute $0 owing (per policy: archiving
-  // removes any outstanding balance from the books without erasing income).
-  let totalInvoiced = 0, totalPaid = 0, totalOwed = 0, totalTax = 0;
+  // Totals. Paid-in-full counts as fully paid. ARCHIVED campers count only
+  // what was actually collected — invoiced is capped at the collected amount
+  // so they contribute $0 owing. REFUNDED campers are no longer excluded:
+  // their payments stay in "Paid" (the money really came in) and the recorded
+  // refundedAmount is subtracted on its own line, so the Net matches the
+  // Finances tab logic (income minus exactly what was returned). A legacy
+  // refund with no recorded amount counts as fully returned.
+  let totalInvoiced = 0, totalPaid = 0, totalOwed = 0, totalTax = 0, totalRefunded = 0;
   groups.forEach(g => {
-    if (g.registrations[0] && g.registrations[0].refunded) return;
+    const isRefunded = !!(g.registrations[0] && g.registrations[0].refunded);
     const gArchived = (g.registrations || []).every(x => x.archived);
     const r = window.adminData.get(adminId(g.key)) || {};
     const total = parseFloat(r.totalAmount) || 0;
     const collected = r.paidInFull ? total : (parseFloat(r.amountPaid) || 0);
-    if (gArchived) {
+    let refundAmt = 0;
+    if (isRefunded) {
+      const raw = parseFloat(r.refundedAmount);
+      refundAmt = Number.isFinite(raw) ? raw : collected; // legacy → full
+    }
+    if (isRefunded) {
+      totalInvoiced += collected;       // nothing left owing on a refunded file
+      totalPaid += collected;
+      totalRefunded += refundAmt;
+    } else if (gArchived) {
       totalInvoiced += collected;
       totalPaid += collected;
       // owed += 0
@@ -12340,8 +12634,9 @@ function renderAdmin() {
       totalPaid += collected;
       totalOwed += Math.max(0, total - collected);
     }
-    totalTax += (typeof invoiceTaxOf === 'function' ? invoiceTaxOf(collected) : 0);
+    totalTax += (typeof invoiceTaxOf === 'function' ? invoiceTaxOf(Math.max(0, collected - refundAmt)) : 0);
   });
+  const netCollected = Math.round((totalPaid - totalRefunded) * 100) / 100;
   const totalsRow = `<tr class="admin-totals-row">
       <td colspan="3" style="text-align:right">Totals</td>
       <td>${money(totalInvoiced)}</td>
@@ -12351,8 +12646,18 @@ function renderAdmin() {
       <td>${money(totalOwed)}</td>
       <td></td>
     </tr>
+    ${totalRefunded > 0 ? `<tr class="admin-totals-row admin-tax-row">
+      <td colspan="6" style="text-align:right">less refunds</td>
+      <td>−${money(totalRefunded)}</td>
+      <td colspan="2"></td>
+    </tr>
+    <tr class="admin-totals-row">
+      <td colspan="6" style="text-align:right">Net collected</td>
+      <td>${money(netCollected)}</td>
+      <td colspan="2"></td>
+    </tr>` : ''}
     <tr class="admin-totals-row admin-tax-row">
-      <td colspan="6" style="text-align:right">of which HST collected (13%, included in amount paid)</td>
+      <td colspan="6" style="text-align:right">of which HST collected (13%, included in net)</td>
       <td>${money(totalTax)}</td>
       <td colspan="2"></td>
     </tr>`;
@@ -13185,9 +13490,6 @@ window.selectCalWeek = selectCalWeek;
 window.populateCalWeekButtons = populateCalWeekButtons;
 window.showDayPopup = showDayPopup;
 window.closeDayPopup = closeDayPopup;
-window.openInvoice = openInvoice;
-window.closeInvoice = closeInvoice;
-window.generateInvoiceFiles = generateInvoiceFiles;
 // Admin page
 window.requestAdmin = requestAdmin;
 window.showLogin = showLogin;
