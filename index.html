@@ -993,6 +993,25 @@
      consent is given, muted with an X when it isn't. */
   .badge-consent-yes { background: var(--green-light); color: var(--green); }
   .badge-consent-no  { background: var(--surface2); color: var(--text-3); border: 1px solid var(--border); }
+  /* Awaiting = quiet (it's just outstanding paperwork). Denied = loud, because
+     it's an instruction staff must act on, not an absence of one. */
+  .badge-consent-awaiting { background: var(--surface2); color: var(--text-3); border: 1px solid var(--border); }
+  .badge-consent-denied   { background: #FDECEA; color: #B3261E; border: 1px solid #F3C4BF; font-weight: 700; }
+  /* Three-way consent control in the camper detail panel */
+  .consent-block { margin-bottom: 14px; }
+  .consent-block:last-child { margin-bottom: 0; }
+  .consent-block-label { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; color: var(--text); margin-bottom: 7px; }
+  .consent-opts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .consent-opt {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 7px 12px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--surface); color: var(--text-2); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .consent-opt i { font-size: 14px; }
+  .consent-opt:hover { background: var(--surface2); color: var(--text); }
+  .consent-opt.active.consent-opt-granted  { background: var(--green); border-color: var(--green); color: #fff; }
+  .consent-opt.active.consent-opt-denied   { background: #B3261E; border-color: #B3261E; color: #fff; }
+  .consent-opt.active.consent-opt-awaiting { background: var(--text-3); border-color: var(--text-3); color: #fff; }
   /* Consent checkbox rows in the camper detail panel */
   .consent-row {
     display: flex; align-items: center; gap: 8px;
@@ -2722,13 +2741,13 @@
             </button>
             <button class="email-action" onclick="copyReportEmails('splash', this)">
               <i class="ti ti-ripple"></i>
-              <span class="ea-title">Missing Splash Pad consent</span>
-              <span class="ea-desc">Parents who haven't submitted splash pad consent</span>
+              <span class="ea-title">Awaiting Splash Pad consent</span>
+              <span class="ea-desc">Parents we're still waiting on — excludes anyone who declined</span>
             </button>
             <button class="email-action" onclick="copyReportEmails('photo', this)">
               <i class="ti ti-camera"></i>
-              <span class="ea-title">Missing Photo consent</span>
-              <span class="ea-desc">Parents who haven't submitted photo consent</span>
+              <span class="ea-title">Awaiting Photo consent</span>
+              <span class="ea-desc">Parents we're still waiting on — excludes anyone who declined</span>
             </button>
           </div>
           <div class="form-group" style="margin-top:16px">
@@ -4404,9 +4423,11 @@ async function copyReportEmails(kind, btnEl) {
   let children, label;
   if (kind === 'splash' || kind === 'photo') {
     const rows = consentGroupsForWeek(week);
-    children = rows.filter(r => kind === 'splash' ? !r.splash : !r.photo)
+    // Chase ONLY the parents we're still waiting on. A parent who explicitly
+    // declined must not be nagged — their answer is on file, it just isn't yes.
+    children = rows.filter(r => (kind === 'splash' ? r.splash : r.photo) === 'awaiting')
                    .map(r => ({ name: r.name, emails: r.emails }));
-    label = kind === 'splash' ? 'missing Splash Pad consent' : 'missing Photo consent';
+    label = kind === 'splash' ? 'awaiting Splash Pad consent' : 'awaiting Photo consent';
   } else {
     const groups = emailGroupsForWeek(week);
     children = (kind === 'new' ? groups.filter(g => g.isNew) : groups);
@@ -4482,6 +4503,49 @@ window.copyEmailReportOut = copyEmailReportOut;
 
 // Group non-refunded campers per child for the selected week ('all' = every
 // week). Consent counts as given if ANY of the child's registrations has it.
+// ── Consent status (tri-state) ──
+// Each consent has TWO fields on the registration:
+//   consentXStatus : 'granted' | 'denied' | 'awaiting'   ← the real value
+//   consentX       : boolean                              ← legacy mirror
+// The legacy boolean is still WRITTEN (kept === 'granted') so any older code
+// path, export or external reader can't silently mistake a denial for a yes.
+// Reads go through consentStatusOf(), which falls back to the legacy boolean
+// when the status field is absent — so existing records need no migration:
+// legacy true → 'granted', legacy false/missing → 'awaiting'. A stored false is
+// deliberately NOT read as 'denied': it's ambiguous (unticked, never touched,
+// or a real refusal), and inventing a denial record you don't hold is worse
+// than showing it as still outstanding.
+const CONSENT_FIELDS = {
+  consentSplash: { statusField: 'consentSplashStatus', atField: 'consentSplashAt', label: 'Splash Pad' },
+  consentPhoto:  { statusField: 'consentPhotoStatus',  atField: 'consentPhotoAt',  label: 'Photo' }
+};
+function consentStatusOf(reg, base) {
+  const meta = CONSENT_FIELDS[base];
+  if (!reg || !meta) return 'awaiting';
+  const s = reg[meta.statusField];
+  if (s === 'granted' || s === 'denied' || s === 'awaiting') return s;
+  return reg[base] === true ? 'granted' : 'awaiting';
+}
+// Combine a child's week documents into one answer. Precedence is
+// denied > granted > awaiting: if the copies ever disagree, fail toward the
+// restrictive answer rather than assuming permission.
+function consentStatusForRegs(regs, base) {
+  let seenGranted = false;
+  for (const r of (regs || [])) {
+    const s = consentStatusOf(r, base);
+    if (s === 'denied') return 'denied';
+    if (s === 'granted') seenGranted = true;
+  }
+  return seenGranted ? 'granted' : 'awaiting';
+}
+const CONSENT_UI = {
+  granted:  { label: 'Granted',  badge: 'badge-consent-yes',      icon: 'ti-check' },
+  denied:   { label: 'Denied',   badge: 'badge-consent-denied',   icon: 'ti-ban' },
+  awaiting: { label: 'Awaiting', badge: 'badge-consent-awaiting', icon: 'ti-clock' }
+};
+window.consentStatusOf = consentStatusOf;
+window.consentStatusForRegs = consentStatusForRegs;
+
 function consentGroupsForWeek(weekStart) {
   const active = (window.campers || []).filter(c =>
     !c.refunded && !c.archived && (weekStart === 'all' || c.weekStart === weekStart));
@@ -4492,10 +4556,11 @@ function consentGroupsForWeek(weekStart) {
     const cur = byChild.get(k) || {
       key: k,
       name: `${(c.first || '').trim()} ${(c.last || '').trim()}`.trim(),
-      emails: [], splash: false, photo: false
+      emails: [], regs: [], splash: 'awaiting', photo: 'awaiting'
     };
-    cur.splash = cur.splash || !!c.consentSplash;
-    cur.photo  = cur.photo  || !!c.consentPhoto;
+    // Collect the registrations, then resolve status once (below) so the
+    // denied > granted > awaiting precedence is applied across all of them.
+    cur.regs.push(c);
     // Primary parent email always; secondary only if this camper has the
     // per-camper "CC secondary parent" flag turned on.
     const candidates = [c.email];
@@ -4505,6 +4570,10 @@ function consentGroupsForWeek(weekStart) {
       if (t && !cur.emails.some(x => x.toLowerCase() === t.toLowerCase())) cur.emails.push(t);
     });
     byChild.set(k, cur);
+  });
+  byChild.forEach(cur => {
+    cur.splash = consentStatusForRegs(cur.regs, 'consentSplash');
+    cur.photo  = consentStatusForRegs(cur.regs, 'consentPhoto');
   });
   return [...byChild.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -4518,17 +4587,23 @@ function renderConsentReport() {
     body.innerHTML = '<div class="report-empty">No campers found for this week.</div>';
     return;
   }
-  const missingSplash = rows.filter(r => !r.splash).length;
-  const missingPhoto  = rows.filter(r => !r.photo).length;
+  // Awaiting and denied are counted separately: they're two different to-do
+  // lists (chase the parent vs. respect the refusal and brief staff).
+  const cnt = (which, st) => rows.filter(r => r[which] === st).length;
+  const badge = (st, label) => {
+    const ui = CONSENT_UI[st] || CONSENT_UI.awaiting;
+    return `<span class="badge ${ui.badge}" title="${esc(label)}: ${ui.label}"><i class="ti ${ui.icon}" style="font-size:10px"></i> ${esc(label)}</span>`;
+  };
+  const deniedSplash = cnt('splash', 'denied'), deniedPhoto = cnt('photo', 'denied');
   body.innerHTML = `
     <div class="report-summary">${rows.length} camper${rows.length === 1 ? '' : 's'}
-      · missing Splash Pad: <strong>${missingSplash}</strong>
-      · missing Photo: <strong>${missingPhoto}</strong></div>
+      · Splash Pad awaiting: <strong>${cnt('splash', 'awaiting')}</strong>${deniedSplash ? `, denied: <strong>${deniedSplash}</strong>` : ''}
+      · Photo awaiting: <strong>${cnt('photo', 'awaiting')}</strong>${deniedPhoto ? `, denied: <strong>${deniedPhoto}</strong>` : ''}</div>
     ${rows.map(r => `
       <div class="report-row">
         <button class="report-name report-name-btn" onclick="openDetail('${jsArg(r.key)}')" title="Open camper details">${esc(r.name)}</button>
-        <span class="badge ${r.splash ? 'badge-consent-yes' : 'badge-consent-no'}"><i class="ti ${r.splash ? 'ti-check' : 'ti-x'}" style="font-size:10px"></i> Splash pad</span>
-        <span class="badge ${r.photo ? 'badge-consent-yes' : 'badge-consent-no'}"><i class="ti ${r.photo ? 'ti-check' : 'ti-x'}" style="font-size:10px"></i> Photo</span>
+        ${badge(r.splash, 'Splash pad')}
+        ${badge(r.photo, 'Photo')}
       </div>`).join('')}`;
 }
 window.renderConsentReport = renderConsentReport;
@@ -8720,8 +8795,8 @@ function renderRoster() {
     const hasAllergy = g.registrations.some(r => r.allergies);
     const hasPre  = g.registrations.some(r => r.preDays?.length);
     const hasPost = g.registrations.some(r => r.postDays?.length);
-    const okSplash = g.registrations.some(r => r.consentSplash);
-    const okPhoto  = g.registrations.some(r => r.consentPhoto);
+    const stSplash = consentStatusForRegs(g.registrations, 'consentSplash');
+    const stPhoto  = consentStatusForRegs(g.registrations, 'consentPhoto');
     const isArchived = g.registrations.every(r => r.archived);
     return `<div class="camper-card${isArchived ? ' camper-card-archived' : ''}" onclick="openDetail('${firstReg.id}')">
       ${isArchived ? '<div class="archived-ribbon"><i class="ti ti-archive"></i> ARCHIVED</div>' : ''}
@@ -8739,8 +8814,8 @@ function renderRoster() {
         ${hasPre?'<span class="badge badge-pre"><i class="ti ti-sunrise" style="font-size:10px"></i> Pre</span>':''}
         ${hasPost?'<span class="badge badge-post"><i class="ti ti-sunset" style="font-size:10px"></i> Post</span>':''}
         ${hasAllergy?'<span class="badge badge-allergy"><i class="ti ti-alert-triangle" style="font-size:10px"></i> Allergy</span>':''}
-        <span class="badge ${okSplash?'badge-consent-yes':'badge-consent-no'}"><i class="ti ${okSplash?'ti-check':'ti-x'}" style="font-size:10px"></i> Splash pad</span>
-        <span class="badge ${okPhoto?'badge-consent-yes':'badge-consent-no'}"><i class="ti ${okPhoto?'ti-check':'ti-x'}" style="font-size:10px"></i> Photo</span>
+        <span class="badge ${CONSENT_UI[stSplash].badge}" title="Splash pad: ${CONSENT_UI[stSplash].label}"><i class="ti ${CONSENT_UI[stSplash].icon}" style="font-size:10px"></i> Splash pad</span>
+        <span class="badge ${CONSENT_UI[stPhoto].badge}" title="Photo: ${CONSENT_UI[stPhoto].label}"><i class="ti ${CONSENT_UI[stPhoto].icon}" style="font-size:10px"></i> Photo</span>
       </div>
     </div>`;
   }).join('');
@@ -9583,16 +9658,8 @@ function openDetail(key) {
 
     <div class="detail-section">
       <div class="detail-section-title">Consent</div>
-      <label class="consent-row">
-        <input type="checkbox" ${regs.some(r=>r.consentSplash)?'checked':''}
-               onchange="toggleConsent('${jsArg(camperKey(c))}','consentSplash',this.checked,this)">
-        <i class="ti ti-ripple" style="color:var(--blue)"></i> Splash Pad
-      </label>
-      <label class="consent-row">
-        <input type="checkbox" ${regs.some(r=>r.consentPhoto)?'checked':''}
-               onchange="toggleConsent('${jsArg(camperKey(c))}','consentPhoto',this.checked,this)">
-        <i class="ti ti-camera" style="color:var(--purple)"></i> Photo
-      </label>
+      ${consentControlHtml(camperKey(c), 'consentSplash', consentStatusForRegs(regs, 'consentSplash'), 'ti-ripple', 'var(--blue)', 'Splash Pad')}
+      ${consentControlHtml(camperKey(c), 'consentPhoto', consentStatusForRegs(regs, 'consentPhoto'), 'ti-camera', 'var(--purple)', 'Photo')}
     </div>
 
     <div class="detail-section">
@@ -9826,31 +9893,67 @@ window.saveLearningNotes = saveLearningNotes;
 // toggle writes the flag to EVERY registration doc for that camper. Reads use
 // .some() so partially-written legacy data still shows as consented if any
 // doc has the flag.
-async function toggleConsent(key, field, checked, cbEl) {
-  // Consent (splash pad / photo) is toggleable by both admins and employees —
-  // it's day-to-day operational info that front-desk staff need to update.
-  if (field !== 'consentSplash' && field !== 'consentPhoto') return;
+// Build the three-way consent control for the detail slide-over.
+function consentControlHtml(key, base, status, icon, colour, label) {
+  const cur = CONSENT_UI[status] ? status : 'awaiting';
+  const btn = (val) => {
+    const ui = CONSENT_UI[val];
+    return '<button type="button" class="consent-opt consent-opt-' + val +
+      (val === cur ? ' active' : '') +
+      '" onclick="setConsentStatus(\'' + jsArg(key) + '\',\'' + base + '\',\'' + val + '\',this)">' +
+      '<i class="ti ' + ui.icon + '"></i> ' + ui.label + '</button>';
+  };
+  return '<div class="consent-block" data-consent="' + base + '">'
+    + '<div class="consent-block-label"><i class="ti ' + icon + '" style="color:' + colour + '"></i> ' + esc(label) + '</div>'
+    + '<div class="consent-opts">' + btn('awaiting') + btn('granted') + btn('denied') + '</div>'
+    + '</div>';
+}
+window.consentControlHtml = consentControlHtml;
+
+// Set a consent to granted / denied / awaiting. Editable by admins AND
+// employees — it's day-to-day operational info the front desk needs to update.
+// Writes the tri-state status to every one of the child's registrations, and
+// keeps the legacy boolean in sync (true only when granted) so nothing that
+// still reads the old field can mistake a denial for permission.
+async function setConsentStatus(key, base, status, btnEl) {
+  if (!CONSENT_FIELDS[base]) return;
+  if (status !== 'granted' && status !== 'denied' && status !== 'awaiting') return;
+  const meta = CONSENT_FIELDS[base];
   const regs = window.campers.filter(c => camperKey(c) === key);
   if (!regs.length) { showToast('Camper not found', 'error'); return; }
-  // Optimistically mirror in memory so the roster cards re-render correctly
-  // right away (the Firestore snapshot will confirm shortly after).
-  const prev = regs.map(r => r[field]);
-  regs.forEach(r => { r[field] = !!checked; });
+
+  // Optimistic in-memory update so the roster cards and the control re-render
+  // immediately (the Firestore snapshot confirms shortly after).
+  const prev = regs.map(r => ({ st: r[meta.statusField], legacy: r[base], at: r[meta.atField] }));
+  const stamp = new Date().toISOString();
+  regs.forEach(r => { r[meta.statusField] = status; r[base] = (status === 'granted'); r[meta.atField] = stamp; });
+  // Repaint just this control's buttons without rebuilding the whole panel.
+  const block = btnEl && btnEl.closest ? btnEl.closest('.consent-block') : null;
+  if (block) block.querySelectorAll('.consent-opt').forEach(b =>
+    b.classList.toggle('active', b === btnEl));
   if (typeof renderRoster === 'function') { try { renderRoster(); } catch (e) {} }
+
   try {
     await Promise.all(regs.map(r =>
-      window._updateDoc(window._doc(window._db, 'campers', r.id), { [field]: !!checked })
+      window._updateDoc(window._doc(window._db, 'campers', r.id), {
+        [meta.statusField]: status,
+        [base]: (status === 'granted'),
+        [meta.atField]: stamp
+      })
     ));
-    showToast('Consent updated');
+    showToast(meta.label + ' consent: ' + CONSENT_UI[status].label.toLowerCase());
+    if (typeof renderConsentReport === 'function') { try { renderConsentReport(); } catch (e) {} }
   } catch (e) {
-    // Revert memory + checkbox on failure
-    regs.forEach((r, i) => { r[field] = prev[i]; });
-    if (cbEl) cbEl.checked = !checked;
+    // Revert memory + repaint on failure
+    regs.forEach((r, i) => { r[meta.statusField] = prev[i].st; r[base] = prev[i].legacy; r[meta.atField] = prev[i].at; });
+    const restored = consentStatusForRegs(regs, base);
+    if (block) block.querySelectorAll('.consent-opt').forEach(b =>
+      b.classList.toggle('active', b.classList.contains('consent-opt-' + restored)));
     if (typeof renderRoster === 'function') { try { renderRoster(); } catch (e2) {} }
     showToast('Could not update: ' + (e.code || e.message || 'error'), 'error');
   }
 }
-window.toggleConsent = toggleConsent;
+window.setConsentStatus = setConsentStatus;
 
 // ── Per-camper "CC secondary parent on emails" flag ──
 // Admin-only. When on, this camper's secondary parent email (email2) is
