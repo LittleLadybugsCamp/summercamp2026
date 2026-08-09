@@ -4571,9 +4571,24 @@ function consentGroupsForWeek(weekStart) {
     });
     byChild.set(k, cur);
   });
-  byChild.forEach(cur => {
-    cur.splash = consentStatusForRegs(cur.regs, 'consentSplash');
-    cur.photo  = consentStatusForRegs(cur.regs, 'consentPhoto');
+  // Consent is a PER-CHILD fact, not a per-week one: a parent grants photo
+  // permission for the child, not for one week. So the week filter decides
+  // WHO is listed, but the status is resolved across ALL of that child's
+  // registrations — matching what the camper detail card shows. Resolving it
+  // from the week-filtered records only made a consent recorded on one week
+  // (or a week added later, which starts without the fields) read as
+  // "Awaiting" here while the card correctly said "Granted".
+  const allByKey = new Map();
+  (window.campers || []).forEach(c => {
+    const k = camperKey(c);
+    if (!k || k === '|') return;
+    if (!allByKey.has(k)) allByKey.set(k, []);
+    allByKey.get(k).push(c);
+  });
+  byChild.forEach((cur, k) => {
+    const all = allByKey.get(k) || cur.regs;
+    cur.splash = consentStatusForRegs(all, 'consentSplash');
+    cur.photo  = consentStatusForRegs(all, 'consentPhoto');
   });
   return [...byChild.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -10436,7 +10451,10 @@ async function saveCamper() {
         showToast('Already registered for that week.', 'error'); return;
       }
       // Copy personal fields from the existing camper, set this week's schedule
-      const personalFields = ['first','last','age','dob','parent','phone','email','address','allergies','medical','healthCard','notes','learningNotes','parent2','phone2','email2','address2','ec1Name','ec1Phone','ec1Rel','ec2Name','ec2Phone','ec2Rel','pickup'];
+      // Consent fields are included so a newly added week inherits the child's
+      // existing permissions instead of starting blank (which used to make the
+      // consent report disagree with the camper card).
+      const personalFields = ['first','last','age','dob','parent','phone','email','address','allergies','medical','healthCard','notes','learningNotes','parent2','phone2','email2','address2','ec1Name','ec1Phone','ec1Rel','ec2Name','ec2Phone','ec2Rel','pickup','consentSplash','consentPhoto','consentSplashStatus','consentPhotoStatus','consentSplashAt','consentPhotoAt'];
       const newReg = {};
       personalFields.forEach(f => { if (editing[f] !== undefined && editing[f] !== null) newReg[f] = editing[f]; });
       newReg.type = cType;
