@@ -9449,7 +9449,13 @@ function doPrint() {
     .filter(c => c.weekStart === weeklyWk && !c.refunded && !c.archived && (c.campDays || []).includes(dayIdx)))
     .sort((a,b) => ((a.last||'')+(a.first||'')).localeCompare((b.last||'')+(b.first||'')));
 
-  const html = buildSignInSheetHtml(title, subtitle, dateLine, campers.map(c => (c.first || '') + ' ' + (c.last || '')));
+  // Pre/post care is recorded per day, so check THIS day's index rather than
+  // whether the camper has care at any point in the week.
+  const html = buildSignInSheetHtml(title, subtitle, dateLine, campers.map(c => ({
+    name: (c.first || '') + ' ' + (c.last || ''),
+    pre:  Array.isArray(c.preDays)  && c.preDays.includes(dayIdx),
+    post: Array.isArray(c.postDays) && c.postDays.includes(dayIdx)
+  })));
 
   closePrintModal();
 
@@ -9506,9 +9512,23 @@ function buildSignInSheetHtml(title, subtitle, dateLine, names) {
   const last = pages[pages.length - 1];
   while (last.length < lastCap) last.push(null); // null = blank write-in row
 
-  const rowHtml = (name) =>
-    '<tr><td class="name-cell">' + (name === null ? '' : esc(name)) +
-    '</td><td class="time-cell"></td><td class="time-cell"></td></tr>';
+  // Each entry is either null (blank write-in row) or { name, pre, post }.
+  // Plain strings are still accepted so any other caller keeps working.
+  const rowHtml = (entry) => {
+    let inner = '';
+    if (entry !== null && entry !== undefined) {
+      const e = (typeof entry === 'string') ? { name: entry } : entry;
+      inner = '<span class="nm">' + esc(e.name || '') + '</span>';
+      const tags = [];
+      if (e.pre)  tags.push('PRE-CARE');
+      if (e.post) tags.push('POST-CARE');
+      // Only campers with care get a second line, so ordinary rows keep their
+      // single-line height and the page still fits the same number of rows.
+      if (tags.length) inner += '<span class="care">' + tags.join(' \u00b7 ') + '</span>';
+    }
+    return '<tr><td class="name-cell">' + inner +
+      '</td><td class="time-cell"></td><td class="time-cell"></td></tr>';
+  };
 
   const thead = '<thead><tr><th>Name</th><th>Sign in time</th><th>Sign out time</th></tr></thead>';
   const countLabel = count + ' camper' + (count === 1 ? '' : 's');
@@ -9545,7 +9565,11 @@ function buildSignInSheetHtml(title, subtitle, dateLine, names) {
       '.list thead th { font-size: 9.5pt; font-weight: 600; color: #555; letter-spacing: 0.5pt; text-transform: uppercase; text-align: left; padding: 5pt 8pt; border-bottom: 1pt solid #555; border-right: 0.5pt solid #bbb; font-family: -apple-system, system-ui, sans-serif; }' +
       '.list tbody td { padding: 0 8pt; height: 30pt; vertical-align: middle; border-bottom: 0.5pt solid #bbb; border-right: 0.5pt solid #bbb; }' +
       '.list tbody td:last-child, .list thead th:last-child { border-right: none; }' +
-      '.list .name-cell { font-size: 13pt; font-family: -apple-system, system-ui, "Helvetica Neue", sans-serif; }' +
+      '.list .name-cell { font-size: 12.5pt; font-family: -apple-system, system-ui, "Helvetica Neue", sans-serif; line-height: 1.15; }' +
+      '.list .name-cell .nm { display: block; }' +
+      // Small, letter-spaced caps under the name — readable at a glance on a
+      // clipboard without stealing a whole row.
+      '.list .name-cell .care { display: block; font-size: 7.5pt; font-weight: 700; letter-spacing: 0.6pt; color: #555; margin-top: 1pt; }' +
       '.list .time-cell { width: 110pt; }' +
       '.list tr { break-inside: avoid; page-break-inside: avoid; }' +
       '.sheet-footer { position: absolute; left: 0.6in; right: 0.6in; bottom: 0.45in; display: flex; justify-content: space-between; font-size: 10pt; color: #777; font-family: -apple-system, system-ui, sans-serif; border-top: 0.5pt solid #ccc; padding-top: 6pt; }' +
