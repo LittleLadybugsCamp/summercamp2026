@@ -4517,7 +4517,8 @@ window.copyEmailReportOut = copyEmailReportOut;
 // than showing it as still outstanding.
 const CONSENT_FIELDS = {
   consentSplash: { statusField: 'consentSplashStatus', atField: 'consentSplashAt', label: 'Splash Pad' },
-  consentPhoto:  { statusField: 'consentPhotoStatus',  atField: 'consentPhotoAt',  label: 'Photo' }
+  consentPhoto:  { statusField: 'consentPhotoStatus',  atField: 'consentPhotoAt',  label: 'Photo' },
+  consentFacePaint: { statusField: 'consentFacePaintStatus', atField: 'consentFacePaintAt', label: 'Face Painting' }
 };
 function consentStatusOf(reg, base) {
   const meta = CONSENT_FIELDS[base];
@@ -4589,6 +4590,7 @@ function consentGroupsForWeek(weekStart) {
     const all = allByKey.get(k) || cur.regs;
     cur.splash = consentStatusForRegs(all, 'consentSplash');
     cur.photo  = consentStatusForRegs(all, 'consentPhoto');
+    cur.facePaint = consentStatusForRegs(all, 'consentFacePaint');
   });
   return [...byChild.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -4609,16 +4611,18 @@ function renderConsentReport() {
     const ui = CONSENT_UI[st] || CONSENT_UI.awaiting;
     return `<span class="badge ${ui.badge}" title="${esc(label)}: ${ui.label}"><i class="ti ${ui.icon}" style="font-size:10px"></i> ${esc(label)}</span>`;
   };
-  const deniedSplash = cnt('splash', 'denied'), deniedPhoto = cnt('photo', 'denied');
+  const deniedSplash = cnt('splash', 'denied'), deniedPhoto = cnt('photo', 'denied'), deniedFacePaint = cnt('facePaint', 'denied');
   body.innerHTML = `
     <div class="report-summary">${rows.length} camper${rows.length === 1 ? '' : 's'}
       · Splash Pad awaiting: <strong>${cnt('splash', 'awaiting')}</strong>${deniedSplash ? `, denied: <strong>${deniedSplash}</strong>` : ''}
-      · Photo awaiting: <strong>${cnt('photo', 'awaiting')}</strong>${deniedPhoto ? `, denied: <strong>${deniedPhoto}</strong>` : ''}</div>
+      · Photo awaiting: <strong>${cnt('photo', 'awaiting')}</strong>${deniedPhoto ? `, denied: <strong>${deniedPhoto}</strong>` : ''}
+      · Face Painting awaiting: <strong>${cnt('facePaint', 'awaiting')}</strong>${deniedFacePaint ? `, denied: <strong>${deniedFacePaint}</strong>` : ''}</div>
     ${rows.map(r => `
       <div class="report-row">
         <button class="report-name report-name-btn" onclick="openDetail('${jsArg(r.key)}')" title="Open camper details">${esc(r.name)}</button>
         ${badge(r.splash, 'Splash pad')}
         ${badge(r.photo, 'Photo')}
+        ${badge(r.facePaint, 'Face paint')}
       </div>`).join('')}`;
 }
 window.renderConsentReport = renderConsentReport;
@@ -8812,6 +8816,7 @@ function renderRoster() {
     const hasPost = g.registrations.some(r => r.postDays?.length);
     const stSplash = consentStatusForRegs(g.registrations, 'consentSplash');
     const stPhoto  = consentStatusForRegs(g.registrations, 'consentPhoto');
+    const stFacePaint = consentStatusForRegs(g.registrations, 'consentFacePaint');
     const isArchived = g.registrations.every(r => r.archived);
     return `<div class="camper-card${isArchived ? ' camper-card-archived' : ''}" onclick="openDetail('${firstReg.id}')">
       ${isArchived ? '<div class="archived-ribbon"><i class="ti ti-archive"></i> ARCHIVED</div>' : ''}
@@ -8831,6 +8836,7 @@ function renderRoster() {
         ${hasAllergy?'<span class="badge badge-allergy"><i class="ti ti-alert-triangle" style="font-size:10px"></i> Allergy</span>':''}
         <span class="badge ${CONSENT_UI[stSplash].badge}" title="Splash pad: ${CONSENT_UI[stSplash].label}"><i class="ti ${CONSENT_UI[stSplash].icon}" style="font-size:10px"></i> Splash pad</span>
         <span class="badge ${CONSENT_UI[stPhoto].badge}" title="Photo: ${CONSENT_UI[stPhoto].label}"><i class="ti ${CONSENT_UI[stPhoto].icon}" style="font-size:10px"></i> Photo</span>
+        <span class="badge ${CONSENT_UI[stFacePaint].badge}" title="Face painting: ${CONSENT_UI[stFacePaint].label}"><i class="ti ${CONSENT_UI[stFacePaint].icon}" style="font-size:10px"></i> Face paint</span>
       </div>
     </div>`;
   }).join('');
@@ -9699,6 +9705,7 @@ function openDetail(key) {
       <div class="detail-section-title">Consent</div>
       ${consentControlHtml(camperKey(c), 'consentSplash', consentStatusForRegs(regs, 'consentSplash'), 'ti-ripple', 'var(--blue)', 'Splash Pad')}
       ${consentControlHtml(camperKey(c), 'consentPhoto', consentStatusForRegs(regs, 'consentPhoto'), 'ti-camera', 'var(--purple)', 'Photo')}
+      ${consentControlHtml(camperKey(c), 'consentFacePaint', consentStatusForRegs(regs, 'consentFacePaint'), 'ti-brush', 'var(--coral)', 'Face Painting')}
     </div>
 
     <div class="detail-section">
@@ -10478,7 +10485,7 @@ async function saveCamper() {
       // Consent fields are included so a newly added week inherits the child's
       // existing permissions instead of starting blank (which used to make the
       // consent report disagree with the camper card).
-      const personalFields = ['first','last','age','dob','parent','phone','email','address','allergies','medical','healthCard','notes','learningNotes','parent2','phone2','email2','address2','ec1Name','ec1Phone','ec1Rel','ec2Name','ec2Phone','ec2Rel','pickup','consentSplash','consentPhoto','consentSplashStatus','consentPhotoStatus','consentSplashAt','consentPhotoAt'];
+      const personalFields = ['first','last','age','dob','parent','phone','email','address','allergies','medical','healthCard','notes','learningNotes','parent2','phone2','email2','address2','ec1Name','ec1Phone','ec1Rel','ec2Name','ec2Phone','ec2Rel','pickup','consentSplash','consentPhoto','consentSplashStatus','consentPhotoStatus','consentSplashAt','consentPhotoAt','consentFacePaint','consentFacePaintStatus','consentFacePaintAt'];
       const newReg = {};
       personalFields.forEach(f => { if (editing[f] !== undefined && editing[f] !== null) newReg[f] = editing[f]; });
       newReg.type = cType;
